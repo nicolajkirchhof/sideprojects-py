@@ -4,442 +4,482 @@ PRODID:-//epresto-orange.de//Abfuhrkalender Hildesheim//
 CALSCALE:GEORGIAN
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240409T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240409T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
+UID:GtahKkce2HrJ15@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240213T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240213T060000Z
+SUMMARY:Abfuhr Gelbe Tonne
+UID:GtahKkce2HrJ2@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240604T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240604T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
+UID:GtahKkce2HrJ26@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240924T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240924T060000Z
+SUMMARY:Abfuhr Gelbe Tonne
+UID:GtahKkce2HrJ50@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Altpapier (verschoben) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230414T070000Z
+DTEND:20240510T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230414T060000Z
+DTSTART:20240510T060000Z
 SUMMARY:Abfuhr Altpapier (verschoben)
-UID:sw2OX7QMGndJ11@zah-hildesheim.de
+UID:GtahKkce2HrJ22@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230815T070000Z
+DTEND:20240910T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230815T060000Z
+DTSTART:20240910T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ37@zah-hildesheim.de
+UID:GtahKkce2HrJ48@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231205T070000Z
+DTEND:20241231T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231205T060000Z
+DTSTART:20241231T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ61@zah-hildesheim.de
+UID:GtahKkce2HrJ72@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230606T070000Z
+DTEND:20240702T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230606T060000Z
+DTSTART:20240702T060000Z
 SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ22@zah-hildesheim.de
+UID:GtahKkce2HrJ33@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230801T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230801T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ33@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Gelbe Tonne (verschoben) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230412T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230412T060000Z
-SUMMARY:Abfuhr Gelbe Tonne (verschoben)
-UID:sw2OX7QMGndJ9@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231123T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231123T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ59@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230316T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230316T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ5@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231107T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231107T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ55@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230509T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230509T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ16@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230829T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230829T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ40@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230228T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230228T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ1@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231024T070000Z
+DTEND:20240827T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231024T060000Z
+DTSTART:20240827T060000Z
 SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ51@zah-hildesheim.de
+UID:GtahKkce2HrJ44@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230704T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230704T060000Z
-SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ27@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230608T070000Z
+DTEND:20240411T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230608T060000Z
+DTSTART:20240411T060000Z
 SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ23@zah-hildesheim.de
+UID:GtahKkce2HrJ16@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240801T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240801T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ40@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231010T070000Z
+DTEND:20241203T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231010T060000Z
+DTSTART:20241203T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ49@zah-hildesheim.de
+UID:GtahKkce2HrJ66@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240213T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240213T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
+UID:GtahKkce2HrJ3@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230801T070000Z
+DTEND:20240604T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230801T060000Z
+DTSTART:20240604T060000Z
 SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ34@zah-hildesheim.de
+UID:GtahKkce2HrJ27@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230926T070000Z
+DTEND:20240924T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230926T060000Z
+DTSTART:20240924T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ45@zah-hildesheim.de
+UID:GtahKkce2HrJ51@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr (verschoben) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240325T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240325T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr (verschoben)
+UID:GtahKkce2HrJ12@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240730T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240730T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
+UID:GtahKkce2HrJ38@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20241119T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20241119T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
+UID:GtahKkce2HrJ62@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230511T070000Z
+DTEND:20240704T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230511T060000Z
+DTSTART:20240704T060000Z
 SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ17@zah-hildesheim.de
+UID:GtahKkce2HrJ34@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230831T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230831T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ41@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230704T070000Z
+DTEND:20240827T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230704T060000Z
+DTSTART:20240827T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ28@zah-hildesheim.de
+UID:GtahKkce2HrJ45@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231024T070000Z
+DTEND:20240312T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231024T060000Z
+DTSTART:20240312T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ52@zah-hildesheim.de
+UID:GtahKkce2HrJ8@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230425T070000Z
+DTEND:20240618T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230425T060000Z
+DTSTART:20240618T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ13@zah-hildesheim.de
+UID:GtahKkce2HrJ30@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230829T070000Z
+DTEND:20241022T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230829T060000Z
+DTSTART:20241022T060000Z
 SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ39@zah-hildesheim.de
+UID:GtahKkce2HrJ56@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240215T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240215T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ4@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240606T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240606T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ28@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240926T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240926T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ52@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240730T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240730T060000Z
+SUMMARY:Abfuhr Gelbe Tonne
+UID:GtahKkce2HrJ39@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20241119T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20241119T060000Z
+SUMMARY:Abfuhr Gelbe Tonne
+UID:GtahKkce2HrJ63@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr (verschoben) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240522T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240522T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr (verschoben)
+UID:GtahKkce2HrJ24@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240507T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240507T060000Z
+SUMMARY:Abfuhr Gelbe Tonne
+UID:GtahKkce2HrJ20@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240829T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240829T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ46@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20241219T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20241219T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ70@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240312T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240312T060000Z
+SUMMARY:Abfuhr Gelbe Tonne
+UID:GtahKkce2HrJ9@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231219T070000Z
+DTEND:20241022T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231219T060000Z
+DTSTART:20241022T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ63@zah-hildesheim.de
+UID:GtahKkce2HrJ57@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230803T070000Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240423T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230803T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ35@zah-hildesheim.de
+DTSTART:20240423T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
+UID:GtahKkce2HrJ18@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240813T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240813T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
+UID:GtahKkce2HrJ42@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230926T070000Z
+DTEND:20241217T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230926T060000Z
+DTSTART:20241217T060000Z
 SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ46@zah-hildesheim.de
+UID:GtahKkce2HrJ68@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230718T070000Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240409T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230718T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ31@zah-hildesheim.de
+DTSTART:20240409T060000Z
+SUMMARY:Abfuhr Gelbe Tonne
+UID:GtahKkce2HrJ14@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230328T070000Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20241121T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230328T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ7@zah-hildesheim.de
+DTSTART:20241121T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ64@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240314T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240314T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ10@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20240716T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20240716T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
+UID:GtahKkce2HrJ36@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20241105T070000Z
+LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTSTART:20241105T060000Z
+SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
+UID:GtahKkce2HrJ60@zah-hildesheim.de
+END:VEVENT
+BEGIN:VEVENT
+CATEGORIES:Abfuhrkalender
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231121T070000Z
+DTEND:20240507T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231121T060000Z
+DTSTART:20240507T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ57@zah-hildesheim.de
+UID:GtahKkce2HrJ21@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230706T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230706T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ29@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231026T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231026T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ53@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230314T070000Z
+DTEND:20240702T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230314T060000Z
+DTSTART:20240702T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ3@zah-hildesheim.de
+UID:GtahKkce2HrJ32@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231219T070000Z
+DTSTAMP:20240205T002406Z
+DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
+DTEND:20241024T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231219T060000Z
-SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ64@zah-hildesheim.de
+DTSTART:20241024T060000Z
+SUMMARY:Abfuhr Altpapier
+UID:GtahKkce2HrJ58@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230620T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230620T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ25@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) (verschoben) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230412T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230412T060000Z
-SUMMARY:Abfuhr Restmüll (14tägige Abfuhr) (verschoben)
-UID:sw2OX7QMGndJ10@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige Abfuhr) in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230606T070000Z
+DTEND:20241217T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230606T060000Z
+DTSTART:20241217T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige Abfuhr)
-UID:sw2OX7QMGndJ21@zah-hildesheim.de
+UID:GtahKkce2HrJ69@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230928T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230928T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ47@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231121T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231121T060000Z
-SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ58@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230523T070000Z
+DTEND:20240227T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230523T060000Z
+DTSTART:20240227T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ19@zah-hildesheim.de
+UID:GtahKkce2HrJ6@zah-hildesheim.de
 END:VEVENT
 BEGIN:VEVENT
 CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
+DTSTAMP:20240205T002406Z
 DESCRIPTION:Heute Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230912T070000Z
+DTEND:20241008T070000Z
 LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230912T060000Z
+DTSTART:20241008T060000Z
 SUMMARY:Abfuhr Restmüll (14tägige und vierwöchentliche Abfuhr
-UID:sw2OX7QMGndJ43@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230314T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230314T060000Z
-SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ4@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Gelbe Tonne in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20230509T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20230509T060000Z
-SUMMARY:Abfuhr Gelbe Tonne
-UID:sw2OX7QMGndJ15@zah-hildesheim.de
-END:VEVENT
-BEGIN:VEVENT
-CATEGORIES:Abfuhrkalender
-DTSTAMP:20230227T110746Z
-DESCRIPTION:Heute Abfuhr Altpapier in Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTEND:20231221T070000Z
-LOCATION:Sarstedt\, Sarstedt\, Graf-Zeppelin-Str.
-DTSTART:20231221T060000Z
-SUMMARY:Abfuhr Altpapier
-UID:sw2OX7QMGndJ65@zah-hildesheim.de
+UID:GtahKkce2HrJ54@zah-hildesheim.de
 END:VEVENT
 END:VCALENDAR

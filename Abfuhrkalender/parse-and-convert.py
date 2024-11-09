@@ -6,7 +6,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 #%%
-with open('./Abfuhrkalender_Hildesheim.ics', encoding='utf-8') as f:
+with open('Abfuhrkalender/Abfuhrkalender_Hildesheim.ics', encoding='utf-8') as f:
   c = ics.Calendar(f.read())
 #%%
 events_no_biomuell = {e for e in c.events if e.name.find('Bio') < 0}
