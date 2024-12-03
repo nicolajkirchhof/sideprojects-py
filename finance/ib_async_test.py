@@ -29,29 +29,31 @@ ib.reqMarketDataType(4)  # Use free, delayed, frozen data
 contract = Stock('TSLA', 'SMART', 'USD')
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY', 'OPTION_IMPLIED_VOLATILITY']
 types_of_data = ['TRADES', 'BID_ASK', 'HISTORICAL_VOLATILITY', 'OPTION_IMPLIED_VOLATILITY']
-rth=True
+rth=False
 data = {}
+dfs = {}
 for typ in types_of_data:
-  data[typ] = ib.reqHistoricalData(contract, endDateTime='', durationStr='10 D',
+  data[typ] = ib.reqHistoricalData(contract, endDateTime='', durationStr='1 Y',
   barSizeSetting='1 day', whatToShow=typ, useRTH=rth)
+  dfs[typ] = util.df(data[typ])
   print(data[typ])
-#%%
-dfs = []
-for typ in types_of_data:
-  df = util.df(data[typ])
-  df['name'] = typ
-  dfs.append(df)
-
-all_df = pd.concat(dfs)
 
 #%%
-# convert to pandas dataframe (pandas needs to be installed):
-df = util.df(bars)
-df['date'] = pd.to_datetime(df['date'])
+df_contract = dfs['TRADES']
+# BID_ASK	Time average bid	Max Ask	Min Bid	Time average ask
+df_contract['ta_bid'] = dfs['BID_ASK'].open
+df_contract['ta_ask'] = dfs['BID_ASK'].close
+df_contract['max_ask'] = dfs['BID_ASK'].high
+df_contract['min_bid'] = dfs['BID_ASK'].low
+df_contract['historical_volatility']= dfs['HISTORICAL_VOLATILITY'].average
+df_contract['option_implied_volatility'] =   dfs['OPTION_IMPLIED_VOLATILITY'].average
 
+df_contract['date'] = pd.to_datetime(df_contract['date'])
+
+df_contract.to_pickle(contract.symbol + '.pkl')
 #%%
 cerebro = bt.Cerebro(preload=True)
-data = bt.feeds.PandasData(dataname=df, datetime='date')
+data = bt.feeds.PandasData(dataname=df_contract, datetime='date')
 cerebro.adddata(data)
 
 # Add the printer as a strategy
