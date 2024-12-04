@@ -26,10 +26,11 @@ ib.connect('127.0.0.1', api_paper_port, clientId=10, readonly=True)
 ib.reqMarketDataType(4)  # Use free, delayed, frozen data
 
 #%%
-contract = Stock('TSLA', 'SMART', 'USD')
+stock_name = 'TSLA'
+contract = Stock(stock_name, 'SMART', 'USD')
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY', 'OPTION_IMPLIED_VOLATILITY']
 types_of_data = ['TRADES', 'BID_ASK', 'HISTORICAL_VOLATILITY', 'OPTION_IMPLIED_VOLATILITY']
-rth=False
+rth=True
 data = {}
 dfs = {}
 for typ in types_of_data:
@@ -50,7 +51,9 @@ df_contract['option_implied_volatility'] =   dfs['OPTION_IMPLIED_VOLATILITY'].av
 
 df_contract['date'] = pd.to_datetime(df_contract['date'])
 
-df_contract.to_pickle(contract.symbol + '.pkl')
+df_contract.to_pickle(stock_name + '.pkl')
+#%%
+df_contract = pd.read_pickle(stock_name + '.pkl')
 #%%
 cerebro = bt.Cerebro(preload=True)
 data = bt.feeds.PandasData(dataname=df_contract, datetime='date')
@@ -63,4 +66,5 @@ cerebro.addstrategy(EmaStrategy)
 
 cerebro.run()
 
+plt.xticks(rotation=45)
 cerebro.plot(style='bar', iplot=False)

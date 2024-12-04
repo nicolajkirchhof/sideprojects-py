@@ -1,4 +1,8 @@
+import datetime
+
 import backtrader as bt
+from aiohttp.payload import Order
+
 
 # Create a Stratey
 class EmaStrategy(bt.Strategy):
@@ -6,6 +10,7 @@ class EmaStrategy(bt.Strategy):
     print('init 5/9 EMA')
     self.sma_5 = bt.ind.EMA(period=5)
     self.sma_9 = bt.ind.EMA(period=9)
+    self.sma_20 = bt.ind.EMA(period=20)
 
   def log(self, txt, ts=None):
     ''' Logging function for this strategy'''
@@ -14,25 +19,26 @@ class EmaStrategy(bt.Strategy):
 
   def next(self):
     # Current close
-    self.log(f'Open: {self.data.open[-1]:.2f}, {self.data.open[0]:.2f}\
+    self.log(f'Open: {self.data.open[0]:.2f},\
     # Close: {self.data.close[0]:.2f}')
 
     # if negative candle and open position get out if min is below SMA[-1]
-    negative_stop_candle = self.data.close[0] < self.data.open[0] and self.data.close[0] < self.sma_5[-1]
-    if self.position and negative_stop_candle:
-      self.log(f'SELL @{self.data.close[0]}')
-      self.sell()
+    # negative_stop_candle = self.data.close[0] < self.data.open[0] and self.data.close[0] < self.sma_5[-1]
+    # if self.position and negative_stop_candle:
+    #   self.log(f'Close @{self.data.close[0]}')
+    #   self.close()
 
-    positive_entry_candle = self.data.close[0] > self.sma_5[0]
+    positive_entry_candle = self.data.close[0] > self.data.open[0] and self.data.close[0] > self.sma_5[0] > self.sma_20[0]
+    new_position = False
     if not self.position and positive_entry_candle:
-      self.log(f'BUY @{self.data.close[0]}')
-      self.buy()
+      self.log(f'BUY @{self.data.close[0]} STOP @{self.sma_5[0]}')
+      self.buy(exectype=bt.Order.Close)
+      new_position = True
 
-    close_below_ema5 = self.data.close[0] < self.sma_5[0]
-    # if self
-    # if self.close[0] < self.close[-1]:
-    #   # current close less than previous close, think about buying
-    #   if self.close[-1] < self.close[-2]:
-    #     # previous close less than previous close, so buy
-    #     self. log('BUY CREATE, .2f' self.close [0])
-    #     self.buy()
+
+    if self.position or new_position:
+      self.sell( exectype=bt.Order.Stop, price=self.sma_5[0], valid=self.data.datetime.date()+datetime.timedelta(days=1))
+
+
+
+
