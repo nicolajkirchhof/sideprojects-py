@@ -3,16 +3,18 @@ import datetime
 import backtrader as bt
 from aiohttp.payload import Order
 
+# Strategy:
+# Get in after you have seen at least two red candles with declining VWAP
+# Get in after positive gap > 2%
+# Stop-Loss is 2%
+# Get out if VWAP is not positive anymore
+#
+
 
 # Create a Stratey
 class EmaStrategy(bt.Strategy):
   def __init__(self):
-    print('init 5/9 EMA')
-    self.sma_5 = bt.ind.EMA(period=5)
-    self.sma_9 = bt.ind.EMA(period=9)
-    self.sma_20 = bt.ind.EMA(period=20)
-    bt.ind.SMA(self.data.average, period=1, subplot=False)
-
+    print('init')
 
   def log(self, txt, ts=None):
     ''' Logging function for this strategy'''
