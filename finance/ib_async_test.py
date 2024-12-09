@@ -6,10 +6,15 @@ import backtrader as bt
 
 
 from finance.ema_strategy import EmaStrategy
+from finance.in_out_strategy import InOutStrategy
 import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.dates as mdates
+
+from finance.utils import percentage_change
+
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
@@ -53,18 +58,58 @@ df_contract['date'] = pd.to_datetime(df_contract['date'])
 
 df_contract.to_pickle(stock_name + '.pkl')
 #%%
+stock_name = 'TSLA'
 df_contract = pd.read_pickle(stock_name + '.pkl')
+
+#%%
+class IbkrPandasData(bt.feeds.PandasData):
+  lines = ('average',)
+  params = (
+    ('datetime', 'timestamp'),
+    ('open', -1),
+    ('high', -1),
+    ('low', -1),
+    ('close', -1),
+    ('volume', -1),
+    ('openinterest',None),
+    ('average', -1),
+    ('barCount', -1),
+    ('ta_bid', -1),
+    ('ta_ask', -1),
+    ('max_ask', -1),
+    ('min_bid', -1),
+    ('historical_volatility', -1),
+    ('option_implied_volatility', -1),
+  )
+
+#%%
+df_pct_vwap = pd.concat([df_contract['average'], df_contract['average'].shift(-1)], axis=1).dropna().apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
+df_pct_vwap.plot()
+#%%
+df_vwap_open_abs = pd.concat([df_contract['average'], df_contract[['open', 'date']].shift(-1)], axis=1).dropna()
+df_vwap_open_abs['diff'] = df_vwap_open_abs['average'] - df_vwap_open_abs['open']
+df_vwap_open_abs['pct'] = df_vwap_open_abs.apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
+# ax = df_vwap_open_abs.plot(x='date', y=['diff', 'pct'], kind='scatter')
+ax = df_vwap_open_abs.plot(x='date', y='pct', kind='scatter')
+
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+plt.show()
+
+#%%
+df_vwap_open_pct = df_vwap_open_abs.apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
+df_vwap_open_pct = plot(x='date', y='diff', kind='scatter')
+plt.show()
 #%%
 cerebro = bt.Cerebro(preload=True)
-data = bt.feeds.PandasData(dataname=df_contract, datetime='date')
+data = IbkrPandasData(dataname=df_contract, datetime='date')
 cerebro.adddata(data)
 
 # Add the printer as a strategy
-cerebro.addstrategy(EmaStrategy)
+cerebro.addstrategy(InOutStrategy)
+# cerebro.addstrategy(EmaStrategy)
 # cerebro.addstrategy(MyStrategy)
 # cerebro.addstrategy(bt.Strategy)
 
 cerebro.run()
 
-plt.xticks(rotation=45)
 cerebro.plot(style='bar', iplot=False)
