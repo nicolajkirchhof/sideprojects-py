@@ -23,10 +23,7 @@ def subtract_percentage(number, percentage):
     Returns:
         The result of subtracting the percentage from the number.
     """
-
-  if isinstance(percentage, int):  # Handle integer percentages
-    percentage = percentage / 100.0
-
-  amount_to_subtract = number * percentage
+  pct = percentage / 100.0
+  amount_to_subtract = number * pct
   result = number - amount_to_subtract
   return result

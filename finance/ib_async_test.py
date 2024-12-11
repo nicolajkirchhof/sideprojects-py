@@ -1,5 +1,7 @@
 #%%
 # from __future__ import (absolute_import, division, print_function, unicode_literals)
+import numpy as np
+import scipy
 from ib_async import ib, util, IB, Forex, Stock
 # util.startLoop()  # uncomment this line when in a notebook
 import backtrader as bt
@@ -94,6 +96,33 @@ ax = df_vwap_open_abs.plot(x='date', y='pct', kind='scatter')
 
 ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
 plt.show()
+#%% match gaussian
+# df_vwap_open_abs.hist(column='pct',bins=100)
+data = df_vwap_open_abs['pct']
+_, bins, _ = plt.hist(data, 100, density=1, alpha=0.5)
+mu, sigma = scipy.stats.norm.fit(data)
+best_fit_line = scipy.stats.norm.pdf(bins, mu, sigma)
+plt.plot(bins, best_fit_line)
+plt.show()
+
+#get exact values
+#%%
+x = data.index.values
+y = np.array(data)
+
+def lin_interp(x, y, i, half):
+  return x[i] + (x[i+1] - x[i]) * ((half - y[i]) / (y[i+1] - y[i]))
+
+def half_max_x(x, y):
+  half = max(y)/2.0
+  signs = np.sign(np.add(y, -half))
+  zero_crossings = (signs[0:-2] != signs[1:-1])
+  zero_crossings_i = np.where(zero_crossings)[0]
+  return [lin_interp(x, y, zero_crossings_i[0], half),
+          lin_interp(x, y, zero_crossings_i[1], half)]
+hmx = half_max_x(x,y)
+fwhm = hmx[1] - hmx[0]
+
 
 #%%
 df_vwap_open_pct = df_vwap_open_abs.apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
@@ -111,5 +140,5 @@ cerebro.addstrategy(InOutStrategy)
 # cerebro.addstrategy(bt.Strategy)
 
 cerebro.run()
-
+#%%
 cerebro.plot(style='bar', iplot=False)
