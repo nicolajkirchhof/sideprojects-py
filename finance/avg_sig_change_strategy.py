@@ -7,6 +7,7 @@ from aiohttp.payload import Order
 from finance.utils import percentage_change, subtract_percentage, add_percentage, profit_loss
 
 #%% TODO: Use the inner angle instead of the simple pct addition
+#%% Test trailing stop loss based on ATR
 #%%
 # Strategy:
 # LONG
