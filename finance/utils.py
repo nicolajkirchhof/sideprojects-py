@@ -27,3 +27,25 @@ def subtract_percentage(number, percentage):
   amount_to_subtract = number * pct
   result = number - amount_to_subtract
   return result
+
+def add_percentage(number, percentage):
+  """Subtracts a percentage from a number.
+
+    Args:
+        number: The number to subtract from.
+        percentage: The percentage to subtract (as a decimal or integer).
+
+    Returns:
+        The result of subtracting the percentage from the number.
+    """
+  pct = percentage / 100.0
+  amount_to_subtract = number * pct
+  result = number + amount_to_subtract
+  return result
+
+def profit_loss(order_price, sell_price, is_long):
+  if is_long:
+    return sell_price - order_price
+  else:
+    return order_price - sell_price
+

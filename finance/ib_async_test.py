@@ -6,7 +6,8 @@ from ib_async import ib, util, IB, Forex, Stock
 # util.startLoop()  # uncomment this line when in a notebook
 import backtrader as bt
 
-
+from finance.avg_sig_change_strategy import AverageSignificantChangeStrategy
+from finance.bull_flag_dip_strategy import BullFlagDipStrategy
 from finance.ema_strategy import EmaStrategy
 from finance.in_out_strategy import InOutStrategy
 import pandas as pd
@@ -14,6 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.dates as mdates
+import matplotlib.ticker as mticker
 
 from finance.utils import percentage_change
 
@@ -63,7 +65,7 @@ df_contract.to_pickle(stock_name + '.pkl')
 stock_name = 'TSLA'
 df_contract = pd.read_pickle(stock_name + '.pkl')
 
-#%%
+##%%
 class IbkrPandasData(bt.feeds.PandasData):
   lines = ('average',)
   params = (
@@ -84,61 +86,22 @@ class IbkrPandasData(bt.feeds.PandasData):
     ('option_implied_volatility', -1),
   )
 
-#%%
-df_pct_vwap = pd.concat([df_contract['average'], df_contract['average'].shift(-1)], axis=1).dropna().apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
-df_pct_vwap.plot()
-#%%
-df_vwap_open_abs = pd.concat([df_contract['average'], df_contract[['open', 'date']].shift(-1)], axis=1).dropna()
-df_vwap_open_abs['diff'] = df_vwap_open_abs['average'] - df_vwap_open_abs['open']
-df_vwap_open_abs['pct'] = df_vwap_open_abs.apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
-# ax = df_vwap_open_abs.plot(x='date', y=['diff', 'pct'], kind='scatter')
-ax = df_vwap_open_abs.plot(x='date', y='pct', kind='scatter')
-
-ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-plt.show()
-#%% match gaussian
-# df_vwap_open_abs.hist(column='pct',bins=100)
-data = df_vwap_open_abs['pct']
-_, bins, _ = plt.hist(data, 100, density=1, alpha=0.5)
-mu, sigma = scipy.stats.norm.fit(data)
-best_fit_line = scipy.stats.norm.pdf(bins, mu, sigma)
-plt.plot(bins, best_fit_line)
-plt.show()
-
-#get exact values
-#%%
-x = data.index.values
-y = np.array(data)
-
-def lin_interp(x, y, i, half):
-  return x[i] + (x[i+1] - x[i]) * ((half - y[i]) / (y[i+1] - y[i]))
-
-def half_max_x(x, y):
-  half = max(y)/2.0
-  signs = np.sign(np.add(y, -half))
-  zero_crossings = (signs[0:-2] != signs[1:-1])
-  zero_crossings_i = np.where(zero_crossings)[0]
-  return [lin_interp(x, y, zero_crossings_i[0], half),
-          lin_interp(x, y, zero_crossings_i[1], half)]
-hmx = half_max_x(x,y)
-fwhm = hmx[1] - hmx[0]
-
 
 #%%
-df_vwap_open_pct = df_vwap_open_abs.apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
-df_vwap_open_pct = plot(x='date', y='diff', kind='scatter')
-plt.show()
-#%%
+plt.close()
+print('=============================== NEW RUN ======================================')
 cerebro = bt.Cerebro(preload=True)
-data = IbkrPandasData(dataname=df_contract, datetime='date')
+data = IbkrPandasData(dataname=df_contract, datetime='date', todate=pd.Timestamp('2024-03-01'))
 cerebro.adddata(data)
 
 # Add the printer as a strategy
-cerebro.addstrategy(InOutStrategy)
+# cerebro.addstrategy(InOutStrategy)
+# cerebro.addstrategy(BullFlagDipStrategy)
+cerebro.addstrategy(AverageSignificantChangeStrategy)
 # cerebro.addstrategy(EmaStrategy)
 # cerebro.addstrategy(MyStrategy)
 # cerebro.addstrategy(bt.Strategy)
 
 cerebro.run()
-#%%
+##%%
 cerebro.plot(style='bar', iplot=False)
