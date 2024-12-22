@@ -36,6 +36,23 @@ plt.figure()
 df_pct_vwap = pd.concat([df_contract['average'], df_contract['average'].shift(-1)], axis=1).dropna().apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
 df_pct_vwap.plot()
 plt.show()
+
+#%%
+def angle_rowwise_v2(A, B):
+  p1 = np.einsum('ij,ij->i',A,B)
+  p2 = np.einsum('ij,ij->i',A,A)
+  p3 = np.einsum('ij,ij->i',B,B)
+  p4 = p1 / np.sqrt(p2*p3)
+  return np.arccos(np.clip(p4,-1.0,1.0))
+
+#%% Inner angle
+
+df_p2_p3 = pd.concat([df_contract['average'] - df_contract['average'].shift(1), pd.Series(1, df_contract['average'].index, name='X')], axis=1)
+df_p2_p1 = df_contract['average'].shift(2) - df_contract['average'].shift(1)
+angle_rowwise_v2()
+angle.plot()
+plt.show()
+
 #%%
 df_contract['average'].plot()
 X = np.fft.fft(df_contract['average'])

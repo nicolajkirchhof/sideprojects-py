@@ -4,6 +4,8 @@ import pandas as pd
 import mplfinance as mpf
 
 import matplotlib.pyplot as plt
+
+from finance.ib_async_test import df_contract
 %matplotlib qt
 
 #%%
@@ -60,3 +62,6 @@ plt.cla()
 fig, ax = mpf.plot(df, returnfig=True, volume=True, type='candle', mav=(7,21), tight_layout=True)
 
 df.plot(ax[0], y=['CloseMa', 'HighMa', 'LowMa'])
+
+#%%
+df_contract['average']
