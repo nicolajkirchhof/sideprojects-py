@@ -47,10 +47,24 @@ class AverageSignificantChangeStrategy(bt.Strategy):
     # Current close
     last_average_change = percentage_change(self.data.average[-2], self.data.average[-1])
     current_average_change = percentage_change(self.data.average[-1], self.data.average[0])
-    is_trend_change = np.sign(current_average_change) != np.sign(last_average_change) and abs(last_average_change-current_average_change) > CHANGE_PERCENTAGE
+    sign_consistency = np.sign(current_average_change) == np.sign(last_average_change)
+
+    # Initialize is_long if needed to reverse of current state
+    if self.is_long is None and sign_consistency:
+      self.is_long = not (np.sign(current_average_change) > 0)
+
+
+    sign_trend_change = (np.sign(current_average_change) > 0) != self.is_long
+    current_sentiment_matches = np.sign(self.sentiment[0]) == np.sign(current_average_change)
+    bull_trend_change = self.data.deg_change[0] < 45
+    bear_trend_change = self.data.deg_change[0] > (360 - 45)
+    is_trend_change = (sign_consistency and sign_trend_change) or (bull_trend_change and not self.is_long) or (bear_trend_change and self.is_long)
+
 
     self.log(f'O{self.data.open[0]:.2f} H{self.data.high[0]:.2f} L{self.data.low[0]:.2f} C{self.data.close[0]:.2f} VWAP{self.data.average[0]:.2f}')
-    self.log(f'2A{self.data.average[-2]:.2f} 1A{self.data.average[-1]:.2f} A{self.data.average[0]:.2f} LAC{last_average_change:.2f} CAC{current_average_change:.2f} TC {is_trend_change}', True)
+    self.log(f'{"LONG" if self.is_long else "SHORT"} LAC{last_average_change:.2f} CAC{current_average_change:.2f} DC{self.data.deg_change[0]:.2f} TC {is_trend_change}', True)
+    self.log(f'SC {sign_consistency} ST {sign_trend_change} CS/NA {current_sentiment_matches} BULL {bull_trend_change} BEAR {bear_trend_change}', True)
+    self.log(f'POS {self.position.size} @{self.position.price:.2f}', True)
 
     reverse_position = False
     if self.position and self.is_long:
@@ -71,6 +85,11 @@ class AverageSignificantChangeStrategy(bt.Strategy):
         self.stop_price = self.stop_price if self.sentiment[0] < 0 else tight_stop
         self.log(f'SL @{self.stop_price:.2f}', True)
 
+        # buy if vwap increases and positive result
+        if current_average_change > 0 and self.sentiment[0] > 0:
+          self.buy(exectype=bt.Order.Market, size=10,  price=self.data.close[0])
+          self.log(f'INC', True)
+
     if self.position and not self.is_long:
       if self.stop_price < self.data.high[0]:
         self.close_position(price=self.stop_price)
@@ -87,12 +106,17 @@ class AverageSignificantChangeStrategy(bt.Strategy):
         tight_stop =min(add_percentage(self.data.high[0], OFFSET_PERCENTAGE),self.stop_price)
         self.stop_price = self.stop_price if self.sentiment[0] > 0 else tight_stop
         self.log(f'SL @{self.stop_price:.2f}', True)
+
+        if current_average_change < 0 and self.sentiment[0] < 0:
+          self.sell(exectype=bt.Order.Market, size=10,  price=self.data.close[0])
+          self.log(f'INC', True)
       # else:
       #   stop_price =max(subtract_percentage(self.data.close[0], OFFSET_PERCENTAGE),self.data.low[0])
       #   self.log(f'SL @{stop_price}', True)
       #   self.sell(exectype=bt.Order.Stop, price=stop_price, valid=self.data.datetime.date()+datetime.timedelta(days=1))
 
-    if not self.position or reverse_position:
+    # in case of reverse position we have not closed with backtrader yet
+    if reverse_position or (not self.position and is_trend_change):
       # immediate entry
 
       # if self.sentiment[-1] > 0 and self.data.open[0] > self.data.average[-1]:
@@ -101,9 +125,9 @@ class AverageSignificantChangeStrategy(bt.Strategy):
       #   self.is_long = True
       #   self.stop_price =max(subtract_percentage(self.data.open[0], OFFSET_PERCENTAGE),self.data.low[-1])
       #   self.log(f'BUY @{self.data.open[0]} STOP @{self.stop_price} GAP', True)
-      if (reverse_position and not self.is_long) or (is_trend_change and current_average_change > 0) or (last_average_change > 0 and current_average_change > 0):
+      if not self.is_long:
         self.order_price = self.data.close[0]
-        self.buy(exectype=bt.Order.Market, price=self.order_price)
+        self.buy(exectype=bt.Order.Market, size=10,  price=self.order_price)
         self.is_long = True
         self.stop_price =subtract_percentage(self.data.low[0], OFFSET_PERCENTAGE)
         self.log(f'BUY @{self.data.close[0]} STOP @{self.stop_price:.2f} TREND', True)
@@ -113,9 +137,9 @@ class AverageSignificantChangeStrategy(bt.Strategy):
       #   self.is_long = False
       #   self.stop_price =min(add_percentage(self.data.open[0], OFFSET_PERCENTAGE),self.data.high[-1])
       #   self.log(f'SELL @{self.data.open[0]} STOP @{self.stop_price} GAP', True)
-      elif (reverse_position and self.is_long) or (is_trend_change and current_average_change < 0) or (last_average_change < 0 and current_average_change < 0):
+      elif self.is_long:
         self.order_price = self.data.close[0]
-        self.sell(exectype=bt.Order.Market, price=self.order_price)
+        self.sell(exectype=bt.Order.Market, size=10, price=self.order_price)
         self.is_long = False
         self.stop_price =add_percentage(self.data.high[0], OFFSET_PERCENTAGE)
         self.log(f'SELL @{self.data.close[0]} STOP @{self.stop_price:.2f} TREND', True)

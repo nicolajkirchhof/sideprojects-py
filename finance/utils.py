@@ -1,3 +1,5 @@
+import numpy as np
+
 def percentage_change(old_value, new_value):
   """Calculates the percentage change between two numbers.
 
@@ -49,3 +51,9 @@ def profit_loss(order_price, sell_price, is_long):
   else:
     return order_price - sell_price
 
+def angle_rowwise_v2(A, B):
+  p1 = np.einsum('ij,ij->i',A,B)
+  p2 = np.einsum('ij,ij->i',A,A)
+  p3 = np.einsum('ij,ij->i',B,B)
+  p4 = p1 / np.sqrt(p2*p3)
+  return np.arccos(np.clip(p4,-1.0,1.0))*180/np.pi

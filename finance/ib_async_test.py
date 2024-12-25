@@ -65,9 +65,20 @@ df_contract.to_pickle(stock_name + '.pkl')
 stock_name = 'TSLA'
 df_contract = pd.read_pickle(stock_name + '.pkl')
 
+p1_p0 = pd.DataFrame(df_contract['average'] - df_contract['average'].shift(1))
+p1_p0['x'] = 1
+p1_p0['angle'] = np.arctan2(p1_p0['x'], p1_p0['average'])
+
+p1_p2 = pd.DataFrame(df_contract['average'].shift(2) - df_contract['average'].shift(1))
+p1_p2['x'] = -1
+p1_p2['angle'] = np.arctan2(p1_p2['x'], p1_p2['average'])
+
+df_contract['deg_change'] = (p1_p0['angle'] - p1_p2['angle'] ) *(180/np.pi)
+
+
 ##%%
 class IbkrPandasData(bt.feeds.PandasData):
-  lines = ('average',)
+  lines = ('average','deg_change')
   params = (
     ('datetime', 'timestamp'),
     ('open', -1),
@@ -84,6 +95,7 @@ class IbkrPandasData(bt.feeds.PandasData):
     ('min_bid', -1),
     ('historical_volatility', -1),
     ('option_implied_volatility', -1),
+    ('deg_change', -1),
   )
 
 
@@ -93,6 +105,7 @@ print('=============================== NEW RUN =================================
 cerebro = bt.Cerebro(preload=True)
 data = IbkrPandasData(dataname=df_contract, datetime='date', todate=pd.Timestamp('2024-03-01'))
 cerebro.adddata(data)
+cerebro.broker.setcash(100000)
 
 # Add the printer as a strategy
 # cerebro.addstrategy(InOutStrategy)

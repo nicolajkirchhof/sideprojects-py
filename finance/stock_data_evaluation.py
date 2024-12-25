@@ -8,6 +8,7 @@ import backtrader as bt
 
 from finance.bull_flag_dip_strategy import BullFlagDipStrategy
 from finance.ema_strategy import EmaStrategy
+from finance.ib_async_test import df_contract
 from finance.in_out_strategy import InOutStrategy
 import pandas as pd
 
@@ -31,11 +32,7 @@ df_contract = pd.read_pickle(stock_name + '.pkl')
 ax = df_contract[['average', 'open', 'close']].plot(style='o-')
 df_contract[['high', 'low']].plot(ax=ax, style='x')
 plt.show()
-#%%
-plt.figure()
-df_pct_vwap = pd.concat([df_contract['average'], df_contract['average'].shift(-1)], axis=1).dropna().apply(lambda x: percentage_change(x.iloc[0], x.iloc[1]), axis=1)
-df_pct_vwap.plot()
-plt.show()
+
 
 #%%
 def angle_rowwise_v2(A, B):
@@ -43,7 +40,36 @@ def angle_rowwise_v2(A, B):
   p2 = np.einsum('ij,ij->i',A,A)
   p3 = np.einsum('ij,ij->i',B,B)
   p4 = p1 / np.sqrt(p2*p3)
-  return np.arccos(np.clip(p4,-1.0,1.0))
+  return np.arccos(np.clip(p4,-1.0,1.0))*180/np.pi
+
+def angle_rowwise_dir(A, B):
+  p1 = np.einsum('ij,ij->i',A,B)
+  p2 = np.einsum('ij,ij->i',A,A)
+  p3 = np.einsum('ij,ij->i',B,B)
+  p4 = p1 / np.sqrt(p2*p3)
+  return np.arccos(np.clip(p4,-1.0,1.0))*180/np.pi
+
+#%%
+a = np.array([[1, 1], [1, 0.5]])
+b = np.array([[1, 0], [1, 0]])
+angle_rowwise_v2(a, b)
+
+
+#%%
+plt.figure()
+
+p1_p0 = pd.DataFrame(df_contract['average'] - df_contract['average'].shift(1))
+p1_p0['x'] = 1
+p1_p0['angle'] = np.arctan2(p1_p0['x'], p1_p0['average'])
+
+p1_p2 = pd.DataFrame(df_contract['average'].shift(2) - df_contract['average'].shift(1))
+p1_p2['x'] = -1
+p1_p2['angle'] = np.arctan2(p1_p2['x'], p1_p2['average'])
+
+df_ang = (p1_p2['angle']- p1_p0['angle'] + np.pi) *(180/np.pi)
+
+plt.plot(df_ang)
+plt.show()
 
 #%% Inner angle
 
