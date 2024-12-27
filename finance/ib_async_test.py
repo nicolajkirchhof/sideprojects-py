@@ -106,6 +106,8 @@ cerebro = bt.Cerebro(preload=True)
 data = IbkrPandasData(dataname=df_contract, datetime='date', todate=pd.Timestamp('2024-03-01'))
 cerebro.adddata(data)
 cerebro.broker.setcash(100000)
+cerebro.broker.setcommission(commission=1, name='us', margin=True)
+cerebro.broker.set_coc(True)
 
 # Add the printer as a strategy
 # cerebro.addstrategy(InOutStrategy)

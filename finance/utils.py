@@ -45,11 +45,8 @@ def add_percentage(number, percentage):
   result = number + amount_to_subtract
   return result
 
-def profit_loss(order_price, sell_price, is_long):
-  if is_long:
-    return sell_price - order_price
-  else:
-    return order_price - sell_price
+def profit_loss(position, close_price):
+  return position.size * (close_price - position.price)
 
 def angle_rowwise_v2(A, B):
   p1 = np.einsum('ij,ij->i',A,B)
