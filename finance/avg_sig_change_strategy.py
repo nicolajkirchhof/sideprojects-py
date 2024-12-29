@@ -43,10 +43,9 @@ class AverageSignificantChangeStrategy(bt.Strategy):
     self.log(
       f'Close @{self.data.close[0]:.2f} Size @{self.position.size} P/L {profit_loss(self.position, self.data.close[0]):.2f}',
       True)
-    self.close()
+    self.close(exectype=bt.Order.Market)
 
   def notify_trade(self, trade):
-    self.log(trade)
     if trade.isclosed:
       self.log(f'Close @{trade.price:.2f} P/L {trade.pnl:.2f} COM {trade.commission:.2f}')
     else:
@@ -101,6 +100,7 @@ class AverageSignificantChangeStrategy(bt.Strategy):
         reverse_position = self.is_bearish
 
       elif position_trend_changed:
+        self.cancel(self.stop_order)
         self.close_position()
         reverse_position = self.is_bullish
       else:
@@ -125,6 +125,7 @@ class AverageSignificantChangeStrategy(bt.Strategy):
       if self.stop_price < self.data.high[0]:
         reverse_position = self.is_bullish
       elif position_trend_changed:
+        self.cancel(self.stop_order)
         self.close_position()
         reverse_position = self.is_bullish
       else:
