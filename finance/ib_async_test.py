@@ -36,7 +36,22 @@ p1_p2['angle'] = np.arctan2(p1_p2['x'], p1_p2['average'])
 
 df_contract['deg_change'] = (p1_p0['angle'] - p1_p2['angle'] ) *(180/np.pi)
 
+#%%
+import numpy as np
+# p1_p0 = df_contract['average'][153] - df_contract['average'][152]
+p1_p0 = percentage_change(df_contract['average'][152], df_contract['average'][153] )
+p1_p0_x = 1
+p1_p0_ang = np.arctan2(p1_p0, p1_p0_x) *(180/np.pi)
+#%%
 
+# p1_p2 = df_contract['average'][151] - df_contract['average'][152]
+p1_p2 = percentage_change(df_contract['average'][152], df_contract['average'][151] )
+p1_p2_x = -1
+p1_p2_ang = np.arctan2(p1_p2, p1_p2_x)*(180/np.pi)
+#%%
+df_contract['deg_change'] = (p1_p0['angle'] - p1_p2['angle'] ) *(180/np.pi)
+
+#%%
 ##%%
 class IbkrPandasData(bt.feeds.PandasData):
   lines = ('average','deg_change')
@@ -64,7 +79,7 @@ class IbkrPandasData(bt.feeds.PandasData):
 plt.close()
 print('=============================== NEW RUN ======================================')
 cerebro = bt.Cerebro(preload=True)
-data = IbkrPandasData(dataname=df_contract, datetime='date', fromdate=pd.Timestamp('2024-03-01'), todate=pd.Timestamp('2024-07-01'))
+data = IbkrPandasData(dataname=df_contract, datetime='date') # fromdate=pd.Timestamp('2024-03-01'), todate=pd.Timestamp('2024-07-01'))
 cerebro.adddata(data)
 cerebro.broker.setcash(100000)
 cerebro.broker.setcommission(commission=1, name='us', margin=True)

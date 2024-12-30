@@ -17,7 +17,7 @@ from finance.utils import percentage_change, subtract_percentage, add_percentage
 # SHORT
 #   Reverse of LONG
 
-OFFSET_PERCENTAGE = 0.5
+OFFSET_PERCENTAGE = 0.75
 CHANGE_PERCENTAGE = 4
 ORDER_SIZE = 10
 INCREASE_SIZE = 10
@@ -97,12 +97,13 @@ class AverageSignificantChangeStrategy(bt.Strategy):
         stop_order_triggered and self.stop_order.ordtype == self.stop_order.Sell):
       # # immediate exit
       if self.stop_price > self.data.low[0]:
-        reverse_position = self.is_bearish
+        pass
+        # reverse_position = self.is_bearish
 
-      elif position_trend_changed:
-        self.cancel(self.stop_order)
-        self.close_position()
-        reverse_position = self.is_bullish
+      # elif position_trend_changed:
+      #   self.cancel(self.stop_order)
+      #   self.close_position()
+      #   reverse_position = self.is_bearish
       else:
         tight_stop = max(subtract_percentage(self.data.low[0], OFFSET_PERCENTAGE), self.stop_price)
         self.stop_price = self.stop_price if self.sentiment[0] < 0 else tight_stop
@@ -123,11 +124,12 @@ class AverageSignificantChangeStrategy(bt.Strategy):
     if (self.position and self.position.size < 0) or (
         stop_order_triggered and self.stop_order.ordtype == self.stop_order.Buy):
       if self.stop_price < self.data.high[0]:
-        reverse_position = self.is_bullish
-      elif position_trend_changed:
-        self.cancel(self.stop_order)
-        self.close_position()
-        reverse_position = self.is_bullish
+        pass
+        # reverse_position = self.is_bullish
+      # elif position_trend_changed:
+      #   self.cancel(self.stop_order)
+      #   self.close_position()
+      #   reverse_position = self.is_bullish
       else:
         tight_stop = min(add_percentage(self.data.high[0], OFFSET_PERCENTAGE), self.stop_price)
         self.stop_price = self.stop_price if self.sentiment[0] > 0 else tight_stop
