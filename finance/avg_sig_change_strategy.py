@@ -18,9 +18,10 @@ from finance.utils import percentage_change, subtract_percentage, add_percentage
 #   Reverse of LONG
 
 OFFSET_PERCENTAGE = 0.75
-CHANGE_PERCENTAGE = 4
+TREND_CHANGE_PERCENTAGE = 3
 ORDER_SIZE = 10
 INCREASE_SIZE = 10
+MIN_TREND_PCT = 2
 
 
 # Create a Strategy
@@ -56,17 +57,24 @@ class AverageSignificantChangeStrategy(bt.Strategy):
       return
 
     # Current close
-    last_average_change = percentage_change(self.data.average[-2], self.data.average[-1])
-    current_average_change = percentage_change(self.data.average[-1], self.data.average[0])
-    sign_consistency = np.sign(current_average_change) == np.sign(last_average_change)
+    before_last_average_change_pct = percentage_change(self.data.average[-3], self.data.average[-2])
+    last_average_change_pct = percentage_change(self.data.average[-2], self.data.average[-1])
+    current_average_change_pct = percentage_change(self.data.average[-1], self.data.average[0])
+    sign_consistency = np.sign(current_average_change_pct) == np.sign(last_average_change_pct)
+    strong_sign_consistency =np.sign(current_average_change_pct) == np.sign(last_average_change_pct) == np.sign(before_last_average_change_pct)
 
     # negative trend sign (short) corresponds with negative position size (short)
-    sign_trend_bullish = sign_consistency and np.sign(current_average_change) > 0
-    sign_trend_bearish = sign_consistency and np.sign(current_average_change) < 0
+    sign_trend_bullish = sign_consistency and (current_average_change_pct + last_average_change_pct > TREND_CHANGE_PERCENTAGE or (strong_sign_consistency and current_average_change_pct > 0))
+    sign_trend_bearish = sign_consistency and (current_average_change_pct + last_average_change_pct < -TREND_CHANGE_PERCENTAGE or (strong_sign_consistency and current_average_change_pct < 0))
+
     sign_trend_change = sign_trend_bearish and self.position.size > 0 or sign_trend_bullish and self.position.size < 0
-    current_sentiment_matches = np.sign(self.sentiment[0]) == np.sign(current_average_change)
-    bull_trend_change = self.data.deg_change[0] < 45
-    bear_trend_change = self.data.deg_change[0] > (360 - 45)
+    current_sentiment_matches = np.sign(self.sentiment[0]) == np.sign(current_average_change_pct)
+    # bull_trend_change = self.data.deg_change[0] < 45
+    # bear_trend_change = self.data.deg_change[0] > (360 - 45)
+    bull_trend_change = current_average_change_pct > TREND_CHANGE_PERCENTAGE
+    bear_trend_change = current_average_change_pct < -TREND_CHANGE_PERCENTAGE
+    # bull_trend_change = self.data.high[0] > self.data.high[-1] and self.data.low[0] > self.data.low[-2]
+    # bear_trend_change = self.data.high[0] < self.data.high[-1] and self.data.low[0] < self.data.low[-2]
 
     self.is_bullish = bull_trend_change or sign_trend_bullish
     self.is_bearish = bear_trend_change or sign_trend_bearish
@@ -75,9 +83,9 @@ class AverageSignificantChangeStrategy(bt.Strategy):
 
     self.log(
       f'O{self.data.open[0]:.2f} H{self.data.high[0]:.2f} L{self.data.low[0]:.2f} C{self.data.close[0]:.2f} VWAP{self.data.average[0]:.2f}')
-    self.log(f'LAC{last_average_change:.2f} CAC{current_average_change:.2f} DC{self.data.deg_change[0]:.2f}', True)
+    self.log(f'BLAC{before_last_average_change_pct:.2f} LAC{last_average_change_pct:.2f} CAC{current_average_change_pct:.2f} DC{self.data.deg_change[0]:.2f}', True)
     self.log(
-      f'TC {position_trend_changed} SC {sign_consistency} STC {sign_trend_change} CS/NA {current_sentiment_matches} BULL {self.is_bullish} BEAR {self.is_bearish}',
+      f'TC {position_trend_changed} SC {sign_consistency} SSC {strong_sign_consistency} STC {sign_trend_change} CS/NA {current_sentiment_matches} BULL {self.is_bullish} BEAR {self.is_bearish}',
       True)
     self.log(f'POS {self.position.size} @{self.position.price:.2f}', True)
     if self.stop_order is not None:
@@ -97,13 +105,13 @@ class AverageSignificantChangeStrategy(bt.Strategy):
         stop_order_triggered and self.stop_order.ordtype == self.stop_order.Sell):
       # # immediate exit
       if self.stop_price > self.data.low[0]:
-        pass
-        # reverse_position = self.is_bearish
+        # pass
+        reverse_position = self.is_bearish
 
-      # elif position_trend_changed:
-      #   self.cancel(self.stop_order)
-      #   self.close_position()
-      #   reverse_position = self.is_bearish
+      elif position_trend_changed:
+        self.cancel(self.stop_order)
+        self.close_position()
+        reverse_position = self.is_bearish
       else:
         tight_stop = max(subtract_percentage(self.data.low[0], OFFSET_PERCENTAGE), self.stop_price)
         self.stop_price = self.stop_price if self.sentiment[0] < 0 else tight_stop
@@ -113,8 +121,8 @@ class AverageSignificantChangeStrategy(bt.Strategy):
 
         # buy if vwap increases and positive result
         # if self.is_bullish and self.stop_price > increased_price:
-        if self.stop_price > increased_price:
-          self.buy(exectype=bt.Order.Market, size=10)
+        if self.stop_price > increased_price and INCREASE_SIZE > 0:
+          self.buy(exectype=bt.Order.Market, size=INCREASE_SIZE)
           size += INCREASE_SIZE
           self.log(f'INC to {size}x @{self.data.close[0]:.2f} => AVG @{increased_price:.2f}', True)
 
@@ -124,12 +132,12 @@ class AverageSignificantChangeStrategy(bt.Strategy):
     if (self.position and self.position.size < 0) or (
         stop_order_triggered and self.stop_order.ordtype == self.stop_order.Buy):
       if self.stop_price < self.data.high[0]:
-        pass
-        # reverse_position = self.is_bullish
-      # elif position_trend_changed:
-      #   self.cancel(self.stop_order)
-      #   self.close_position()
-      #   reverse_position = self.is_bullish
+        # pass
+        reverse_position = self.is_bullish
+      elif position_trend_changed:
+        self.cancel(self.stop_order)
+        self.close_position()
+        reverse_position = self.is_bullish
       else:
         tight_stop = min(add_percentage(self.data.high[0], OFFSET_PERCENTAGE), self.stop_price)
         self.stop_price = self.stop_price if self.sentiment[0] > 0 else tight_stop
@@ -138,8 +146,8 @@ class AverageSignificantChangeStrategy(bt.Strategy):
         size = np.abs(self.position.size)
         decreased_price = (size*self.position.price + INCREASE_SIZE *self.data.close[0])/ (size+INCREASE_SIZE)
         # if self.is_bearish and self.stop_price < decreased_price:
-        if self.stop_price < decreased_price:
-          self.sell(exectype=bt.Order.Market, size=10)
+        if self.stop_price < decreased_price and INCREASE_SIZE > 0:
+          self.sell(exectype=bt.Order.Market, size=INCREASE_SIZE)
           size += INCREASE_SIZE
           self.log(f'DEC to -{size}x @{self.data.close[0]:.2f} => AVG @{decreased_price:.2f}', True)
 
