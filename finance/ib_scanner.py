@@ -54,32 +54,53 @@ print(tags)
 sub = ib.ScannerSubscription(
   instrument='STK',
   locationCode='STK.US.MAJOR',
-  scanCode='TOP_PERC_GAIN')
+  scanCode='TOP_TRADE_RATE',
+  abovePrice=2,
+  belowPrice=50,
+  numberOfRows=50,
+  marketCapBelow=1000
+)
 
 tagValues = [
   ib.TagValue("changePercAbove", "10"),
   ib.TagValue('priceAbove', 5),
   ib.TagValue('tradeRateAbove', 10),
+  ib.TagValue('marketCapBelow1e6', 1000),
   ib.TagValue('priceBelow', 50)]
 
 #%%
+ib_conn.scannerDataEvent += lambda scanData: [print(sd.contractDetails.contract.symbol) for sd in scanData]
 # the tagValues are given as 3rd argument; the 2nd argument must always be an empty list
 # (IB has not documented the 2nd argument and it's not clear what it does)
-scanData = ib_conn.reqScannerData(sub, [], tagValues)
+# scanData = ib_conn.reqScannerData(sub, [], tagValues)
+scanData = ib_conn.reqScannerSubscription(sub, [], tagValues)
+ib_conn.sleep(5)
+ib_conn.cancelScannerSubscription(scanData)
 
-contracts = [sd.contractDetails.contract for sd in scanData]
-
-for contract in contracts:
-  print(contract.symbol, contract.secType, contract.currency, contract.exchange)
-  stock = ib.Stock(contract.symbol, contract.exchange)
-  stock_data = ib_conn.reqMktData(stock, '1,2,4,9,55,56,46,89', False, False)
-  print(stock_data)
+# contracts = [sd.contractDetails.contract for sd in scanData]
+#
+# for contract in contracts:
+#   print(contract.symbol, contract.secType, contract.currency, contract.exchange)
+#   stock = ib.Stock(contract.symbol, contract.exchange)
+#   stock_data = ib_conn.reqMktData(stock, '1,2,4,9,55,56,46,89', False, False)
+#   print(stock_data)
 
 #%%
-f = ib.Forex('EURUSD')
-ticker = ib_conn.reqMktData(f, '1,2,4,9,55,56,46,89', False, False)
-ticker.updateEvent += lambda ticker: print(ticker)
-# ib_conn.cancelMktData(f)
+
+events = []
+def store_ticker_events(ticker):
+  events.append(ticker)
+  print(ticker)
+
+
+# ticker.updateEvent += lambda ticker: print(ticker)
+# ib_conn.pendingTickersEvent += lambda ticker: print(ticker)
+f = ib.Stock('NVDA', 'SMART', 'USD')
+ticker = ib_conn.reqMktData(f, '236, 233, 293, 294, 295, 318, 411, 595', False, False)
+# ticker = ib_conn.reqMktData(f, '236, 233, 293, 294, 295, 318, 411, 595', True, False)
+ticker.updateEvent += store_ticker_events
+ib_conn.sleep(10)
+ib_conn.cancelMktData(f)
 #%%
 def wait_for_market_data(tickers):
   """print tickers as they arrive"""
