@@ -4,6 +4,8 @@ import numpy as np
 import scipy
 import ib_async as ib
 import backtrader as bt
+from tests.test_indicators import volume_ts
+from vectorbt.portfolio import trade_dt
 
 from finance.avg_sig_change_strategy import AverageSignificantChangeStrategy
 from finance.bull_flag_dip_strategy import BullFlagDipStrategy
@@ -51,7 +53,7 @@ tags = [elem.text for elem in tree.findall('.//AbstractField/code')]
 print(len(tags), 'tags:')
 print(tags)
 #%%
-sub = ib.ScannerSubscription(
+low_price_gainers = ib.ScannerSubscription(
   instrument='STK',
   locationCode='STK.US.MAJOR',
   scanCode='TOP_TRADE_RATE',
@@ -63,27 +65,60 @@ sub = ib.ScannerSubscription(
 
 tagValues = [
   ib.TagValue("changePercAbove", "10"),
-  ib.TagValue('priceAbove', 5),
+  ib.TagValue('priceAbove', 2),
   ib.TagValue('tradeRateAbove', 10),
   ib.TagValue('marketCapBelow1e6', 1000),
   ib.TagValue('priceBelow', 50)]
 
+# low_price_gainers = ib.ScannerSubscription(
+#   instrument='STK',
+#   locationCode='STK.US.MAJOR',
+#   scanCode='TOP_TRADE_RATE',
+#   abovePrice=2,
+#   belowPrice=50,
+#   numberOfRows=50,
+#   marketCapBelow=1000
+# )
+#
+# tagValues = [
+#   ib.TagValue("changePercAbove", "10"),
+#   ib.TagValue('priceAbove', 2),
+#   ib.TagValue('tradeRateAbove', 10),
+#   ib.TagValue('marketCapBelow1e6', 1000),
+#   ib.TagValue('priceBelow', 50)]
+
 #%%
-ib_conn.scannerDataEvent += lambda scanData: [print(sd.contractDetails.contract.symbol) for sd in scanData]
+def stock_ticker_events(ticker):
+  spread = np.abs(ticker.ask - ticker.bid)
+  shortable = 'S ' if ticker.shortableShares > 100 else ''
+  trade_rate = f'{ticker.tradeRate}' if ticker.tradeRate < 1000 else f'{ticker.tradeRate/1000:.1f}K'
+  volume_rate = f'{ticker.volumeRate}' if ticker.volumeRate < 1000 else f'{ticker.volumeRate/1000:.0f}K'
+  change = percentage_change(ticker.vwap, ticker.close)
+  print(f'{shortable} {ticker.contract.symbol} VWAP {ticker.vwap:.2f} CHG {change:.2f}% SPR {spread:.1f} T/M {trade_rate} V/M {volume_rate}')
+
+#%%
+# ib_conn.scannerDataEvent += lambda scanData: [print(sd.contractDetails.contract.symbol) for sd in scanData]
 # the tagValues are given as 3rd argument; the 2nd argument must always be an empty list
 # (IB has not documented the 2nd argument and it's not clear what it does)
-# scanData = ib_conn.reqScannerData(sub, [], tagValues)
-scanData = ib_conn.reqScannerSubscription(sub, [], tagValues)
-ib_conn.sleep(5)
-ib_conn.cancelScannerSubscription(scanData)
+scanData = ib_conn.reqScannerData(sub, [], tagValues)
+# scanData = ib_conn.reqScannerSubscription(sub, [], tagValues)
+# for sd in scanData:
+#   print(sd.contractDetails.contract.symbol)
+# ib_conn.sleep(20)
+# ib_conn.cancelScannerSubscription(scanData)
 
 # contracts = [sd.contractDetails.contract for sd in scanData]
 #
-# for contract in contracts:
-#   print(contract.symbol, contract.secType, contract.currency, contract.exchange)
-#   stock = ib.Stock(contract.symbol, contract.exchange)
-#   stock_data = ib_conn.reqMktData(stock, '1,2,4,9,55,56,46,89', False, False)
-#   print(stock_data)
+#%%
+for e in events:
+  stock_ticker_events(e)
+#%%
+for sd in scanData:
+  contract = sd.contractDetails.contract
+  print(contract.symbol, contract.secType, contract.currency, contract.exchange)
+  stock = ib.Stock(contract.symbol, contract.exchange)
+  stock_ticker = ib_conn.reqMktData(stock, '236, 233, 293, 294, 295, 318, 411, 595', True, False)
+  print(stock_ticker)
 
 #%%
 
