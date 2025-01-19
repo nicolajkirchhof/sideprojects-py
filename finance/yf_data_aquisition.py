@@ -5,7 +5,7 @@ import mplfinance as mpf
 
 import matplotlib.pyplot as plt
 
-from finance.ib_async_test import df_contract
+
 %matplotlib qt
 
 #%%
@@ -24,11 +24,28 @@ import finplot as fplt
 # fdf = yfinance.download('AAPL')
 fplt.candlestick_ochl(df[['Open', 'Close', 'High', 'Low']])
 fplt.show()
+
+#%% ETFS
+
+df_etfs = pd.read_csv('finance/etf_symbols.csv')
+
+for etf_symbol in df_etfs['symbol']:
+  df = yf.Ticker(etf_symbol).history(start="2015-01-01", interval="1d")
+  pd.DataFrame(df).to_csv(f'finance/y_finance_data/{etf_symbol}')
+
+
+
+
 #%%
 # data = yf.download("FJTSY", start="2023-11-08", interval="1h")
 
+msci_world_acc = yf.Ticker('IWDA.AS')
+df = msci_world_acc.history(start="2015-01-01", interval="1d")
+pd.DataFrame(df)
+
+#%%
 fjtsy = yf.Ticker('fjtsy')
-df = fjtsy.history(start="2024-01-01", interval="1h")
+df = fjtsy.history(start="2024-01-01", interval="1d")
 # df = fjtsy.history(start="2024-10-08", interval="1h")
 
 #%%
