@@ -10,7 +10,49 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\y_finance_data\symbols.csv">
+        <entry key="\finance\y_finance_data\AVUV.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\y_finance_data\EUNL.DE.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\y_finance_data\EWA.MX.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\y_finance_data\EWJ.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\y_finance_data\IMAE.AS.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\y_finance_data\ISFA.AS.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\y_finance_data\VTI.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

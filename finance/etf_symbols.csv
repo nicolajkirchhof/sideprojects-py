@@ -1,12 +1,12 @@
-symbol,description,p_ref,p_docoyo
-EUNL.DE,iShares Core MSCI World UCITS ETF USD (Acc) (EUNL.DE),100,0
-VUN.TO,Vanguard Total Stock Market Index Fund ETF Shares (VTI),0,35
-AVUV,Avantis US Small Cap Value ETF (AVUV),0,10
-XMD.TO,Shares S&P/TSX Completion Index ETF (XMD.TO),0,5
-EWJ,iShares MSCI Japan ETF (EWJ),0,10
-EEMS,iShares MSCI Emerging Markets Small-Cap ETF (EEMS),0,5
-EEM,iShares MSCI Emerging Markets ETF (EEM),0,5
-IEUR,iShares Core MSCI Europe ETF (IEUR),0,15
-EXSA.DE,iShares STOXX Europe 600 UCITS ETF (DE) EUR (Dist) (EXSA.DE),0,0
-EWA.MX,iShares MSCI Australia ETF (EWA.MX),0,5
-ISFA.AS,iShares Core FTSE 100 UCITS ETF GBP (Dist) (ISFA.AS),0,10
+symbol,description,p_ref,p_docoyo,p_dcy
+EUNL.DE,iShares Core MSCI World UCITS ETF USD (Acc) (EUNL.DE),100,0,0
+VTI,Vanguard Total Stock Market Index Fund ETF Shares (VTI),0,35,50
+ZPRV.DE,SPDR MSCI USA Small Cap Value Weighted UCITS ETF USD Acc (ZPRV.DE),0,10,10
+XMD.TO,Shares S&P/TSX Completion Index ETF (XMD.TO),0,5,5
+EWJ,iShares MSCI Japan ETF (EWJ),0,10,10
+EEMS,iShares MSCI Emerging Markets Small-Cap ETF (EEMS),0,5,5
+EEM,iShares MSCI Emerging Markets ETF (EEM),0,5,0
+XMEU.DE,Xtrackers MSCI Europe UCITS ETF 1C,0,15,10
+EXSA.DE,iShares STOXX Europe 600 UCITS ETF (DE) EUR (Dist) (EXSA.DE),0,0,0
+EWA.MX,iShares MSCI Australia ETF (EWA.MX),0,5,3
+ISFA.AS,iShares Core FTSE 100 UCITS ETF GBP (Dist) (ISFA.AS),0,7
