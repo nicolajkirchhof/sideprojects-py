@@ -20,7 +20,7 @@ mpl.use('QtAgg')
 # %% ETFS
 df_etfs = pd.read_csv('finance/etf_symbols.csv')
 
-# %%
+## %%
 
 etf_data = {}
 for etf_symbol in df_etfs['symbol']:
@@ -34,7 +34,7 @@ for etf_symbol in df_etfs['symbol']:
   etf_data[etf_symbol] = yf.Ticker(etf_symbol).history(start="2015-01-01", interval="1d")
   pd.DataFrame(etf_data[etf_symbol]).to_csv(filename)
 
-# %%
+## %%
 
 portfolios = [k for k in df_etfs.keys() if 'p_' in k]
 df_portfolios = []
@@ -90,11 +90,11 @@ for pf in df_portfolios_clean:
 
 #%%
 
-for pk in df_portfolios:
-  first = df_portfolios_clean[pk][-1].head(1)
-  last = df_portfolios_clean[pk][-1].tail(1)
+for pf in df_portfolios_clean:
+  first = pf['data'][-1].head(1)
+  last = pf['data'][-1].tail(1)
   PCT = utils.percentage_change(first['Open'].values[0], last['Close'].values[0])
-  print(pk, PCT)
+  print(pf['name'], PCT)
 
 # %%
 

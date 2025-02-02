@@ -3,14 +3,14 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="\finance\etf_symbols.csv">
+        <entry key="\finance\THREEFY1.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\y_finance_data\AVUV.csv">
+        <entry key="\finance\etf_symbols.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -32,13 +32,6 @@
           </value>
         </entry>
         <entry key="\finance\y_finance_data\EWJ.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\y_finance_data\IMAE.AS.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
