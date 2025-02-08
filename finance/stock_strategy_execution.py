@@ -97,5 +97,7 @@ for result in results:
   print(f'BuyDate {result.params.buyday} IntervalDays {result.params.intervaldays} AP/L {result.allPL:.0f} AW {result.wins} AL {result.losses}')
 
 df_eval = pd.DataFrame({'bd': all_bd, 'id': all_id, 'pl': all_pl, 'w': all_w, 'l': all_l})
+
+df_eval.to_pickle('finance/_data/spy_options_eval.pkl')
 ##%%
 # cerebro.plot(style='bar', iplot=False)
