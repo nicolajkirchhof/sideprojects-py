@@ -26,61 +26,94 @@ mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-#%%
-
 
 #%% get influx data
 
 index_client_df = idb.DataFrameClient(database='index')
 index_client = idb.InfluxDBClient(database='index')
 index_client.query('show measurements')
-index_client.query('show field keys')
+keys = index_client.query('show field keys')
 #%%
 symbol = 'DAX'
-def get_candles_range(start, end, group_by_time=None):
-  base_query = f'select first(o) as o, last(c) as c, max(h) as h, min(l) as l from DAX where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
+tz = pytz.timezone('Europe/Berlin')
+# symbol = 'SPX'
+# tz = pytz.timezone('EST')
+
+eval_range_start = datetime.timedelta(hours=9, minutes=0)
+eval_range_end = datetime.timedelta(hours=16, minutes=0)
+time_range = '30m'
+
+def get_candles_range(start, end, symbol, group_by_time=None):
+  base_query = f'select first(o) as o, last(c) as c, max(h) as h, min(l) as l from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
   if group_by_time is None:
     return base_query
   return base_query + f' group by time({group_by_time})'
 
-tz = pytz.timezone('Europe/Berlin')
 
 dfs_ref_range = []
 dfs_closing = []
-first_day = tz.localize(dateutil.parser.parse('2015-01-01T00:00:00'))
-last_day = tz.localize(dateutil.parser.parse('2015-02-07T00:00:00'))
+first_day = tz.localize(dateutil.parser.parse('2025-02-05T00:00:00'))
+last_day = tz.localize(dateutil.parser.parse('2025-02-07T00:00:00'))
 while first_day < last_day:
-  # day_end = dateutil.parser.parse('2025-02-01T00:00:00').replace(tzinfo=pytz.timezone('Europe/Berlin'))
   day_end = first_day + datetime.timedelta(days=1)
-  # get the following data for daily assignment
-  # overnight range 0-7:00
-  # onight_stop = day_start + datetime.timedelta(hours=7)
-  # df_onight_range = index_client_df.query(get_candles_range(day_start, onight_stop))
-  # 10min candles from 9:00 - 10:00
-  ref_range_start = first_day + datetime.timedelta(hours=9)
-  ref_range_end = first_day + datetime.timedelta(hours=10)
-  df_ref_range = index_client_df.query(get_candles_range(ref_range_start, ref_range_end, '10m'))
+  ref_range_start = first_day + eval_range_start
+  ref_range_end = first_day + eval_range_end
+  # print(
+  #   f"getting data for {ref_range_start.isoformat()} - {ref_range_end.isoformat()}"
+  # )
+  df_ref_range = index_client_df.query(get_candles_range(ref_range_start, ref_range_end, symbol, time_range))
 
-  # End of day value at 16:00
-  before_closing = first_day + datetime.timedelta(hours=15)
-  closing = first_day + datetime.timedelta(hours=16)
-  df_closing = index_client_df.query(get_candles_range(before_closing, closing))
   if df_ref_range:
     dfs_ref_range.append(df_ref_range[symbol].tz_convert(tz))
-  if df_closing:
-    dfs_closing.append(df_closing[symbol].tz_convert(tz))
   first_day = day_end
+
+#%%
+df_test = dfs_ref_range[0]
+
 
 #%%
 dfs_diff = []
 df_result = []
 for df_in, df_out in zip(dfs_ref_range, dfs_closing):
   df_input = (df_in.c - df_in.o) / (df_in.h - df_in.l)
-  dfs_diff.append(df_input.reset_index(drop=True))
-  df_result.append(percentage_change(df_out.c.iat[0],df_in.iloc[-1].c))
+  if not df_input.isna().any():
+    dfs_diff.append(df_input.reset_index(drop=True))
+    df_result.append(percentage_change(df_out.c.iat[0],df_in.iloc[-1].c))
+
+
+##%%
+dfs_diff_df = pd.concat(dfs_diff, axis=1).T
+dfs_diff_df_pn = dfs_diff_df.map(lambda x: 1 if x > 0 else 0)
+df_result_logreg = [0 if r < 0 else 1 for r in  df_result]
 
 #%%
-dfs_diff_df = pd.concat(dfs_diff, axis=1).T
+X_train, X_test, y_train, y_test = train_test_split(dfs_diff_df, df_result_logreg, test_size=0.5, random_state=42)
+
+# Create and train Logistic Regression model
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+# Predictions
+y_pred = model.predict(X_test)
+
+# Evaluate the model
+print("Accuracy Score:", accuracy_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+# Extract coefficients (model.coef_) and feature names
+coefficients = model.coef_[0]
+features = dfs_diff_df.columns
+
+# Pair features with their absolute coefficients
+feature_importance = pd.DataFrame({
+  'Feature': features,
+  'Coefficient': coefficients,
+  'Absolute Importance': np.abs(coefficients)
+}).sort_values(by='Absolute Importance', ascending=False)
+
+print(feature_importance)
+
 
 #%%
 
