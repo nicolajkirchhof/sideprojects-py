@@ -41,7 +41,7 @@ tz = pytz.timezone('Europe/Berlin')
 
 eval_range_start = datetime.timedelta(hours=9, minutes=0)
 eval_range_end = datetime.timedelta(hours=16, minutes=0)
-time_range = '30m'
+time_range = '2m'
 
 def get_candles_range(start, end, symbol, group_by_time=None):
   base_query = f'select first(o) as o, last(c) as c, max(h) as h, min(l) as l from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
@@ -70,6 +70,11 @@ while first_day < last_day:
 #%%
 df_test = dfs_ref_range[0]
 
+df_change_hh = df_test.h.shift(-1) - df_test.h
+df_change_ll = df_test.l.shift(-1) - df_test.l
+
+df_change = pd.concat([df_change_hh, df_change_ll], axis=1)
+df_change['pos'] = df_change.apply(lambda x: -1 if x.h < 0 and x.l < 0 else 1 if x.h > 0 and x.l > 0 else 0, axis=1)
 
 #%%
 dfs_diff = []
