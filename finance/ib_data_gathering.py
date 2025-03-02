@@ -41,7 +41,6 @@ index_client.create_database('index')
 index_client_df = idb.DataFrameClient(database='index')
 # index_client.create_database('')
 # influx schema
-# db: TypeOfContract, measure: symbol field: h=high l=low o=open c=close v=volume a=average bc=barCount
 
 #%%
 # stock_names = ['TSLA', 'NVDA', 'AAPL', 'MSFT', 'AMZN', 'GOOG', 'SBUX', 'WDC', 'META', 'NFLX', 'SPY', 'QQQ', 'TQQQ', 'VTI', 'RSP', 'DOW']
