@@ -1,5 +1,6 @@
 import yfinance as yf
 import pandas as pd
+
 from finance.utils.greeks import calculate_greeks
 import numpy as np
 import ib_async as ib
@@ -22,7 +23,7 @@ api_real_port = 4002
 api_paper_port = 4002
 ib_con.connect('127.0.0.1', api_paper_port, clientId=12, readonly=True)
 # ib_con.connect('127.0.0.1', tws_paper_port, clientId=10, readonly=True)
-ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
+ib_con.reqMarketDataType(1)  # Use free, delayed, frozen data
 # ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
 
 #%%
@@ -49,7 +50,7 @@ print(f"Fetching options for {symbol} with expiration: {expiration}")
 #%%
 # %%
 expiration_ib = expiration.replace('-', '')
-strike = 490
+strike = 485
 right = 'C'
 # exchange = chain.exchange
 option_contract = ib.Option(symbol=symbol, exchange="SMART", strike=strike, lastTradeDateOrContractMonth=expiration_ib, right=right, currency=contract.currency)
@@ -58,19 +59,14 @@ option_contract = ib.Option(symbol=symbol, exchange="SMART", strike=strike, last
 ib_con.qualifyContracts(option_contract)
 ib_con.sleep(1)
 #%%
-# ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
-ib_con.reqMktData(option_contract, "", False, False)
+ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
+snapshot = ib_con.reqMktData(option_contract, "100, 101, 104, 105, 106, 225, 233, 375, 588", False, False)
 ib_con.sleep(2)
-# ib_con.reqMarketDataType(1)  # Use free, delayed, frozen data
-# snapshot = ib_con.reqMktData(option_contract, "100, 101, 104, 105, 106, 225, 233, 375, 588", False, False)
-# ib_con.sleep(5)
+ib_con.reqMarketDataType(1)  # Use free, delayed, frozen data
+while ib.util.isNan(snapshot.callOpenInterest):
+  ib_con.sleep(2)
 ib_con.cancelMktData(option_contract)
-# ib_con.sleep(1)
-# snapshot = ib_con.reqMktData(option_contract, "", True, False)
-# snapshot = ib_con.reqMktData(option_contract, "", False, False)
-# while snapshot.bid < 0:
-# ib_con.sleep(1)
-# ib_con.cancelMktData(option_contract)
+
 #%%
 # Fetch calls and puts for the specific expiration
 options_chain = {}
