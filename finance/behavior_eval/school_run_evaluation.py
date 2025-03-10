@@ -14,7 +14,7 @@ import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 
-from finance.utils import percentage_change
+from finance.utils.pct import percentage_change
 import finplot as fplt
 import pytz
 from sklearn.model_selection import train_test_split
@@ -31,13 +31,24 @@ mpl.use('QtAgg')
 
 index_client_df = idb.DataFrameClient(database='index')
 index_client = idb.InfluxDBClient(database='index')
-index_client.query('show measurements')
-keys = index_client.query('show field keys')
+indices = index_client.query('show measurements')
+index_fields = index_client.query('show field keys')
+
+future_client_df = idb.DataFrameClient(database='future')
+future_client = idb.InfluxDBClient(database='future')
+futures = future_client.query('show measurements')
+future_fields = future_client.query('show field keys')
 #%%
-# symbol = 'DAX'
-# tz = pytz.timezone('Europe/Berlin')
-symbol = 'SPX'
-tz = pytz.timezone('EST')
+indices_names = [x[0] for x in indices.raw['series'][0]['values']]
+print('Indices: ', indices_names)
+
+futures_names = [x[0] for x in futures.raw['series'][0]['values']]
+print('Futures: ', futures_names)
+#%%
+symbol = 'FDAX'
+tz = pytz.timezone('Europe/Berlin')
+# symbol = 'SPX'
+# tz = pytz.timezone('EST')
 
 indicator_range_start = datetime.timedelta(hours=9, minutes=30)
 indicator_range_end = datetime.timedelta(hours=10, minutes=30)
