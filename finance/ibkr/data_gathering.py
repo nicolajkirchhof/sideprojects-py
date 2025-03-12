@@ -37,7 +37,7 @@ api_paper_port = 4002
 ib_con.connect('127.0.0.1', api_paper_port, clientId=12, readonly=True)
 # ib_con.connect('127.0.0.1', tws_paper_port, clientId=10, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
-## %%
+# %%
 influx_client = idb.InfluxDBClient()
 influx_client.create_database('index')
 influx_client.create_database('future')
