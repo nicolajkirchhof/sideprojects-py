@@ -1,6 +1,7 @@
 # %%
 from datetime import datetime, timedelta
 
+import time
 import dateutil
 import numpy as np
 import scipy
@@ -52,75 +53,49 @@ print('Forex: ', get_values(forex))
 
 
 # %%
+symbols = [('DAX', pytz.timezone('Europe/Berlin'), DB_INDEX), *[(x, pytz.timezone('America/New_York'), DB_CFD) for x in ['IBUS30', 'IBUS500', 'IBUST100']]]
 
-def get_thursdays(start_date, end_date):
-  # Iterate through all days of the year
-  current_date = start_date
-
-  # Check if the current day is a Thursday or Friday
-  while current_date.weekday() != 3:
-    current_date += timedelta(days=1)
-
-  # Create a list for the results
-  result = []
-
-  while current_date <= end_date:
-    result.append(current_date)
-    # Move to the next day
-    current_date += timedelta(days=7)
-
-  return result
-
-
-# %%
-symbols = [('IBDE40', pytz.timezone('Europe/Berlin')), ('IBGB100', pytz.timezone('Europe/London')),
-           *[(x, pytz.timezone('America/New_York')) for x in ['IBUS30', 'IBUS500', 'IBUST100']]]
-
-symbol, tz = symbols[0]
+symbol, tz, db = symbols[1]
 # Create a directory
-directory = f'N:/My Drive/Projects/Trading/Research/Plots/thu_fri_mon'
+directory = f'N:/My Drive/Projects/Trading/Research/Strategies/NoonToClose'
 os.makedirs(directory, exist_ok=True)
+results = []
 
-for symbol, tz in symbols:
-
-##%%
-  dfs_ref_range = []
-  dfs_closing = []
-  first_year = 2020
-  last_year = 2025
-
-  thursdays = get_thursdays(datetime(2020, 1, 1, hour=9, tzinfo=tz),
-                            tz.localize(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)))
+for symbol, tz, db in symbols[1:]:
+##%%%
+  first_day = tz.localize(dateutil.parser.parse('2020-01-02T00:00:00'))
+  # first_day = tz.localize(dateutil.parser.parse('2024-10-24T00:00:00'))
+  last_day =  tz.localize(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0))
+  day_start = first_day
 
   ## %%
-  thu = thursdays[0]
-  results = []
+  while day_start < last_day:
+    ## %%
+    noon = (day_start + timedelta(hours=12)).astimezone(pytz.utc)
+    close = (day_start + timedelta(hours=14)).astimezone(pytz.utc)
 
-  for thu in thursdays:
-    fri = thu + timedelta(days=1)
-    sat = fri + timedelta(days=1)
-    mon = sat + timedelta(days=2)
-    tue = mon + timedelta(days=1)
-
-    thu_influx = influx_client_df.query(get_candles_range_aggregate_query(thu, thu + timedelta(hours=7), symbol), database=DB_CFD)
-    fri_influx = influx_client_df.query(get_candles_range_aggregate_query(fri, fri + timedelta(hours=7), symbol), database=DB_CFD)
-    mon_influx = influx_client_df.query(get_candles_range_aggregate_query(mon, mon + timedelta(hours=7), symbol), database=DB_CFD)
-
-    ##%%
-    if not symbol in thu_influx or not symbol in fri_influx or not symbol in mon_influx:
-      print(f'no data for {thu.isoformat()}')
+    day_start = day_start + timedelta(days=1)
+    if noon.isoweekday() in [6, 7]:
       continue
 
-    thu_candle = thu_influx[symbol].tz_convert(tz)
-    fri_candle = fri_influx[symbol].tz_convert(tz)
-    mon_candle = mon_influx[symbol].tz_convert(tz)
-    thu_dict = thu_candle.rename(columns={'h': 't_h', 'l':'t_l', 'o':'t_o', 'c': 't_c', 'v': 't_v'}).iloc[0].to_dict()
-    fri_dict = fri_candle.rename(columns={'h': 'f_h', 'l':'f_l', 'o':'f_o', 'c': 'f_c', 'v': 'f_v'}).iloc[0].to_dict()
-    mon_dict = mon_candle.rename(columns={'h': 'm_h', 'l':'m_l', 'o':'m_o', 'c': 'm_c', 'v': 'm_v'}).iloc[0].to_dict()
+    noon_influx = influx_client_df.query(get_candles_range_aggregate_query(noon, noon + timedelta(hours=1), symbol), database=db)
+    close_influx = influx_client_df.query(get_candles_range_aggregate_query(close, close + timedelta(hours=3), symbol), database=db)
 
-    result = {'thu': thu, 'fri': fri, 'mon':mon, **thu_dict, **fri_dict, **mon_dict}
+    ##%%
+    if not symbol in noon_influx or not symbol in close_influx:
+      print(f'no data for {symbol} {noon.isoformat()} {not symbol in noon_influx } {not symbol in close_influx }')
+      continue
+
+    noon_candle = noon_influx[symbol].tz_convert(tz)
+    close_candle = close_influx[symbol].tz_convert(tz)
+    noon_dict = noon_candle.rename(columns={'h': 'n_h', 'l':'n_l', 'o':'n_o', 'c': 'n_c', 'v': 'n_v'}).iloc[0].to_dict()
+    close_dict = close_candle.rename(columns={'h': 'c_h', 'l':'c_l', 'o':'c_o', 'c': 'c_c', 'v': 'c_v'}).iloc[0].to_dict()
+
+    result = {'noon': noon, 'close':close,  **noon_dict, **close_dict}
     results.append(result)
 
+
+##%%
   results_df = pd.DataFrame(results)
   results_df.to_pickle(f'{directory}/{symbol}_fri_mon.pkl')
 
@@ -155,11 +130,6 @@ for symbol, tz in symbols:
   print(f'higher thu high, higher mon high {num_higher_thu_higher_mon_high} pct {num_higher_thu_higher_mon_high/num_higher_thu_high:.2%}')
   num_higher_thu_lower_mon_high = results_df[~lower_thu_high & ~higher_mon_high].shape[0]
   print(f'higher thu high, lower mon high {num_higher_thu_higher_mon_high} pct {num_higher_thu_higher_mon_high/num_higher_thu_high:.2%}')
-# results_df[(results_df.t_h > results_df.f_h) & (results_df.f_c > results_df.m_l)]
-# results_df[(results_df.t_h > results_df.f_h) & (results_df.f_c > results_df.m_l)].size
-# results_df[(results_df.t_h > results_df.f_h) & (results_df.f_c > results_df.m_l)].shape
-# results_df[(results_df.f_c > results_df.m_l)].shape
-# results_df[(results_df.t_h < results_df.f_h) & (results_df.f_c > results_df.m_l)].shape
 
 #%%
 # Map the custom column names to the required OHLC column names

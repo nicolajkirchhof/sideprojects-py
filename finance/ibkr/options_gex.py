@@ -22,6 +22,8 @@ import dateutil
 
 import influxdb as idb
 
+from finance.ibkr.utils import get_options_data
+
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
@@ -46,27 +48,9 @@ print(details[0].longName)
 
 # Ensure the contract details are validated via IB
 ib_con.qualifyContracts(contract)
-#%%
-def get_frozen_and_live_data(contracts, tick_list = "100, 101, 104, 105, 106, 165, 588", signalParameter="ask"):
-  contracts = contracts if isinstance(contracts, list) else [contracts]
-  ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
-  snapshots = []
-  for contract in contracts:
-      snapshots.append(ib_con.reqMktData(contract, tick_list, False, False))
-  while any([snapshot.last < 0 for snapshot in snapshots]):
-    print("Waiting for frozen data...")
-    ib_con.sleep(1)
-  ib_con.reqMarketDataType(1)  # Use free, delayed, frozen data
-  while any([ib.util.isNan(getattr(snapshot, signalParameter)) for snapshot in snapshots]):
-    print("Waiting for live data...")
-    ib_con.sleep(1)
-  for contract in contracts:
-    ib_con.cancelMktData(contract)
-  return snapshots
-
 
 #%%
-contract_ticker = get_frozen_and_live_data(contract, signalParameter="impliedVolatility")
+contract_ticker = get_options_data(contract, signalParameterLive="impliedVolatility")
 
 spot = contract_ticker.last
 hv = contract_ticker.histVolatility
