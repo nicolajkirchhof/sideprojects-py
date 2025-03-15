@@ -48,4 +48,13 @@ sigma_move, max_value, min_value = ibkr_utils.get_sigma_move(contract_ticker, 1.
 relevant_option_contract_details = [od.contract for od in option_contract_details if min_value <= od.contract.strike <= max_value]
 
 #%%
-option_contract_details_ticker = ibkr_utils.get_options_data(ib_con, relevant_option_contract_details, signalParameterFrozen="modelGreeks")
+option_contract_details_ticker = ibkr_utils.get_options_data(ib_con, relevant_option_contract_details, signalParameterFrozen="modelGreeks", max_waittime=600)
+valid_option_contract_details_ticker  = [ocdt for ocdt in option_contract_details_ticker if ocdt.modelGreeks is not None]
+
+#%%
+low_put_wing = [ticker for ticker in valid_option_contract_details_ticker if ticker.contract.right == 'P' and  ticker.modelGreeks.delta <= -0.2][0]
+atm_put = [ticker for ticker in valid_option_contract_details_ticker if ticker.contract.right == 'P' and  ticker.contract.strike > contract_ticker.last][0]
+high_call_wing = [ticker for ticker in valid_option_contract_details_ticker if ticker.contract.right == 'C' and  ticker.modelGreeks.delta >= 0.2][-1]
+atm_call = [ticker for ticker in valid_option_contract_details_ticker if ticker.contract.right == 'C' and  ticker.contract.strike < contract_ticker.last][-1]
+
+#%% Create order and submit

@@ -26,7 +26,7 @@ mpl.use('QtAgg')
 # noinspection PyStatementEffect
 %autoreload 2
 
-# %%
+## %%
 ib.util.startLoop()
 ib_con = ib.IB()
 tws_real_port = 7497
@@ -36,7 +36,7 @@ api_paper_port = 4002
 # ib_con.connect('127.0.0.1', api_paper_port, clientId=12, readonly=True)
 ib_con.connect('127.0.0.1', tws_paper_port, clientId=10, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
-# %%
+## %%
 influx_client = idb.InfluxDBClient()
 influx_client.create_database('index')
 # influx_client.create_database('future')
@@ -45,7 +45,7 @@ influx_client.create_database('cfd')
 influx_client.create_database('forex')
 # influx schema
 
-# %%
+## %%
 eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50']]
 us_indices = [ib.Index('SPX', 'CBOE', 'USD'), ib.Index('NDX', 'NASDAQ', 'USD'),
               ib.Index('RUT', 'RUSSELL', 'USD'), ib.Index('INDU', 'CME', 'USD')]
@@ -84,13 +84,15 @@ for contract in contracts:
   print(details[0].longName)
 # # # contract_ticker = ib_con.reqMktData(contracts[0], '236, 233, 293, 294, 295, 318, 411, 595', True, False)
 
-# %%
+## %%
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
                            'OPTION_IMPLIED_VOLATILITY']
 types_of_data = {'IND': ['TRADES'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
 database_lookup = {'IND': 'index', 'CFD': 'cfd', 'CONTFUT': 'future', 'FUT': 'future', 'CASH': 'forex'}
 rth = False
-duration = '14 D'
+#%%
+duration = '10 D'
+offset_days = 9
 barSize = '1 min'
 
 startDateTime = dateutil.parser.parse('2013-06-01')
@@ -117,7 +119,7 @@ field_name_lu = {
 # for stock_name in stock_names:
 # details = ib_con.reqContractDetails(contract)
 current_date = startDateTime
-for contract in contracts:
+for contract in contracts[7:]:
   dfs_contract = {}
   for typ in types_of_data[contract.secType]:
     c_last = influx_client_df.query(f'select last("c") from {contract_to_fieldname(contract)}',
@@ -128,7 +130,7 @@ for contract in contracts:
       current_date = startDateTime
     while current_date < endDateTime:
       ##%%
-      current_date = current_date + pd.Timedelta(days=13)
+      current_date = current_date + pd.Timedelta(days=offset_days)
       endDateTimeString = current_date.strftime('%Y%m%d %H:%M:%S') if not contract.secType == 'CONTFUT' else ""
       data = ib_con.reqHistoricalData(contract, endDateTime=endDateTimeString, durationStr=duration,
                                       barSizeSetting=barSize, whatToShow=typ, useRTH=rth)
