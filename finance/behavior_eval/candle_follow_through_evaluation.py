@@ -23,8 +23,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, mean_squared_error, r2_score
 
-from finance.behavior_eval.influx_utils import get_candles_range_aggregate_query, get_candles_range_raw_query
-
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload

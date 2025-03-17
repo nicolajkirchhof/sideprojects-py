@@ -1,3 +1,5 @@
+from typing import Literal
+
 import ib_async as ib
 import numpy as np
 from datetime import datetime, timedelta
@@ -60,7 +62,7 @@ def third_fridays_of_months(year):
 def get_and_qualify_contract_details(ib_con, contract):
   details = ib_con.reqContractDetails(contract)
   print(details[0].longName)
-  ib_con.qualifyContracts(contract)
+  ib_con.qualifyContracts(details[0].contract)
   return details[0]
 
 
@@ -69,3 +71,9 @@ def get_sigma_move(contract_ticker, sigma, num_days):
   max_value = np.ceil(contract_ticker.last + sigma * sigma_move)
   min_value = np.floor(contract_ticker.last - sigma * sigma_move)
   return sigma_move, max_value, min_value
+
+def get_last_available(ticker, type: Literal["last", "bid", "ask"] = "last"):
+  value = getattr(ticker, type)
+  if np.isnan(value) or value is None or value < 0:
+    value = getattr(ticker, "prev" + type.capitalize())
+  return value

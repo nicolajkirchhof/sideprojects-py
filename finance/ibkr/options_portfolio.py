@@ -2,7 +2,7 @@
 from datetime import datetime
 
 import ib_async as ib
-import finance.ibkr.utils as ibkr_utils
+import finance.utils as utils
 
 %load_ext autoreload
 %autoreload 2
@@ -63,7 +63,7 @@ for position in option_positions:
 
   greeks = market_data.modelGreeks
   iv = greeks.impliedVol if greeks.impliedVol is not None else -1
-  daily_iv = ibkr_utils.yearly_to_daily_iv(iv)
+  daily_iv = utils.ibkr.yearly_to_daily_iv(iv)
   ##%% Greeks sometimes return None
   greeks_to_str = lambda x: f'{x:.2}' if x is not None else 'NaN'
   mkt_price = market_data.last * float(market_data.contract.multiplier)

@@ -2,12 +2,10 @@
 # from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 import dateutil
-import numpy as np
-import scipy
 # from ib_async import ib
 import ib_async as ib
 # util.startLoop()  # uncomment this line when in a notebook
-import backtrader as bt
+
 
 import pandas as pd
 
@@ -15,7 +13,9 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
-import datetime
+from datetime import datetime
+import dateutil
+from finance import utils
 
 import influxdb as idb
 
@@ -27,33 +27,28 @@ mpl.use('QtAgg')
 %autoreload 2
 
 ## %%
+influx_client_df, influx_client = utils.influx.get_influx_clients()
+
 ib.util.startLoop()
 ib_con = ib.IB()
 tws_real_port = 7497
 tws_paper_port = 7497
 api_real_port = 4002
 api_paper_port = 4002
-# ib_con.connect('127.0.0.1', api_paper_port, clientId=12, readonly=True)
-ib_con.connect('127.0.0.1', tws_paper_port, clientId=10, readonly=True)
+# ib_con.connect('127.0.0.1', api_paper_port, clientId=3, readonly=True)
+ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
 ## %%
-influx_client = idb.InfluxDBClient()
-influx_client.create_database('index')
-# influx_client.create_database('future')
-influx_client_df = idb.DataFrameClient()
-influx_client.create_database('cfd')
-influx_client.create_database('forex')
-# influx schema
 
 ## %%
 eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50']]
 us_indices = [ib.Index('SPX', 'CBOE', 'USD'), ib.Index('NDX', 'NASDAQ', 'USD'),
               ib.Index('RUT', 'RUSSELL', 'USD'), ib.Index('INDU', 'CME', 'USD')]
 fr_index = ib.Index('CAC40', 'MONEP', 'EUR')
-es_index = ib.Index('IBEX35', 'MEFFRV', 'EUR')
+# es_index = ib.Index('IBEX35', 'MEFFRV', 'EUR')
 jp_index = ib.Index('N225', 'OSE.JPN', 'JPY')
 hk_index = ib.Index('HSI', 'HKFE', 'HKD')
-indices = [*eu_indices, *us_indices, es_index, jp_index, fr_index, hk_index]
+indices = [*eu_indices, *us_indices, jp_index, fr_index, hk_index]
 ## %%
 index_cfd_euro = ['IBGB100', 'IBEU50', 'IBDE40', 'IBFR40', 'IBES35', 'IBNL25', 'IBCH20']
 index_cfd_us = ['IBUS500', 'IBUS30', 'IBUST100']
@@ -67,17 +62,17 @@ forex = [ib.Forex(symbol=sym, exchange='IDEALPRO', currency=cur) for sym, cur in
           ('USD', 'JPY'), ('CHF', 'USD')]]
 
 ## %%
-# eu_futures = [ib.ContFuture(symbol=x, multiplier='1', exchange='EUREX',currency='EUR', includeExpired=True) for x in ['DAX', 'ESTX50']]
-# us_futures =[*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange='CME',currency='USD', includeExpired=True) for x in [('MES', '5'), ('MNQ', '2'), ('RTY', '50')]],
-#              ib.ContFuture(symbol='MYM', multiplier='0.5', exchange='CBOT',currency='USD', includeExpired=True),
-#             ib.ContFuture(symbol='VXM', multiplier='100', exchange='CFE',currency='USD', includeExpired=True)]
-# jp_futures = [ib.ContFuture(symbol='N225M', multiplier='100', exchange='OSE.JPN',currency='JPY', includeExpired=True)]
-# swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',currency='SEK', includeExpired=True)]
+eu_futures = [ib.ContFuture(symbol=x, multiplier='1', exchange='EUREX',currency='EUR') for x in ['DAX', 'ESTX50']]
+us_futures =[*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange='CME',currency='USD') for x in [('MES', '5'), ('MNQ', '2'), ('RTY', '50')]],
+             ib.ContFuture(symbol='MYM', multiplier='0.5', exchange='CBOT',currency='USD'),
+            ib.ContFuture(symbol='VXM', multiplier='100', exchange='CFE',currency='USD')]
+jp_futures = [ib.ContFuture(symbol='N225M', multiplier='100', exchange='OSE.JPN',currency='JPY')]
+swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',currency='SEK')]
 #
 # # contracts = indices
-# futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
+futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 # contracts = [*futures, *indices]
-contracts = [*index_cfds, *indices, *forex]
+contracts = [*index_cfds, *indices, *forex, *futures]
 
 for contract in contracts:
   details = ib_con.reqContractDetails(contract)
@@ -90,7 +85,7 @@ available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTO
 types_of_data = {'IND': ['TRADES'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
 database_lookup = {'IND': 'index', 'CFD': 'cfd', 'CONTFUT': 'future', 'FUT': 'future', 'CASH': 'forex'}
 rth = False
-#%%
+##%%
 duration = '10 D'
 offset_days = 9
 barSize = '1 min'
@@ -98,7 +93,7 @@ barSize = '1 min'
 startDateTime = dateutil.parser.parse('2013-06-01')
 # startDateTime = dateutil.parser.parse('2025-03-10')
 # endDateTime=dateutil.parser.parse('2013-06-08')
-endDateTime = datetime.datetime.now()
+endDateTime = datetime.now()
 
 
 def contract_to_fieldname(contract):
@@ -119,7 +114,7 @@ field_name_lu = {
 # for stock_name in stock_names:
 # details = ib_con.reqContractDetails(contract)
 current_date = startDateTime
-for contract in contracts[7:]:
+for contract in contracts:
   dfs_contract = {}
   for typ in types_of_data[contract.secType]:
     c_last = influx_client_df.query(f'select last("c") from {contract_to_fieldname(contract)}',
@@ -135,7 +130,7 @@ for contract in contracts[7:]:
       data = ib_con.reqHistoricalData(contract, endDateTime=endDateTimeString, durationStr=duration,
                                       barSizeSetting=barSize, whatToShow=typ, useRTH=rth)
       ##%%
-      print(f'{datetime.datetime.now()} : {contract_to_fieldname(contract)} => {typ} {current_date} #{len(data)}')
+      print(f'{datetime.now()} : {contract_to_fieldname(contract)} => {typ} {current_date} #{len(data)}')
       if not data:
         continue
       dfs_type = ib.util.df(data).rename(columns=field_name_lu[typ]).set_index('date').tz_localize('UTC')
