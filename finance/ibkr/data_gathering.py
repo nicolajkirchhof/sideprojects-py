@@ -1,23 +1,11 @@
 # %%
-# from __future__ import (absolute_import, division, print_function, unicode_literals)
-
-import dateutil
-# from ib_async import ib
 import ib_async as ib
-# util.startLoop()  # uncomment this line when in a notebook
-
-
 import pandas as pd
 
-import matplotlib.pyplot as plt
 import matplotlib as mpl
-import matplotlib.dates as mdates
-import matplotlib.ticker as mticker
 from datetime import datetime
 import dateutil
 from finance import utils
-
-import influxdb as idb
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
@@ -27,6 +15,7 @@ mpl.use('QtAgg')
 %autoreload 2
 
 ## %%
+utils.influx.create_databases()
 influx_client_df, influx_client = utils.influx.get_influx_clients()
 
 ib.util.startLoop()
@@ -40,7 +29,7 @@ ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
 ## %%
 
-## %%
+# %%
 eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50']]
 us_indices = [ib.Index('SPX', 'CBOE', 'USD'), ib.Index('NDX', 'NASDAQ', 'USD'),
               ib.Index('RUT', 'RUSSELL', 'USD'), ib.Index('INDU', 'CME', 'USD')]
@@ -71,8 +60,13 @@ swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',c
 #
 # # contracts = indices
 futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
+
+##%%
+us_etf_symbols = ['SPY', 'QQQ', 'VXX', 'GLD', 'SLV', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLE', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP', 'SMH']
+us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
+
 # contracts = [*futures, *indices]
-contracts = [*index_cfds, *indices, *forex, *futures]
+contracts = [*index_cfds, *indices, *forex, *futures, *us_etfs]
 
 for contract in contracts:
   details = ib_con.reqContractDetails(contract)
@@ -82,8 +76,7 @@ for contract in contracts:
 ## %%
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
                            'OPTION_IMPLIED_VOLATILITY']
-types_of_data = {'IND': ['TRADES'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
-database_lookup = {'IND': 'index', 'CFD': 'cfd', 'CONTFUT': 'future', 'FUT': 'future', 'CASH': 'forex'}
+types_of_data = {'IND': ['TRADES'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
 rth = False
 ##%%
 duration = '10 D'
@@ -97,7 +90,7 @@ endDateTime = datetime.now()
 
 
 def contract_to_fieldname(contract):
-  if contract.secType == 'IND' or contract.secType == 'CFD':
+  if contract.secType == 'IND' or contract.secType == 'CFD' or contract.secType == 'STK':
     return contract.symbol
   if 'FUT' in contract.secType:
     return f'F{contract.symbol}'
@@ -118,7 +111,7 @@ for contract in contracts:
   dfs_contract = {}
   for typ in types_of_data[contract.secType]:
     c_last = influx_client_df.query(f'select last("c") from {contract_to_fieldname(contract)}',
-                                   database=database_lookup[contract.secType])
+                                   database=utils.influx.sec_type_to_database_name(contract.secType))
     if c_last:
       current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime()
     else:
@@ -135,5 +128,5 @@ for contract in contracts:
         continue
       dfs_type = ib.util.df(data).rename(columns=field_name_lu[typ]).set_index('date').tz_localize('UTC')
       influx_client_df.write_points(dfs_type, contract_to_fieldname(contract),
-                                   database=database_lookup[contract.secType])
+                                   database=utils.influx.sec_type_to_database_name(contract.secType))
 

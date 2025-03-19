@@ -16,44 +16,22 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import mplfinance as mpf
 
-from finance.utils.pct import percentage_change
+import finance.utils as utils
 import finplot as fplt
 import pytz
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, mean_squared_error, r2_score
-
-from finance.behavior_eval.influx_utils import get_candles_range_aggregate_query, get_candles_range_raw_query
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-##%% get influx data
-DB_INDEX = 'index'
-DB_CFD = 'cfd'
-DB_FOREX = 'forex'
-
-influx_client_df = idb.DataFrameClient()
-influx_client = idb.InfluxDBClient()
-
-indices = influx_client.query('show measurements', database=DB_INDEX)
-cfds = influx_client.query('show measurements', database=DB_CFD)
-forex = influx_client.query('show measurements', database=DB_FOREX)
-
-get_values = lambda x: [y[0] for y in x.raw['series'][0]['values']]
-print('Indices: ', get_values(indices))
-print('Cfds: ', get_values(cfds))
-print('Forex: ', get_values(forex))
-
-
 # %%
 directory = f'N:/My Drive/Projects/Trading/Research/Plots/thu_fri_mon'
 os.makedirs(directory, exist_ok=True)
 # symbol = 'IBDE40'
-symbols = [('IBDE40', pytz.timezone('Europe/Berlin')), ('IBGB100', pytz.timezone('Europe/London')),
-           *[(x, pytz.timezone('America/New_York')) for x in ['IBUS30', 'IBUS500', 'IBUST100']]]
+# symbols = [('IBDE40', pytz.timezone('Europe/Berlin')), ('IBGB100', pytz.timezone('Europe/London')),
+#            *[(x, pytz.timezone('America/New_York')) for x in ['IBUS30', 'IBUS500', 'IBUST100']]]
+symbols = ['IBDE40', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100']
 
 for symbol, tz in symbols:
 # tz = pytz.timezone('Europe/Berlin')
@@ -147,10 +125,10 @@ for symbol, tz in symbols:
         ax2.axhline(y=prior_close, color="black", linestyle="--", linewidth=1, label="Prior Close")
         ax3.axhline(y=prior_close, color="black", linestyle="--", linewidth=1, label="Prior Close")
 
-      plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
+      # plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
       # plt.savefig(f'finance/_data/dax_plots_mpl/IBDE40_{date_str}.png', dpi=300, bbox_inches='tight')  # High-quality save
-      # plt.show()
-      plt.close()
+      plt.show()
+      # plt.close()
       print(f'finished {symbol} {date_str}')
     except Exception as e:
       print(f'error: {e}')

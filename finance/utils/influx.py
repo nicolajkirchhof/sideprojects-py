@@ -6,8 +6,13 @@ from finance.utils.exchanges import DE_EXCHANGE, US_EXCHANGE, GB_EXCHANGE, JP_EX
 DB_INDEX = 'index'
 DB_CFD = 'cfd'
 DB_FOREX = 'forex'
+DB_ETF = 'etf'
+DB_FUTURE = 'future'
 MPF_COLUMN_MAPPING = ['o', 'h', 'l', 'c', 'v']
 
+SEC_TYPE_DB_MAPPING = {
+  'IND': DB_INDEX, 'CFD': DB_CFD, 'CONTFUT': DB_FUTURE, 'FUT': DB_FUTURE, 'CASH': DB_FOREX, 'STK': DB_ETF,
+}
 
 SYMBOLS = {'IBDE40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBNL25': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
@@ -42,11 +47,13 @@ def get_influx_clients():
   indices = influx_client.query('show measurements', database=DB_INDEX)
   cfds = influx_client.query('show measurements', database=DB_CFD)
   forex = influx_client.query('show measurements', database=DB_FOREX)
+  # etf = influx_client.query('show measurements', database=DB_ETF)
 
   get_values = lambda x: [y[0] for y in x.raw['series'][0]['values']]
   print('Indices: ', get_values(indices))
   print('Cfds: ', get_values(cfds))
   print('Forex: ', get_values(forex))
+  # print('Etfs: ', get_values(etf))
   return influx_client_df, influx_client
 
 
@@ -71,3 +78,16 @@ def get_candles_range_aggregate_query(start, end, symbol, group_by_time=None):
 
 def get_candles_range_raw_query(start, end, symbol):
   return f'select o, c, h, l from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
+
+
+def create_databases():
+  influx_client = idb.InfluxDBClient()
+  influx_client.create_database(DB_INDEX)
+  influx_client.create_database(DB_FOREX)
+  influx_client.create_database(DB_ETF)
+  influx_client.create_database(DB_FUTURE)
+  influx_client.create_database(DB_CFD)
+
+
+def sec_type_to_database_name(sec_type):
+  return SEC_TYPE_DB_MAPPING[sec_type]
