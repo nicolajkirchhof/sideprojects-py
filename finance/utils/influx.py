@@ -66,14 +66,14 @@ def get_candles_range_aggregate(start, end, symbol, group_by_time=None):
   influx_data = influx_client_df.query(query, database=symbol_def['DB'])
   if symbol not in influx_data:
     return None
-  return influx_data[symbol].tz_convert(symbol_def['EX'].tz)
+  return influx_data[symbol].tz_convert(symbol_def['EX']['TZ'])
 
 
 def get_candles_range_aggregate_query(start, end, symbol, group_by_time=None):
   base_query = f'select first(o) as o, last(c) as c, max(h) as h, min(l) as l from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
   if group_by_time is None:
     return base_query
-  return base_query + f' group by time({group_by_time})'
+  return base_query + f' group by time({group_by_time}) fill(none)'
 
 
 def get_candles_range_raw_query(start, end, symbol):
