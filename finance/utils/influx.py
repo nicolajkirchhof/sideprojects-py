@@ -20,7 +20,7 @@ SYMBOLS = {'IBDE40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBES35': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBFR40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBGB100': {'EX': GB_EXCHANGE, 'DB': DB_CFD},
-           'IBEU50': {'EX': US_EXCHANGE, 'DB': DB_CFD},
+           'IBEU50': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBUS30': {'EX': US_EXCHANGE, 'DB': DB_CFD},
            'IBUS500': {'EX': US_EXCHANGE, 'DB': DB_CFD},
            'IBUST100': {'EX': US_EXCHANGE, 'DB': DB_CFD},
@@ -47,13 +47,15 @@ def get_influx_clients():
   indices = influx_client.query('show measurements', database=DB_INDEX)
   cfds = influx_client.query('show measurements', database=DB_CFD)
   forex = influx_client.query('show measurements', database=DB_FOREX)
-  # etf = influx_client.query('show measurements', database=DB_ETF)
+  etf = influx_client.query('show measurements', database=DB_ETF)
+  futures = influx_client.query('show measurements', database=DB_FUTURE)
 
   get_values = lambda x: [y[0] for y in x.raw['series'][0]['values']]
   print('Indices: ', get_values(indices))
   print('Cfds: ', get_values(cfds))
   print('Forex: ', get_values(forex))
-  # print('Etfs: ', get_values(etf))
+  print('Etfs: ', get_values(etf))
+  print('Futures: ', get_values(futures))
   return influx_client_df, influx_client
 
 

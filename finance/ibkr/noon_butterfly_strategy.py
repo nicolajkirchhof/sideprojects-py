@@ -19,7 +19,7 @@ ib_con.connect('127.0.0.1', tws_paper_port, clientId=5, readonly=False)
 # ib_con.connect('127.0.0.1', api_real_port, clientId=5, readonly=True)
 ib_con.reqMarketDataType(2)
 
-# %%
+## %%
 eu_indices = [utils.ibkr.get_and_qualify_contract_details(ib_con,ib.Index(x, 'EUREX', 'EUR')) for x in ['DAX', 'ESTX50']]
 us_indices = [utils.ibkr.get_and_qualify_contract_details(ib_con, ib.Index(symbol=x[0], exchange=x[1], currency='USD')) for x in [('XSP', 'CBOE')]]
 de_tz = utils.exchanges.DE_EXCHANGE['TZ']
@@ -31,13 +31,15 @@ trading_class_map = {'DAX': 'ODAP', 'ESTX50': 'OEXP', 'XSP': 'XSP'}
 
 min_noon = datetime.combine(datetime.now().date(), time(11, 45, 00))
 noon = datetime.combine(datetime.now().date(), time(12, 00, 00))
-max_noon = datetime.combine(datetime.now().date(), time(12, 15, 00))
+max_noon = datetime.combine(datetime.now().date(), time(12, 30, 00))
 
 target_times = {'DAX': de_tz, 'ESTX50': de_tz, 'XSP':us_tz}
 indices = [*eu_indices, *us_indices]
+##%%
+contracts_detail = us_indices[0]
+# contracts_detail = eu_indices[1]
 #%%
-# contracts_detail = us_indices[0]
-for contracts_detail in indices:
+for contracts_detail in indices[1:]:
   if not target_times[contracts_detail.contract.symbol].localize(min_noon) <= datetime.now(timezone.utc) <= target_times[contracts_detail.contract.symbol].localize(max_noon):
     print(f'Skipping {contracts_detail.contract.symbol} ...')
     continue
@@ -132,7 +134,7 @@ for contracts_detail in indices:
 
   combo_contract.comboLegs = [leg_low_put_wing, leg_atm_put, leg_high_call_wing, leg_atm_call]
 
-  ## %%
+## %%
   # Specify the order
   order = ib.LimitOrder(
     action="BUY",  # Action for the entire combo
@@ -140,8 +142,19 @@ for contracts_detail in indices:
     lmtPrice=combo_contract_ask_price(),  # Specify your limit price
     transmit=False
   )
+
   trade = ib_con.placeOrder(combo_contract, order)
-  ib_con.sleep(1)
+  ib_con.sleep(5)
+  bid_ask_spread = combo_contract_ask_price() - combo_contract_bid_price()
+  bid_ask_spread_pct = bid_ask_spread * 0.1 if bid_ask_spread * 0.1 >= 0.1 else 0.1
+
+##%%
+  order.transmit = True
+  while trade.orderStatus.status != 'Filled':
+    order.lmtPrice = round(order.lmtPrice + bid_ask_spread_pct, 1)
+    print(f'Adapted order price to {order.lmtPrice} ...')
+    ib_con.placeOrder(combo_contract, order)
+    ib_con.sleep(5)
 
   # %%
   # ib_con.cancelMktData(low_put_wing.contract)

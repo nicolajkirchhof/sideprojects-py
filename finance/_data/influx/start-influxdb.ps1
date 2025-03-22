@@ -1,2 +1,2 @@
 cd $PSScriptRoot
-influxd -config influxdb.conf
+./influxd.exe -config influxdb.conf

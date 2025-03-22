@@ -62,25 +62,27 @@ swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',c
 futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 
 ##%%
-us_etf_symbols = ['SPY', 'QQQ', 'VXX', 'GLD', 'SLV', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLE', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP', 'SMH']
-us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
+##%% To be evaluated ['QQQ']
+# us_etf_symbols = ['SPY', 'QQQ', 'GLD', 'SLV', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLE', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP', 'SMH']
+# us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
 # contracts = [*futures, *indices]
-contracts = [*index_cfds, *indices, *forex, *futures, *us_etfs]
+contracts = [ *index_cfds, *indices, *forex, *futures,]
 
 for contract in contracts:
+  ib_con.qualifyContracts(contract)
   details = ib_con.reqContractDetails(contract)
   print(details[0].longName)
 # # # contract_ticker = ib_con.reqMktData(contracts[0], '236, 233, 293, 294, 295, 318, 411, 595', True, False)
 
-## %%
+# %%
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
                            'OPTION_IMPLIED_VOLATILITY']
 types_of_data = {'IND': ['TRADES'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
 rth = False
 ##%%
-duration = '10 D'
-offset_days = 9
+duration = '5 D'
+offset_days = 4
 barSize = '1 min'
 
 startDateTime = dateutil.parser.parse('2013-06-01')
@@ -105,7 +107,6 @@ field_name_lu = {
 
 
 # for stock_name in stock_names:
-# details = ib_con.reqContractDetails(contract)
 current_date = startDateTime
 for contract in contracts:
   dfs_contract = {}
