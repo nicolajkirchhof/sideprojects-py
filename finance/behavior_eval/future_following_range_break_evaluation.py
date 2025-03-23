@@ -16,6 +16,8 @@ import matplotlib.ticker as mticker
 import mplfinance as mpf
 
 import finance.utils as utils
+from finance.behavior_eval.noon_to_close import pct_change
+
 pd.options.plotting.backend = "matplotlib"
 pd.set_option("display.max_columns", None)  # None means "no limit"
 pd.set_option("display.max_rows", None)  # None means "no limit"
@@ -46,7 +48,9 @@ S_cbc_20_pct_up = 'cbc_20_pct_up'
 
 
 #%%
-timeranges = ['2m', '10m', '5m', '15m']
+
+symbol = symbols[1]
+timeranges = ['2m', '10m', '5m']
 dfs_follow = []
 for timerange in timeranges:
   # files = glob.glob(f'{symbol_directory}/*2023*.pkl')
@@ -78,11 +82,22 @@ def move_max(x):
 
 df_follow['move'] = df_follow.apply(lambda x: utils.pct.percentage_change(x.entry, x.stopout) if x.type == 'long' else utils.pct.percentage_change(x.stopout, x.entry), axis=1)
 df_follow['move_max'] = df_follow.apply(move_max, axis=1)
-df_follow['move_pts'] = df_follow.apply(lambda x:  x.stopout - x.entry - 2 if x.type == 'long' else x.entry - x.stopout -2, axis=1)
+# df_follow['move_pts'] = df_follow.apply(lambda x:  x.stopout - x.entry - 2 if x.type == 'long' else x.entry - x.stopout -2, axis=1)
 #%%
-df_follow['low_5'] = np.nan
 for i in range(1, 5):
   df_follow[f'move_{i}'] = df_follow.apply(lambda x:  utils.pct.percentage_change( x.entry, x[f'high_{i}']) if x.type == 'long' else utils.pct.percentage_change(x[f'low_{i}'], x.entry), axis=1)
+
+# %%
+def pct_loss(x):
+  return x.sum()/x.count()
+
+# df_follow[df_follow['type'] == 'long'].groupby(['strategy']).agg({'loss':['sum', 'count', pct_loss]})
+print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'loss':['sum', 'count', pct_loss], }))
+print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'candles':['mean', 'median', 'std']}))
+print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move':['mean', 'median', 'std', 'sum']}))
+# print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_max':['mean', 'median', 'std', 'sum']}))
+# print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_pts':['mean', 'median', 'std', 'sum']}))
+
 #%%
 print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move':['mean', 'median', 'std', 'sum']}))
 # print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_1':['mean', 'median', 'std', 'sum']}))
@@ -95,20 +110,16 @@ print(df_filtred.groupby(['timerange', 'strategy', 'type']).agg({'move':['sum'],
 
 
 # df_follow['loss'] = df_follow.apply(lambda x: x.low > x.stopout if x.type == 'long' else x.stopout > x.high, axis=1)
-# %%
-def pct_loss(x):
-  return x.sum()/x.count()
-
-# df_follow[df_follow['type'] == 'long'].groupby(['strategy']).agg({'loss':['sum', 'count', pct_loss]})
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'loss':['sum', 'count', pct_loss], }))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'candles':['mean', 'median', 'std']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_max':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_pts':['mean', 'median', 'std', 'sum']}))
 #%%
 # print(df_follow.groupby(['timerange', 'strategy', 'type', 'candles']).agg({'loss':['sum', 'count', pct_loss]}))
 df_filtred = df_follow[df_follow['timerange'].isin(['2m', '5m']) & df_follow['strategy'].isin([S_cbc_10_pct, S_cbc_10_pct_up])]
 print(df_filtred.groupby(['timerange', 'strategy', 'type', 'candles']).agg({'loss':['sum', 'count', pct_loss]}))
+
+#%%
+df_filtred = df_follow[df_follow['timerange'].isin(['2m', '5m', '10m']) & df_follow['strategy'].isin([S_cbc_10_pct, S_cbc, S_cbc_10_pct_up])]
+df_filtred.groupby(['timerange', 'strategy', 'type', 'candles']).agg({'loss':[pct_loss]}).plot(kind='bar', stacked=True, figsize=(12, 8))
+plt.show()
+
 #%%
 df_follow[df_follow['loss']].agg({'move':['sum']})
 # %%
@@ -128,16 +139,18 @@ print(df_follow.groupby(['timerange', 'type','loss', 'strategy']).agg({'candles'
 print(df_follow.groupby(['timerange', 'type','loss', 'strategy']).agg({'move_max':['mean', 'median', 'std', 'sum']}))
 
 #%%
-S_01_pct = '01_pct'
-S_02_pct = '02_pct'
-S_cbc = 'cbc'
-S_cbc_10_pct = 'cbc_10_pct'
-S_cbc_20_pct = 'cbc_20_pct'
-
-strategies = [S_01_pct, S_02_pct, S_cbc, S_cbc_10_pct, S_cbc_20_pct]
+# strategies = [s_01_pct, s_02_pct, S_cbc, S_cbc_10_pct, S_cbc_20_pct]
+strategies = [S_cbc_10_pct, S_cbc, S_cbc_10_pct_up]
 strategiesToNumber = dict(zip(strategies,  [0, 1, 2, 3, 4]))
+# df_follow['strategyId'] = df_follow.apply(lambda x: strategiesToNumber[x.strategy], axis=1)
 
-df_follow['strategyId'] = df_follow.apply(lambda x: strategiesToNumber[x.strategy], axis=1)
+for type in ['long', 'short']:
+  fig, axs = plt.subplots(len(strategies), len(timeranges), tight_layout=True, figsize=(24, 13))
+  fig.suptitle(f'{symbol} {type}')
+  for i, timerange in enumerate(timeranges):
+    for j, strategy in enumerate(strategies):
+      df_follow[(df_follow['type'] == type) & (df_follow['strategy'] == strategy) & (df_follow['timerange'] == timerange)].groupby(['candles']).agg({'loss':pct_change}).plot(kind='bar', x='candles', y='move', ax=axes[i])
+
 
 
 #%%

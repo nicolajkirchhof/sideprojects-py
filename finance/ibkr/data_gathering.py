@@ -67,7 +67,7 @@ futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 # us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
 # contracts = [*futures, *indices]
-contracts = [ *index_cfds, *indices, *forex, *futures,]
+contracts = [ *indices, *index_cfds, *forex, *futures,]
 
 for contract in contracts:
   ib_con.qualifyContracts(contract)
@@ -75,14 +75,14 @@ for contract in contracts:
   print(details[0].longName)
 # # # contract_ticker = ib_con.reqMktData(contracts[0], '236, 233, 293, 294, 295, 318, 411, 595', True, False)
 
-# %%
+## %%
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
                            'OPTION_IMPLIED_VOLATILITY']
-types_of_data = {'IND': ['TRADES'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
+types_of_data = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY','OPTION_IMPLIED_VOLATILITY'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
 rth = False
 ##%%
-duration = '5 D'
-offset_days = 4
+duration = '10 D'
+offset_days = 9
 barSize = '1 min'
 
 startDateTime = dateutil.parser.parse('2013-06-01')
@@ -102,6 +102,8 @@ def contract_to_fieldname(contract):
 field_name_lu = {
   'TRADES': {'open': 'o', 'high': 'h', 'low': 'l', 'close': 'c', 'volume': 'v', 'average': 'a', 'barCount': 'bc'},
   'MIDPOINT': {'open': 'o', 'high': 'h', 'low': 'l', 'close': 'c', 'volume': 'v', 'average': 'a', 'barCount': 'bc'},
+  'HISTORICAL_VOLATILITY': {'open': 'hvo', 'high': 'hvh', 'low': 'hvl', 'close': 'hvc', 'volume': 'hvv', 'average': 'hva', 'barCount': 'hvbc'},
+  'OPTION_IMPLIED_VOLATILITY': {'open': 'ivo', 'high': 'ivh', 'low': 'ivl', 'close': 'ivc', 'volume': 'ivv', 'average': 'iva', 'barCount': 'ivbc'},
 }
 ## %%
 
@@ -111,7 +113,8 @@ current_date = startDateTime
 for contract in contracts:
   dfs_contract = {}
   for typ in types_of_data[contract.secType]:
-    c_last = influx_client_df.query(f'select last("c") from {contract_to_fieldname(contract)}',
+    field_name = field_name_lu[typ]['close']
+    c_last = influx_client_df.query(f'select last("{field_name}") from {contract_to_fieldname(contract)}',
                                    database=utils.influx.sec_type_to_database_name(contract.secType))
     if c_last:
       current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime()

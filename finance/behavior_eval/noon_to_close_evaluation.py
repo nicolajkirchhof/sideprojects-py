@@ -16,6 +16,10 @@ import matplotlib.ticker as mticker
 import mplfinance as mpf
 
 import finance.utils as utils
+from finance.behavior_eval.noon_to_close import df_noon, df_close
+
+import blackscholes as bs
+
 pd.options.plotting.backend = "matplotlib"
 pd.set_option("display.max_columns", None)  # None means "no limit"
 pd.set_option("display.max_rows", None)  # None means "no limit"
@@ -30,8 +34,106 @@ mpl.use('QtAgg')
 # %%
 directory = f'N:/My Drive/Projects/Trading/Research/Strategies/noon_to_close'
 os.makedirs(directory, exist_ok=True)
-symbols = ['IBDE40', 'IBEU50', 'IBUS500']
+symbols = ['DAX', 'ESTX50', 'SPX']
 symbol = symbols[0]
+#%%
+eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
+
+# risk_free_rate_year = df_treasury[df_treasury['observation_date'] <= stock_info.date.iat[0]].tail(1)['THREEFY1'].iat[0]/100
+iv = df_noon.ivc.iat[0]
+iv_day = iv / np.sqrt(252)
+underlying = df_noon.c.iat[0]
+risk_free_rate_year = eu_interest[eu_interest.index < str(df_noon.index[0].date())].iloc[-1].Main/100
+multiple = 25
+#%%
+underlying_low = underlying - underlying * 2 * iv_day
+underlying_high = underlying + underlying * 2 * iv_day
+underlying_low_boundary = int(np.floor(underlying_low/multiple)*multiple)
+underlying_high_boundary = int(np.ceil(underlying_high/multiple)*multiple)
+strikes = range(underlying_low_boundary, underlying_high_boundary, multiple)
+
+#%%
+opts = []
+for strike in strikes:
+  S = underlying
+  K = strike
+  T = 0.5 / 365
+  r = risk_free_rate_year
+  sigma = iv #*np.sqrt(252)
+
+  call = bs.BlackScholesCall(S, K, T, r, sigma)
+  put = bs.BlackScholesPut(S, K, T, r, sigma)
+  v_call = vars(call)
+  v_call['right'] = 'C'
+  v_put = vars(put)
+  v_put['right'] = 'P'
+  opts.append({'right':'C', 'delta': call.delta(), 'theta': call.theta(), 'gamma': call.gamma(), 'vega': call.vega(), 'price': call.price(), 'strike': K, 'pos':0})
+  opts.append({'right':'P', 'delta': put.delta(), 'theta': put.theta(), 'gamma': put.gamma(), 'vega': put.vega(), 'price': put.price(), 'strike': K, 'pos':0})
+  print(f'{call.price():.3f} Δ {call.delta():.3f} Θ {call.theta():.3f} Γ {call.gamma():.3f} ν {call.vega():.3f} {K} C -- {K} -- P {put.price():.3f} Δ {put.delta():.3f} Θ {put.theta():.3f} Γ {put.gamma():.3f} ν {put.vega():.3f} ')
+
+df_opts = pd.DataFrame(opts)
+
+#%%
+# search butterfly
+wing_call = df_opts[(df_opts['delta'] > 0.2) & (df_opts['right'] == 'C')].iloc[-1]
+wing_call.pos = 1
+atm_call = df_opts[(df_opts['strike'] < underlying) & (df_opts['right'] == 'C')].iloc[-1]
+atm_call.pos = -1
+wing_put = df_opts[(df_opts['delta'] < -0.2) & (df_opts['right'] == 'P')].iloc[0]
+wing_put.pos = 1
+atm_put = df_opts[(df_opts['strike'] > underlying) & (df_opts['right'] == 'P')].iloc[0]
+atm_put.pos = -1
+
+close = df_close.c.iat[0]
+pnl = utils.options.iron_butterfly_profit_loss(close, wing_call, atm_call, atm_put, wing_put)
+print(f'''
+  Created butterfly 
+  Noon: {underlying} 
+  \t\t\tWingPut: Buy {wing_put.strike} @ {wing_put.price} 
+  AtmCall:  Sell {atm_call.strike} @ -{atm_call.price}
+  \t\t\tAtmPut:  Sell {atm_call.strike} @ -{atm_put.price}
+  WingCall: Buy {wing_call.strike} @ {wing_call.price}
+  
+  Close: {close}
+  PnL: {pnl:.2f}
+''')
+#%%
+
+#%%
+
+
+#%%
+# Generate a range of stock prices
+stock_prices = np.linspace(underlying_low_boundary, underlying_high_boundary, 50)  # From $560 to $575
+
+# Calculate P/L for each stock price
+pnl_values = [utils.options.iron_butterfly_profit_loss(S, wing_call, atm_call, atm_put, wing_put) for S in stock_prices]
+
+# Plot the P/L curve
+plt.figure(figsize=(10, 6))
+plt.plot(stock_prices, pnl_values, label="Iron Butterfly P/L", color="blue")
+plt.axhline(0, color="black", linestyle="--", linewidth=1, label="Breakeven Line")  # Breakeven line
+plt.axvline(wing_put.strike, color="green", linestyle="--", label=f"Protective Put Strike (K0={wing_put.strike})")
+plt.axvline(atm_put.strike, color="orange", linestyle="--", label=f"Short Put Strike (K1={atm_put.strike})")
+plt.axvline(atm_call.strike, color="red", linestyle="--", label=f"Short Call Strike (K3={atm_call.strike})")
+plt.axvline(wing_call.strike, color="purple", linestyle="--", label=f"Protective Call Strike (K4={wing_call.strike})")
+plt.title("Iron Butterfly Profit/Loss at Expiration")
+plt.xlabel("Stock Price at Expiration (S)")
+plt.ylabel("Profit/Loss ($)")
+plt.legend()
+plt.grid()
+plt.show()
+
+#%%
+# Strategy parameters
+K0 = 562  # Protective Put Strike
+K1 = 567  # Short Put Strike
+K3 = 566  # Short Call Strike
+K4 = 571  # Protective Call Strike
+P0 = 0.78  # Premium Paid for Protective Put
+P1 = 2.21  # Premium Received for Short Put
+P3 = 2.65  # Premium Received for Short Call
+P4 = 0.64  # Premium Paid for Protective Call
 
 #%%
 file = f'{directory}/{symbol}_noon_to_close.pkl'

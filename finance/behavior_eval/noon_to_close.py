@@ -29,10 +29,11 @@ os.makedirs(directory, exist_ok=True)
 # symbol = 'IBDE40'
 # symbols = [('IBDE40', pytz.timezone('Europe/Berlin')), ('IBGB100', pytz.timezone('Europe/London')),
 #            *[(x, pytz.timezone('America/New_York')) for x in ['IBUS30', 'IBUS500', 'IBUST100']]]
-symbols = ['IBDE40', 'IBEU50', 'IBUS500']
+# symbols = ['IBDE40', 'IBEU50', 'IBUS500']
+symbols = ['DAX', 'ESTX50', 'SPX']
 
 symbol = symbols[0]
-for symbol in symbols[1:]:
+# for symbol in symbols[1:]:
   # Create a directory
   symbol_def = utils.influx.SYMBOLS[symbol]
   tz = symbol_def['EX']['TZ']
@@ -44,19 +45,19 @@ for symbol in symbols[1:]:
   prior_close = None
   dfs = []
   offset = timedelta(minutes=5)
-  ## %%
+  # %%
   while day_start < last_day:
     # get the following data for daily assignment
     noon = day_start + symbol_def['EX']['Open'] + timedelta(hours=3)
     close_time = day_start + symbol_def['EX']['Close']
-    df_noon = utils.influx.get_candles_range_aggregate(noon - offset, noon + offset, symbol)
+    df_noon = utils.influx.get_candles_range_aggregate(day_start, noon + offset, symbol)
     day_end = day_start + timedelta(days=1)
-    df_day = utils.influx.get_candles_range_aggregate(day_start, day_start + timedelta(days=1), symbol, '1h')
+    # df_day = utils.influx.get_candles_range_aggregate(day_start, day_start + timedelta(days=1), symbol, '1h')
     if df_noon is None:
       print(f'no data for {day_start.isoformat()}')
       day_start = day_end
       continue
-    df_close = utils.influx.get_candles_range_aggregate(close_time - offset, close_time, symbol)
+    df_close = utils.influx.get_candles_range_aggregate(noon, close_time, symbol)
     if df_close is None:
       print(f'no data for close')
       day_start = day_end
@@ -65,7 +66,10 @@ for symbol in symbols[1:]:
     noon_value = (df_noon.iloc[-1].h + df_noon.iloc[-1].l) / 2
     end_of_day = df_close.iloc[-1].c
     pct_change = (end_of_day - noon_value) / noon_value * 100
-    dfs.append({'date': day_start,'noon': noon_value, 'close': end_of_day, 'pct_change': pct_change, 'symbol': symbol})
+    noon_hvc = df_noon.hvc if 'hvc' in df_noon else np.nan
+    close_hvc = df_close.hvc if 'hvc' in df_close else np.nan
+    dfs.append({'date': day_start,'noon': noon_value, 'close': end_of_day, 'pct_change': pct_change, 'symbol': symbol,
+                'noon_hv':noon_hvc, 'noon_iv': df_noon.ivc, 'close_hv':close_hvc, 'close_iv': df_close.ivc})
     day_start = day_end
     print(f'Done {symbol} {day_start.isoformat()}')
 
