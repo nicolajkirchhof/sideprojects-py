@@ -10,13 +10,14 @@ import finance.utils as utils
 ##%%
 ib.util.startLoop()
 ib_con = ib.IB()
-tws_real_port = 7497
+tws_real_port = 7498
 tws_paper_port = 7497
 api_real_port = 4001
 api_paper_port = 4002
+# ib_con.connect('127.0.0.1', tws_real_port, clientId=11, readonly=True)
 # ib_con.connect('127.0.0.1', api_paper_port, clientId=11, readonly=True)
-ib_con.connect('127.0.0.1', tws_paper_port, clientId=11, readonly=True)
-# ib_con.connect('127.0.0.1', api_real_port, clientId=11, readonly=True)
+# ib_con.connect('127.0.0.1', tws_paper_port, clientId=11, readonly=True)
+ib_con.connect('127.0.0.1', api_real_port, clientId=11, readonly=True)
 ib_con.reqMarketDataType(2)
 
 # %%
@@ -34,8 +35,8 @@ actions = 'Actions: None/Roll/BuySold/TakeProfit/TakeLoss'
 plain = f'Date {SEP} Symbol {SEP} Date {SEP} Right {SEP} Strike {SEP} Pos {SEP} P/L {SEP} Last {SEP} IV {SEP} Δ {SEP} Θ {SEP} Γ {SEP} ν {SEP} Action {SEP} Comment\n'
 html = '''<table class="table table-bordered"><tbody>
 <tr><th>Date</th><th>Symbol</th><th>Pos</th><th>P/L</th><th>Last</th><th>IV</th><th>Δ</th><th>Θ</th><th>Γ</th><th>ν</th><th>Action</th><th>Comment</th></tr>'''
-position = option_portfolio_positions[3]
-for position in option_portfolio_positions:
+# position = option_portfolio_positions[3]
+for position in option_portfolio_positions[2:]:
   print(f'Processing {position.contract.symbol}...')
   ib_con.qualifyContracts(position.contract)
 

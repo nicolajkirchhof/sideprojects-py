@@ -17,6 +17,10 @@ import mplfinance as mpf
 
 import finance.utils as utils
 from finance.behavior_eval.noon_to_close import df_noon, df_close
+pd.set_option("display.max_columns", None)  # None means "no limit"
+pd.set_option("display.max_rows", None)  # None means "no limit"
+pd.set_option("display.width", 140)  # Set the width to 80 characters
+
 
 import blackscholes as bs
 
@@ -35,72 +39,165 @@ mpl.use('QtAgg')
 directory = f'N:/My Drive/Projects/Trading/Research/Strategies/noon_to_close'
 os.makedirs(directory, exist_ok=True)
 symbols = ['DAX', 'ESTX50', 'SPX']
-symbol = symbols[0]
-#%%
-eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
+symbol = symbols[1]
 
-# risk_free_rate_year = df_treasury[df_treasury['observation_date'] <= stock_info.date.iat[0]].tail(1)['THREEFY1'].iat[0]/100
-iv = df_noon.ivc.iat[0]
-iv_day = iv / np.sqrt(252)
-underlying = df_noon.c.iat[0]
-risk_free_rate_year = eu_interest[eu_interest.index < str(df_noon.index[0].date())].iloc[-1].Main/100
-multiple = 25
+file = f'{directory}/{symbol}_noon_to_close.pkl'
+df = pd.read_pickle(file)
 #%%
-underlying_low = underlying - underlying * 2 * iv_day
-underlying_high = underlying + underlying * 2 * iv_day
-underlying_low_boundary = int(np.floor(underlying_low/multiple)*multiple)
-underlying_high_boundary = int(np.ceil(underlying_high/multiple)*multiple)
-strikes = range(underlying_low_boundary, underlying_high_boundary, multiple)
+for field in ['noon_iv', 'noon_hv', 'close_iv', 'close_hv']:
+  df[field] = df[field].apply(lambda x: x.values[0] if type(x) == pd.Series else x)
 
+df.to_pickle(file)
 #%%
-opts = []
-for strike in strikes:
-  S = underlying
-  K = strike
+row = list(df.itertuples())[-4]
+results = []
+is_log = False
+for row in df.itertuples():
+  ##%%
+  eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
+
+  # risk_free_rate_year = df_treasury[df_treasury['observation_date'] <= stock_info.date.iat[0]].tail(1)['THREEFY1'].iat[0]/100
+  iv = row.noon_iv if row.noon_iv > 0.05 else row.noon_iv * np.sqrt(252)
+  iv_day = iv / np.sqrt(252)
+  underlying = row.noon
+  close = row.close
+  risk_free_rate_year = eu_interest[eu_interest.index < str(row.date.date())].iloc[-1].Main/100
+  # multiple = 25
+  multiple = 5
   T = 0.5 / 365
-  r = risk_free_rate_year
-  sigma = iv #*np.sqrt(252)
+  ##%%
+  underlying_low = underlying - underlying * 2 * iv_day
+  underlying_high = underlying + underlying * 2 * iv_day
+  underlying_low_boundary = int(np.floor(underlying_low/multiple)*multiple)
+  underlying_high_boundary = int(np.ceil(underlying_high/multiple)*multiple)
+  strikes = range(underlying_low_boundary, underlying_high_boundary, multiple)
 
-  call = bs.BlackScholesCall(S, K, T, r, sigma)
-  put = bs.BlackScholesPut(S, K, T, r, sigma)
-  v_call = vars(call)
-  v_call['right'] = 'C'
-  v_put = vars(put)
-  v_put['right'] = 'P'
-  opts.append({'right':'C', 'delta': call.delta(), 'theta': call.theta(), 'gamma': call.gamma(), 'vega': call.vega(), 'price': call.price(), 'strike': K, 'pos':0})
-  opts.append({'right':'P', 'delta': put.delta(), 'theta': put.theta(), 'gamma': put.gamma(), 'vega': put.vega(), 'price': put.price(), 'strike': K, 'pos':0})
-  print(f'{call.price():.3f} Δ {call.delta():.3f} Θ {call.theta():.3f} Γ {call.gamma():.3f} ν {call.vega():.3f} {K} C -- {K} -- P {put.price():.3f} Δ {put.delta():.3f} Θ {put.theta():.3f} Γ {put.gamma():.3f} ν {put.vega():.3f} ')
+  ##%%
+  # iv = 0.16
+  # underlying = 22891.4
+  # risk_free_rate_year = eu_interest[eu_interest.index < '2025-03-23'].iloc[-1].Main/100
+  # S = underlying
+  # T = 3 / 365
 
-df_opts = pd.DataFrame(opts)
+  opts = []
+  for strike in strikes:
+    K = strike
+
+    call = bs.BlackScholesCall(underlying, K, T, risk_free_rate_year, iv)
+    put = bs.BlackScholesPut(underlying, K, T, risk_free_rate_year, iv)
+    v_call = vars(call)
+    v_call['right'] = 'C'
+    v_put = vars(put)
+    v_put['right'] = 'P'
+    opts.append({'right':'C', 'delta': call.delta(), 'theta': call.theta(), 'gamma': call.gamma(), 'vega': call.vega(), 'price': call.price(), 'strike': K, 'pos':0})
+    opts.append({'right':'P', 'delta': put.delta(), 'theta': put.theta(), 'gamma': put.gamma(), 'vega': put.vega(), 'price': put.price(), 'strike': K, 'pos':0})
+    if is_log:
+      print(f'{call.vega():.3f} ν {call.gamma():.3f} Γ {call.theta():.3f} Θ {call.delta():.3f} Δ {call.price():.3f} C -- {K} -- P {put.price():.3f} Δ {put.delta():.3f} Θ {put.theta():.3f} Γ {put.gamma():.3f} ν {put.vega():.3f} ')
+
+  delta_cutoff = 0.1
+  df_opts = pd.DataFrame(opts)
+
+  ##%%
+  # search butterfly
+  wing_call = df_opts[(df_opts['delta'] > delta_cutoff) & (df_opts['right'] == 'C')].iloc[-1]
+  atm_call = df_opts[(df_opts['strike'] < underlying) & (df_opts['right'] == 'C')].iloc[-1]
+  wing_put = df_opts[(df_opts['delta'] < delta_cutoff) & (df_opts['right'] == 'P')].iloc[0]
+  atm_put = df_opts[(df_opts['strike'] > underlying) & (df_opts['right'] == 'P')].iloc[0]
+
+  pnl = utils.options.iron_butterfly_profit_loss(close, wing_call, atm_call, atm_put, wing_put)
+
+  trade = {'date':row.date, 'pnl':pnl, 'underlying':underlying, 'close':close,
+           'wing_call':wing_call.strike, 'wing_put':wing_put.strike,
+           'atm_call':atm_call.strike, 'atm_put':atm_put.strike,
+           'noon_iv':row.noon_iv, 'close_iv':row.close_iv}
+  results.append(trade)
+  if is_log:
+    print(f'''
+      Created butterfly
+      Noon: {underlying}
+      \t\t\tWingPut: Buy {wing_put.strike} @ {wing_put.price}
+      AtmCall:  Sell {atm_call.strike} @ -{atm_call.price}
+      \t\t\tAtmPut:  Sell {atm_put.strike} @ -{atm_put.price}
+      WingCall: Buy {wing_call.strike} @ {wing_call.price}
+
+      Close: {close}
+      PnL: {pnl:.2f}
+    ''')
+##%%
+results_df = pd.DataFrame(results)
+file = f'{directory}/{symbol}_noon_to_close_results_0_1.pkl'
+results_df.to_pickle(file)
+#%%
+file = f'{directory}/dax_noon_to_close_results.pkl'
+results_df_dax = pd.read_pickle(file)
+#%%
+file = f'{directory}/dax_noon_to_close_results_0_1.pkl'
+results_df_dax_01 = pd.read_pickle(file)
 
 #%%
-# search butterfly
-wing_call = df_opts[(df_opts['delta'] > 0.2) & (df_opts['right'] == 'C')].iloc[-1]
-wing_call.pos = 1
-atm_call = df_opts[(df_opts['strike'] < underlying) & (df_opts['right'] == 'C')].iloc[-1]
-atm_call.pos = -1
-wing_put = df_opts[(df_opts['delta'] < -0.2) & (df_opts['right'] == 'P')].iloc[0]
-wing_put.pos = 1
-atm_put = df_opts[(df_opts['strike'] > underlying) & (df_opts['right'] == 'P')].iloc[0]
-atm_put.pos = -1
-
-close = df_close.c.iat[0]
-pnl = utils.options.iron_butterfly_profit_loss(close, wing_call, atm_call, atm_put, wing_put)
-print(f'''
-  Created butterfly 
-  Noon: {underlying} 
-  \t\t\tWingPut: Buy {wing_put.strike} @ {wing_put.price} 
-  AtmCall:  Sell {atm_call.strike} @ -{atm_call.price}
-  \t\t\tAtmPut:  Sell {atm_call.strike} @ -{atm_put.price}
-  WingCall: Buy {wing_call.strike} @ {wing_call.price}
-  
-  Close: {close}
-  PnL: {pnl:.2f}
-''')
-#%%
+file = f'{directory}/{symbol}_noon_to_close_results.pkl'
+results_df_dax = pd.read_pickle(file)
 
 #%%
+df_pnl_dax = results_df_dax[['date', 'pnl']].copy()
+df_pnl_estx = results_df_estx[['date', 'pnl']].copy()
 
+df_pnl_dax.rename(columns={'pnl': 'pnl_dax'}, inplace=True)
+df_pnl_dax['date'] = df_pnl_dax['date'].apply(lambda x: x.date())
+df_pnl_estx.rename(columns={'pnl': 'pnl_estx'}, inplace=True)
+df_pnl_estx['date'] = df_pnl_estx['date'].apply(lambda x: x.date())
+
+df_comb = pd.merge(df_pnl_dax, df_pnl_estx, on='date', how='inner')
+
+df_comb['sign_dax'] = df_comb.pnl_dax.apply(np.sign)
+df_comb['sign_estx'] = df_comb.pnl_estx.apply(np.sign)
+#%%
+results_df_dax['pct_change'] = results_df_dax.apply(lambda x: (x.close - x.underlying) * 100 / x.underlying, axis=1)
+results_df_dax.groupby(['year', 'week']).agg({'pnl':['sum'], 'pct_change': ['mean', 'median', 'std']})
+
+#%%
+longest = 0
+chain = 0
+for row in results_df.itertuples():
+  if row.pnl < 0:
+    chain += 1
+  else:
+    longest = max(longest, chain)
+    chain = 0
+
+
+#%%
+print(f'Wins {(results_df.pnl < 0).sum()} Losses {(results_df.pnl > 0).sum()}')
+print(f'AvgWin {results_df[results_df.pnl > 0].pnl.mean():.2f} AvgLoss {results_df[results_df.pnl < 0].pnl.mean():.2f}')
+
+#%%
+# results_df = results_df_dax_01
+results_df = results_df_dax
+results_df['year'] = results_df['date'].apply(lambda x: x.year)
+results_df['month'] = results_df['date'].apply(lambda x: x.month)
+results_df['week'] = results_df['date'].apply(lambda x: x.strftime('%U'))
+# results_df['iv_diff'] = results_df['close_iv'] - results_df['noon_iv']
+#%%
+results_df.groupby(['year', 'week']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
+results_df.groupby(['year', 'month']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
+results_df[results_df.month > 3].groupby(['year']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
+
+#%%
+for year in results_df['year'].unique():
+  results_df[results_df.year == year].plot.scatter(x='noon_iv', y='pnl')
+  plt.gcf().suptitle(f'{symbol} {year} Iron Butterfly P/L at Expiration PNL {results_df[results_df.year == year].pnl.sum():.2f}', fontsize=16)
+
+plt.show()
+
+#%%
+results_df.plot.scatter(x='date', y='pnl', c='noon_iv', cmap='viridis')
+plt.gcf().suptitle(f'{symbol} Iron Butterfly P/L at Expiration PNL {results_df.pnl.sum():.2f}', fontsize=16)
+plt.show()
+#%%
+# wing_call = pd.Series({'strike': 571, 'price': 0.64})
+# wing_put = pd.Series({'strike': 562, 'price': 0.78})
+# atm_call = pd.Series({'strike': 566, 'price': 2.65})
+# atm_put = pd.Series({'strike': 567, 'price': 2.21})
 
 #%%
 # Generate a range of stock prices
@@ -125,20 +222,8 @@ plt.grid()
 plt.show()
 
 #%%
-# Strategy parameters
-K0 = 562  # Protective Put Strike
-K1 = 567  # Short Put Strike
-K3 = 566  # Short Call Strike
-K4 = 571  # Protective Call Strike
-P0 = 0.78  # Premium Paid for Protective Put
-P1 = 2.21  # Premium Received for Short Put
-P3 = 2.65  # Premium Received for Short Call
-P4 = 0.64  # Premium Paid for Protective Call
 
 #%%
-file = f'{directory}/{symbol}_noon_to_close.pkl'
-df = pd.read_pickle(file)
-
 #%%
 df.agg({'pct_change':['mean', 'median', 'std']})
 
@@ -153,96 +238,4 @@ for i in range(4, 10):
   print(f'{i/10}: {working} of {df_filter.sum()} {working/df_filter.sum() * 100}')
 
 #%%
-df.plot.scatter(y='pct_change', x='date')
-plt.show()
-#%%
-def move_max(x):
-  if x.loss:
-    if x.type == 'long':
-      return utils.pct.percentage_change(x.entry, x.stopout)
-    else:
-      return utils.pct.percentage_change(x.stopout, x.entry)
-  else:
-    if x.type == 'long':
-      return utils.pct.percentage_change(x.entry, x.high)
-    else:
-      return utils.pct.percentage_change(x.low, x.entry)
 
-df_follow['move'] = df_follow.apply(lambda x: utils.pct.percentage_change(x.entry, x.stopout) if x.type == 'long' else utils.pct.percentage_change(x.stopout, x.entry), axis=1)
-df_follow['move_max'] = df_follow.apply(move_max, axis=1)
-df_follow['move_pts'] = df_follow.apply(lambda x:  x.stopout - x.entry - 2 if x.type == 'long' else x.entry - x.stopout -2, axis=1)
-#%%
-df_follow['low_5'] = np.nan
-for i in range(1, 5):
-  df_follow[f'move_{i}'] = df_follow.apply(lambda x:  utils.pct.percentage_change( x.entry, x[f'high_{i}']) if x.type == 'long' else utils.pct.percentage_change(x[f'low_{i}'], x.entry), axis=1)
-#%%
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move':['mean', 'median', 'std', 'sum']}))
-# print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_1':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_2':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_3':['mean', 'median', 'std', 'sum']}))
-# print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_4':['mean', 'median', 'std', 'sum']}))
-#%%
-df_filtred = df_follow[df_follow['timerange'].isin(['2m', '5m', '10m']) & df_follow['strategy'].isin([S_cbc_10_pct, S_cbc, S_cbc_10_pct_up])]
-print(df_filtred.groupby(['timerange', 'strategy', 'type']).agg({'move':['sum'], 'move_1':['sum'], 'move_2':['sum'], 'move_3':['sum'], 'move_4':['sum']}))
-
-
-# df_follow['loss'] = df_follow.apply(lambda x: x.low > x.stopout if x.type == 'long' else x.stopout > x.high, axis=1)
-# %%
-def pct_loss(x):
-  return x.sum()/x.count()
-
-# df_follow[df_follow['type'] == 'long'].groupby(['strategy']).agg({'loss':['sum', 'count', pct_loss]})
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'loss':['sum', 'count', pct_loss], }))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'candles':['mean', 'median', 'std']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_max':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'strategy', 'type']).agg({'move_pts':['mean', 'median', 'std', 'sum']}))
-#%%
-# print(df_follow.groupby(['timerange', 'strategy', 'type', 'candles']).agg({'loss':['sum', 'count', pct_loss]}))
-df_filtred = df_follow[df_follow['timerange'].isin(['2m', '5m']) & df_follow['strategy'].isin([S_cbc_10_pct, S_cbc_10_pct_up])]
-print(df_filtred.groupby(['timerange', 'strategy', 'type', 'candles']).agg({'loss':['sum', 'count', pct_loss]}))
-#%%
-df_follow[df_follow['loss']].agg({'move':['sum']})
-# %%
-df_follow.groupby(['strategy', 'type']).agg({'loss':['sum', 'count', pct_loss]})
-
-#%%
-# df_follow[(df_follow['type'] == 'long') & (~df_follow['loss'])].groupby(['strategy']).agg({'candles':['max', 'mean', 'std', 'min'], 'move':['max', 'mean', 'std', 'min']})
-
-#%%
-# df_follow[df_follow['type'] == 'long'].groupby(['strategy']).agg({'candles':['max', 'mean', 'std', 'min'], 'move':['max', 'mean', 'std', 'min']})
-# print(df_follow.groupby(['type','strategy']).agg({'candles':['mean', 'median', 'std'], 'move':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'type','loss', 'strategy']).agg({'candles':['mean', 'median', 'std'], 'move':['mean', 'median', 'std', 'sum']}))
-print(df_follow.groupby(['timerange', 'type','loss', 'strategy']).agg({'candles':['mean', 'median', 'std'], 'move_max':['mean', 'median', 'std', 'sum']}))
-
-#%%
-
-print(df_follow.groupby(['timerange', 'type','loss', 'strategy']).agg({'move_max':['mean', 'median', 'std', 'sum']}))
-
-#%%
-S_01_pct = '01_pct'
-S_02_pct = '02_pct'
-S_cbc = 'cbc'
-S_cbc_10_pct = 'cbc_10_pct'
-S_cbc_20_pct = 'cbc_20_pct'
-
-strategies = [S_01_pct, S_02_pct, S_cbc, S_cbc_10_pct, S_cbc_20_pct]
-strategiesToNumber = dict(zip(strategies,  [0, 1, 2, 3, 4]))
-
-df_follow['strategyId'] = df_follow.apply(lambda x: strategiesToNumber[x.strategy], axis=1)
-
-
-#%%
-for timerange in timeranges:
-  fig, ax = plt.subplots(2, 3, tight_layout=True, figsize=(24, 13))
-  fig.suptitle(f'{symbol} {timerange}')
-  axes = ax.flatten()
-    for i, strategy in enumerate(strategies):
-      scatter = df_follow[(df_follow['type'] == 'long') & (df_follow['strategy'] == strategy) & (df_follow['timerange'] == timerange)].plot.scatter(x='candles', y='move', ax=axes[i])
-      axes[i].set_title(f'{symbol} {strategy}')
-      plt.show()
-
-#%%
-scatter = df_follow[(df_follow['type'] == 'long') & (~df_follow['loss'])].plot.scatter(x='candles', y='move', c='strategyId', colormap='viridis')
-# plt.colorbar(scatter.collections[0], label='Z  [S_01_pct, S_02_pct, S_cbc, S_cbc_10_pct, S_cbc_20_pct]')
-plt.show()

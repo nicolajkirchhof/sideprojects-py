@@ -40,7 +40,7 @@ for symbol in symbols:
   tz = symbol_def['EX']['TZ']
 
   first_day = tz.localize(dateutil.parser.parse('2022-01-02T00:00:00'))
-  first_day = tz.localize(dateutil.parser.parse('2024-01-01T00:00:00'))
+  # first_day = tz.localize(dateutil.parser.parse('2025-03-14T00:00:00'))
   last_day = tz.localize(dateutil.parser.parse('2025-03-20T00:00:00'))
   day_start = first_day
   prior_close = None
@@ -51,7 +51,7 @@ for symbol in symbols:
     # get the following data for daily assignment
     noon = day_start + symbol_def['EX']['Open'] + timedelta(hours=3)
     close_time = day_start + symbol_def['EX']['Close']
-    df_noon = utils.influx.get_candles_range_aggregate(day_start, noon + offset, symbol)
+    df_noon = utils.influx.get_candles_range_aggregate(day_start + timedelta(hours=9), noon + offset, symbol, '1h')
     day_end = day_start + timedelta(days=1)
     # df_day = utils.influx.get_candles_range_aggregate(day_start, day_start + timedelta(days=1), symbol, '1h')
     if df_noon is None or 'h' not in df_noon.columns or 'ivc' not in df_noon.columns:
@@ -116,59 +116,3 @@ plt.show()
 # # plt.savefig(f'finance/_data/dax_plots_mpl/IBDE40_{date_str}.png', dpi=300, bbox_inches='tight')  # High-quality save
 # plt.show()
 # # plt.close()
-
-#%%
-first_day = tz.localize(dateutil.parser.parse('2022-01-01T00:00:00'))
-last_day = tz.localize(dateutil.parser.parse('2024-01-01T00:00:00'))
-dax_df = utils.influx.get_candles_range_aggregate(first_day, last_day, symbol, '30m')
-df_dax = dax_df
-
-# Group data by the date part of the index
-df_dax_grp = df_dax.groupby(df_dax.index.date)
-
-#%%
-results = []
-date, group = next(iter(df_dax_grp))
-for date, group in df_dax_grp:
-  # Extract value for 17:30
-  value_at_1730 = group.loc[group.index.time == pd.to_datetime('17:30').time(), 'c']
-
-  if value_at_1730.empty:
-    print(f'No data for {date}')
-    continue
-
-  value_at_1730 = value_at_1730.iat[0]
-  result = {'date': date, 'value_at_1730': value_at_1730}
-  for half_hour in ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00']:
-    # Extract mean of 09:30 to 13:00
-    value_at_time = group.loc[group.index.time == pd.to_datetime(half_hour).time(), 'c']
-
-    if value_at_time.empty:
-      print(f'No data for {date} {half_hour}')
-      result[f'{half_hour}_pct'] = np.nan
-      result[f'{half_hour}'] = np.nan
-      continue
-
-    # Calculate percentage difference
-    percentage_difference = ((value_at_1730 - value_at_time) / value_at_time) * 100
-    result[f'{half_hour}_pct'] = percentage_difference.iat[0]
-    result[f'{half_hour}'] = value_at_time.iat[0]
-  results.append(result)
-  # print(f'Done {date}')
-#%%
-results_df = pd.DataFrame(results)
-results_df.set_index('date', inplace=True)
-
-results_df_2024 = results_df
-
-#%%
-results_df_all = pd.concat([results_df, results_df_2024])
-results_df_all.filter(regex='_pct').agg('mean')
-results_df_all.filter(regex='_pct').agg('std')
-#%%
-ax = results_df_all.where(results_df_all.abs() < 0.6).filter(regex='_pct').plot(subplots=True, layout=(4, 2), title="changes")
-
-# Show the plot
-plt.tight_layout()
-plt.show()
-
