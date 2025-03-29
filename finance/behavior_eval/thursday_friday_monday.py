@@ -3,12 +3,9 @@ from datetime import datetime, timedelta
 
 import dateutil
 import numpy as np
-import scipy
 
 import pandas as pd
 import os
-
-import influxdb as idb
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -17,14 +14,9 @@ import matplotlib.ticker as mticker
 import mplfinance as mpf
 from matplotlib.pyplot import tight_layout
 
-from finance.utils.pct import percentage_change
-import finplot as fplt
+from finance import utils
 import pytz
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, mean_squared_error, r2_score
 
-from finance.behavior_eval.influx_utils import get_candles_range_aggregate_query, get_candles_range_raw_query
 pd.options.plotting.backend = "matplotlib"
 
 
@@ -33,23 +25,13 @@ mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-# %% get influx data
-DB_INDEX = 'index'
-DB_CFD = 'cfd'
-DB_FOREX = 'forex'
+#%%
 
-influx_client_df = idb.DataFrameClient()
-influx_client = idb.InfluxDBClient()
 
-indices = influx_client.query('show measurements', database=DB_INDEX)
-cfds = influx_client.query('show measurements', database=DB_CFD)
-forex = influx_client.query('show measurements', database=DB_FOREX)
+#%%
 
-get_values = lambda x: [y[0] for y in x.raw['series'][0]['values']]
-print('Indices: ', get_values(indices))
-print('Cfds: ', get_values(cfds))
-print('Forex: ', get_values(forex))
-
+# Group data by the date part of the index
+# df_grp = df.groupby(df.index.date)
 
 # %%
 
@@ -73,58 +55,26 @@ def get_thursdays(start_date, end_date):
 
 
 # %%
-symbols = [('IBDE40', pytz.timezone('Europe/Berlin')), ('IBGB100', pytz.timezone('Europe/London')),
-           *[(x, pytz.timezone('America/New_York')) for x in ['IBUS30', 'IBUS500', 'IBUST100']]]
-
-symbol, tz = symbols[0]
+symbols = ['DAX', 'ESTX50', 'SPX']
 # Create a directory
 directory = f'N:/My Drive/Projects/Trading/Research/Plots/thu_fri_mon'
 os.makedirs(directory, exist_ok=True)
 
-for symbol, tz in symbols:
+symbol = symbols[0]
 
 ##%%
-  dfs_ref_range = []
-  dfs_closing = []
-  first_year = 2020
-  last_year = 2025
+# for symbol in symbols:
+  symbol_def = utils.influx.SYMBOLS[symbol]
+  tz = symbol_def['EX']['TZ']
 
-  thursdays = get_thursdays(datetime(2020, 1, 1, hour=9, tzinfo=tz),
-                            tz.localize(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)))
+  first_day = tz.localize(dateutil.parser.parse('2020-01-01T00:00:00'))
+  last_day = tz.localize(dateutil.parser.parse('2025-03-19T00:00:00'))
+  df = utils.influx.get_candles_range_aggregate(first_day, last_day, symbol, '1d')
 
-  ## %%
-  thu = thursdays[0]
-  results = []
 
-  for thu in thursdays:
-    fri = thu + timedelta(days=1)
-    sat = fri + timedelta(days=1)
-    mon = sat + timedelta(days=2)
-    tue = mon + timedelta(days=1)
 
-    thu_influx = influx_client_df.query(get_candles_range_aggregate_query(thu, thu + timedelta(hours=7), symbol), database=DB_CFD)
-    fri_influx = influx_client_df.query(get_candles_range_aggregate_query(fri, fri + timedelta(hours=7), symbol), database=DB_CFD)
-    mon_influx = influx_client_df.query(get_candles_range_aggregate_query(mon, mon + timedelta(hours=7), symbol), database=DB_CFD)
 
-    ##%%
-    if not symbol in thu_influx or not symbol in fri_influx or not symbol in mon_influx:
-      print(f'no data for {thu.isoformat()}')
-      continue
-
-    thu_candle = thu_influx[symbol].tz_convert(tz)
-    fri_candle = fri_influx[symbol].tz_convert(tz)
-    mon_candle = mon_influx[symbol].tz_convert(tz)
-    thu_dict = thu_candle.rename(columns={'h': 't_h', 'l':'t_l', 'o':'t_o', 'c': 't_c', 'v': 't_v'}).iloc[0].to_dict()
-    fri_dict = fri_candle.rename(columns={'h': 'f_h', 'l':'f_l', 'o':'f_o', 'c': 'f_c', 'v': 'f_v'}).iloc[0].to_dict()
-    mon_dict = mon_candle.rename(columns={'h': 'm_h', 'l':'m_l', 'o':'m_o', 'c': 'm_c', 'v': 'm_v'}).iloc[0].to_dict()
-
-    result = {'thu': thu, 'fri': fri, 'mon':mon, **thu_dict, **fri_dict, **mon_dict}
-    results.append(result)
-
-  results_df = pd.DataFrame(results)
-  results_df.to_pickle(f'{directory}/{symbol}_fri_mon.pkl')
-
- #%%
+#%%
 for symbol, tz in symbols:
   results_df = pd.read_pickle(f'{directory}/{symbol}_fri_mon.pkl')
   print(f'{symbol}')

@@ -1,5 +1,5 @@
 # %%
-import datetime
+from datetime import datetime
 import glob
 
 import dateutil
@@ -16,7 +16,6 @@ import matplotlib.ticker as mticker
 import mplfinance as mpf
 
 import finance.utils as utils
-from finance.behavior_eval.noon_to_close import df_noon, df_close
 pd.set_option("display.max_columns", None)  # None means "no limit"
 pd.set_option("display.max_rows", None)  # None means "no limit"
 pd.set_option("display.width", 140)  # Set the width to 80 characters
@@ -41,6 +40,7 @@ os.makedirs(directory, exist_ok=True)
 symbols = ['DAX', 'ESTX50', 'SPX']
 symbol = symbols[1]
 
+#%%
 file = f'{directory}/{symbol}_noon_to_close.pkl'
 df = pd.read_pickle(file)
 #%%
@@ -51,9 +51,19 @@ df.to_pickle(file)
 #%%
 row = list(df.itertuples())[-4]
 results = []
-is_log = False
+# is_log = False
+is_log = True
 for row in df.itertuples():
-  ##%%
+# iv = 0.16
+# underlying = 22891.4
+# risk_free_rate_year = eu_interest[eu_interest.index < '2025-03-23'].iloc[-1].Main/100
+# S = underlying
+# T = 3 / 365
+
+# row = list(pd.DataFrame([{'noon_iv': 0.1761, 'noon':22987, 'close_iv':0.18091, 'close':22847, 'date':datetime.now()}]).itertuples())[0]
+# row = list(pd.DataFrame([{'noon_iv': 0.17667, 'noon':23080, 'close_iv':0.18091, 'close':23014, 'date':datetime.now()}]).itertuples())[0]
+row = list(pd.DataFrame([{'noon_iv': 0.29, 'noon':5390.4, 'close_iv':0.18091, 'close':5390, 'date':datetime.now()}]).itertuples())[0]
+#%%
   eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
 
   # risk_free_rate_year = df_treasury[df_treasury['observation_date'] <= stock_info.date.iat[0]].tail(1)['THREEFY1'].iat[0]/100
@@ -73,11 +83,6 @@ for row in df.itertuples():
   strikes = range(underlying_low_boundary, underlying_high_boundary, multiple)
 
   ##%%
-  # iv = 0.16
-  # underlying = 22891.4
-  # risk_free_rate_year = eu_interest[eu_interest.index < '2025-03-23'].iloc[-1].Main/100
-  # S = underlying
-  # T = 3 / 365
 
   opts = []
   for strike in strikes:
@@ -94,12 +99,12 @@ for row in df.itertuples():
     if is_log:
       print(f'{call.vega():.3f} ν {call.gamma():.3f} Γ {call.theta():.3f} Θ {call.delta():.3f} Δ {call.price():.3f} C -- {K} -- P {put.price():.3f} Δ {put.delta():.3f} Θ {put.theta():.3f} Γ {put.gamma():.3f} ν {put.vega():.3f} ')
 
-  delta_cutoff = 0.1
+  delta_cutoff = 0.2
   df_opts = pd.DataFrame(opts)
 
   ##%%
   # search butterfly
-  wing_call = df_opts[(df_opts['delta'] > delta_cutoff) & (df_opts['right'] == 'C')].iloc[-1]
+  wing_call = df_opts[(df_opts['delta'] > -delta_cutoff) & (df_opts['right'] == 'C')].iloc[-1]
   atm_call = df_opts[(df_opts['strike'] < underlying) & (df_opts['right'] == 'C')].iloc[-1]
   wing_put = df_opts[(df_opts['delta'] < delta_cutoff) & (df_opts['right'] == 'P')].iloc[0]
   atm_put = df_opts[(df_opts['strike'] > underlying) & (df_opts['right'] == 'P')].iloc[0]
@@ -123,7 +128,7 @@ for row in df.itertuples():
       Close: {close}
       PnL: {pnl:.2f}
     ''')
-##%%
+#%%
 results_df = pd.DataFrame(results)
 file = f'{directory}/{symbol}_noon_to_close_results_0_1.pkl'
 results_df.to_pickle(file)
@@ -176,12 +181,15 @@ results_df = results_df_dax
 results_df['year'] = results_df['date'].apply(lambda x: x.year)
 results_df['month'] = results_df['date'].apply(lambda x: x.month)
 results_df['week'] = results_df['date'].apply(lambda x: x.strftime('%U'))
+results_df['weekday'] = results_df['date'].apply(lambda x: x.strftime('%A'))
 # results_df['iv_diff'] = results_df['close_iv'] - results_df['noon_iv']
 #%%
 results_df.groupby(['year', 'week']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
+results_df.groupby(['year', 'month', 'weekday']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
 results_df.groupby(['year', 'month']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
 results_df[results_df.month > 3].groupby(['year']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
-
+#%%
+results_df.groupby(['weekday']).agg({'pnl':['sum'], 'noon_iv': ['mean', 'median', 'std'], 'close_iv': ['mean', 'median', 'std']})
 #%%
 for year in results_df['year'].unique():
   results_df[results_df.year == year].plot.scatter(x='noon_iv', y='pnl')

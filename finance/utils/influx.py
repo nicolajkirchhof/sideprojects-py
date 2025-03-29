@@ -70,6 +70,16 @@ def get_candles_range_aggregate(start, end, symbol, group_by_time=None):
     return None
   return influx_data[symbol].tz_convert(symbol_def['EX']['TZ'])
 
+def get_candles_range_raw(start, end, symbol):
+  symbol_def = SYMBOLS[symbol]
+  if symbol_def is None:
+    return None
+  influx_client_df = idb.DataFrameClient()
+  query = get_candles_range_raw_query(start, end, symbol)
+  influx_data = influx_client_df.query(query, database=symbol_def['DB'])
+  if symbol not in influx_data:
+    return None
+  return influx_data[symbol].tz_convert(symbol_def['EX']['TZ'])
 
 def get_candles_range_aggregate_query(start, end, symbol, group_by_time=None, with_volatility=False):
   volatility_query_addon = ', first(hvo) as hvo, last(hvc) as hvc, max(hvh) as hvh, min(hvl) as hvl, first(ivo) as ivo, last(ivc) as ivc, min(ivl) as ivl, max(ivh) as ivh' if with_volatility else ''
