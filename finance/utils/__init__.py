@@ -6,3 +6,4 @@ from . import finplot
 from . import ibkr
 from . import exchanges
 from . import options
+from . import indicators
