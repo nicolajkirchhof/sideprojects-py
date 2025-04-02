@@ -29,7 +29,7 @@ mpl.use('QtAgg')
 influx_client_df, influx_client = utils.influx.get_influx_clients()
 
 #%%
-symbols = ['IBDE40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100']
+symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
 # symbol = symbols[3]
 for symbol in symbols:
   # Create a directory
@@ -45,22 +45,28 @@ for symbol in symbols:
   dfs_ref_range = []
   dfs_closing = []
   first_day = tz.localize(dateutil.parser.parse('2022-01-03T00:00:00'))
-  last_day = tz.localize(dateutil.parser.parse('2025-03-06T00:00:00'))
+  # first_day = tz.localize(dateutil.parser.parse('2025-03-06T00:00:00'))
+  now = datetime.now(tz)
+  last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
+
   prior_day = first_day
   day_start = first_day + timedelta(days=1)
 
   ##%%
   while day_start < last_day:
-    day_end = day_start + exchange['Close'] + timedelta(hours=1)
+    offset = timedelta(hours=0)
+    # offset = timedelta(hours=-1) if tz.zone =='America/Chicago' and day_start > tz.localize(dateutil.parser.parse('2025-03-09T00:00:00')) and day_start < tz.localize(dateutil.parser.parse('2025-03-31T00:00:00')) else timedelta(hours=0)
+    ##%%
+    day_end = day_start + exchange['Close'] + timedelta(hours=1) + offset
     # get the following data for daily assignment
-    day_candles = utils.influx.get_candles_range_raw(day_start+exchange['Open']-timedelta(hours=1, minutes=0), day_end, symbol)
-    if day_candles is None or len(day_candles) == 0:
+    day_candles = utils.influx.get_candles_range_raw(day_start+exchange['Open']-timedelta(hours=1, minutes=0)+offset, day_end, symbol)
+    if day_candles is None or len(day_candles) < 100:
       day_start = day_start + timedelta(days=1)
-      print(f'no data for {day_start.isoformat()}')
+      print(f'{symbol} no data for {day_start.isoformat()}')
       # raise Exception('no data')
       continue
-    prior_day_candle = utils.influx.get_candles_range_aggregate(prior_day + exchange['Open'], prior_day + exchange['Close'], symbol)
-    overnight_candle= utils.influx.get_candles_range_aggregate(day_start, day_start + exchange['Open'] - timedelta(hours=1), symbol)
+    prior_day_candle = utils.influx.get_candles_range_aggregate(prior_day + exchange['Open'] + offset, prior_day + exchange['Close'] + offset, symbol)
+    overnight_candle= utils.influx.get_candles_range_aggregate(day_start + offset, day_start + exchange['Open'] - timedelta(hours=1) + offset, symbol)
 
     prior_day = day_start
     day_start = day_start + timedelta(days=1)
@@ -82,6 +88,7 @@ for symbol in symbols:
 
   ##%%
     try:
+      ## %%
       fig = mpf.figure(style='yahoo', figsize=(16,9), tight_layout=True)
 
       date_str = day_start.strftime('%Y-%m-%d')
@@ -95,13 +102,13 @@ for symbol in symbols:
       indicator_hlines = [prior_day_candle.c.iat[0], prior_day_candle.h.iat[0], prior_day_candle.l.iat[0], overnight_h, overnight_l]
       fig.suptitle(f'{symbol} {date_str} 1m/5m/30m PriorDay: H {prior_day_candle.h.iat[0]:.2f}  C {prior_day_candle.c.iat[0]:.2f} L {prior_day_candle.l.iat[0]:.2f} On: H {overnight_h:.2f} L {overnight_l:.2f}')
 
-      hlines=dict(hlines=indicator_hlines, colors=['#bf42f5'], linewidths=[0.5, 0.5, 0.5, 1, 1], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
+      hlines=dict(hlines=indicator_hlines, colors=['#bf42f5'], linewidths=[0.5, 1, 1, 0.5, 0.5], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
 
-      # ema_plot = mpf.make_addplot( df_1m['9EMA'], ax=ax1, color="yellow")
-      ama_plot = mpf.make_addplot(df_5m['AMA'], ax=ax2, width=0.5, color='gold')
+      ema_plot = mpf.make_addplot(df_5m['9EMA'], ax=ax2, width=0.4, color="turquoise")
+      ama_plot = mpf.make_addplot(df_5m['AMA'], ax=ax2, width=0.4, color='gold')
 
       mpf.plot(df_1m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%H:%M', tight_layout=True, hlines=hlines, warn_too_much_data=700)
-      mpf.plot(df_5m, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=ama_plot)
+      mpf.plot(df_5m, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ama_plot, ema_plot])
       mpf.plot(df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines)
 
       ticks = pd.date_range(df_1m.index.min(),df_1m.index.max()+timedelta(minutes=1),freq='30min')
@@ -129,11 +136,12 @@ for symbol in symbols:
       ax3.set_xticklabels(ticklabels)
       ax3.set_xlim(-0.583, last_tick_30m - 0.45)
 
+      # plt.show()
+      ## %%
       plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
       plt.close()
-      # plt.show()
-      print(f'finished {date_str}')
+      print(f'{symbol} finished {date_str}')
     except Exception as e:
-      print(f'error: {e}')
+      print(f'{symbol} error: {e}')
       continue
 

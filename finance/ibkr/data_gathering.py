@@ -21,11 +21,11 @@ influx_client_df, influx_client = utils.influx.get_influx_clients()
 ib.util.startLoop()
 ib_con = ib.IB()
 tws_real_port = 7497
-tws_paper_port = 7497
+tws_paper_port = 7498
 api_real_port = 4002
 api_paper_port = 4002
-ib_con.connect('127.0.0.1', api_paper_port, clientId=3, readonly=True)
-# ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
+# ib_con.connect('127.0.0.1', api_paper_port, clientId=3, readonly=True)
+ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
 ## %%
 
