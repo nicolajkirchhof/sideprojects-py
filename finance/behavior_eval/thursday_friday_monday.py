@@ -27,9 +27,6 @@ mpl.use('QtAgg')
 
 #%%
 
-
-#%%
-
 # Group data by the date part of the index
 # df_grp = df.groupby(df.index.date)
 

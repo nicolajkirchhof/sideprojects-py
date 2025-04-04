@@ -15,8 +15,8 @@ tws_paper_port = 7498
 api_real_port = 4001
 api_paper_port = 4002
 # ib_con.connect('127.0.0.1', tws_real_port, clientId=11, readonly=True)
-ib_con.connect('127.0.0.1', api_paper_port, clientId=11, readonly=True)
-# ib_con.connect('127.0.0.1', tws_paper_port, clientId=11, readonly=True)
+# ib_con.connect('127.0.0.1', api_paper_port, clientId=11, readonly=True)
+ib_con.connect('127.0.0.1', tws_paper_port, clientId=11, readonly=True)
 # ib_con.connect('127.0.0.1', api_real_port, clientId=11, readonly=True)
 ib_con.reqMarketDataType(2)
 
@@ -68,7 +68,8 @@ for position in option_portfolio_positions:
   greeks_to_str = lambda x: f'{x:.2}' if x is not None else 'NaN'
   # mkt_price = market_data.last * float(market_data.contract.multiplier)
   # pnl = position.position * (mkt_price - position.avgCost)
-  pnl = position.unrealizedPNL + position.realizedPNL
+  # pnl = position.unrealizedPNL + position.realizedPNL
+  pnl = position.unrealizedPNL
   plain += f'{datetime.now().strftime("%Y-%m-%d %H:%M")} {SEP} {position.contract.symbol} {SEP} {position.contract.lastTradeDateOrContractMonth} {SEP} {position.contract.right} {SEP} {position.contract.strike} {SEP} '
   plain += f'{position.position} {SEP} {pnl:.2f} {SEP} {umd.close} {SEP}'
   plain += f'{iv * 100:.2f}, {daily_iv * 100:.2f} {SEP} {greeks_to_str(greeks.delta)} {SEP} {greeks_to_str(greeks.theta)} {SEP} '
