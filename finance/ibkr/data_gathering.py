@@ -17,7 +17,7 @@ mpl.use('QtAgg')
 ## %%
 utils.influx.create_databases()
 influx_client_df, influx_client = utils.influx.get_influx_clients()
-
+##%%
 ib.util.startLoop()
 ib_con = ib.IB()
 tws_real_port = 7497

@@ -7,3 +7,4 @@ from . import ibkr
 from . import exchanges
 from . import options
 from . import indicators
+from . import plots

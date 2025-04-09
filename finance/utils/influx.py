@@ -82,11 +82,12 @@ def get_candles_range_raw(start, end, symbol):
   return influx_data[symbol].tz_convert(symbol_def['EX']['TZ'])
 
 def get_candles_range_aggregate_query(start, end, symbol, group_by_time=None, with_volatility=False):
+  timezone_offset_h = start.utcoffset().total_seconds()/3600
   volatility_query_addon = ', first(hvo) as hvo, last(hvc) as hvc, max(hvh) as hvh, min(hvl) as hvl, first(ivo) as ivo, last(ivc) as ivc, min(ivl) as ivl, max(ivh) as ivh' if with_volatility else ''
   base_query = f'select first(o) as o, last(c) as c, max(h) as h, min(l) as l {volatility_query_addon} from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
   if group_by_time is None:
     return base_query
-  return base_query + f' group by time({group_by_time}) fill(none)'
+  return base_query + f' group by time({group_by_time}, {timezone_offset_h:.0f}h) fill(none)'
 
 
 def get_candles_range_raw_query(start, end, symbol):

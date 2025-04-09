@@ -18,6 +18,9 @@ from finance import utils
 import pytz
 
 pd.options.plotting.backend = "matplotlib"
+pd.set_option("display.max_columns", None)  # None means "no limit"
+pd.set_option("display.max_rows", None)  # None means "no limit"
+pd.set_option("display.width", 140)  # Set the width to 80 characters
 
 
 mpl.use('TkAgg')
@@ -25,177 +28,204 @@ mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-#%%
-
-# Group data by the date part of the index
-# df_grp = df.groupby(df.index.date)
 
 # %%
-
-def get_thursdays(start_date, end_date):
-  # Iterate through all days of the year
-  current_date = start_date
-
-  # Check if the current day is a Thursday or Friday
-  while current_date.weekday() != 3:
-    current_date += timedelta(days=1)
-
-  # Create a list for the results
-  result = []
-
-  while current_date <= end_date:
-    result.append(current_date)
-    # Move to the next day
-    current_date += timedelta(days=7)
-
-  return result
-
-
-# %%
-symbols = ['DAX', 'ESTX50', 'SPX']
+symbols = ['DAX', 'ESTX50', 'SPX', 'INDU', 'NDX']
 # Create a directory
-directory = f'N:/My Drive/Projects/Trading/Research/Plots/thu_fri_mon'
+directory = f'N:/My Drive/Projects/Trading/Research/Strategies/thu_fri_mon'
 os.makedirs(directory, exist_ok=True)
 
-symbol = symbols[0]
+weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+symbol = symbols[1]
 
-##%%
-# for symbol in symbols:
+#%%
+for symbol in symbols:
+  ##%%
+  os.makedirs(f'{directory}/{symbol}', exist_ok=True)
   symbol_def = utils.influx.SYMBOLS[symbol]
   tz = symbol_def['EX']['TZ']
 
-  first_day = tz.localize(dateutil.parser.parse('2020-01-01T00:00:00'))
-  last_day = tz.localize(dateutil.parser.parse('2025-03-19T00:00:00'))
+  first_day = tz.localize(dateutil.parser.parse('2016-01-01T00:00:00'))
+  # last_day = tz.localize(dateutil.parser.parse('2016-03-19T00:00:00'))
+  last_day = tz.localize(dateutil.parser.parse('2025-04-09T00:00:00'))
   df = utils.influx.get_candles_range_aggregate(first_day, last_day, symbol, '1d')
+  df['weekday'] = df.index.day_name()
+  df['year'] = df.index.year
 
+  df = df.dropna()
 
-
-
-#%%
-for symbol, tz in symbols:
-  results_df = pd.read_pickle(f'{directory}/{symbol}_fri_mon.pkl')
-  print(f'{symbol}')
-  lower_thu_high = (results_df.t_h < results_df.f_h)
-  num_lower_thu_high = results_df[lower_thu_high].shape[0]
-  print(f'lower thu high {num_lower_thu_high} pct {num_lower_thu_high/results_df.shape[0]:.2%}')
-  num_higher_thu_high = results_df[~lower_thu_high].shape[0]
-  print(f'higher thu high {num_higher_thu_high} pct {num_higher_thu_high/results_df.shape[0]:.2%}')
-
-  higher_mon_high = (results_df.m_h > results_df.f_c)
-  num_higher_mon_high = results_df[higher_mon_high].shape[0]
-  print(f'higher mon high {num_higher_mon_high} pct {num_higher_mon_high/results_df.shape[0]:.2%}')
-  num_lower_mon_high = results_df[~higher_mon_high].shape[0]
-  print(f'lower mon high {num_lower_mon_high} pct {num_lower_mon_high/results_df.shape[0]:.2%}')
-
-  lower_mon_low = (results_df.m_l < results_df.f_c)
-  num_lower_mon_low = results_df[lower_mon_low].shape[0]
-  print(f'lower mon low {num_lower_mon_low} pct {num_lower_mon_low/results_df.shape[0]:.2%}')
-  num_higer_mon_low =results_df[~lower_mon_low].shape[0]
-  print(f'higher mon low {num_higer_mon_low} pct {num_higer_mon_low/results_df.shape[0]:.2%}')
-
-  num_lower_thu_higher_mon_high = results_df[lower_thu_high & higher_mon_high].shape[0]
-  print(f'lower thu high, higher mon high {num_lower_thu_higher_mon_high} pct {num_lower_thu_higher_mon_high/num_lower_thu_high:.2%}')
-  num_lower_thu_lower_mon_high = results_df[lower_thu_high & ~higher_mon_high].shape[0]
-  print(f'lower thu high, lower mon high {num_lower_thu_lower_mon_high} pct {num_lower_thu_lower_mon_high/num_lower_thu_high:.2%}')
-
-  num_higher_thu_higher_mon_high = results_df[~lower_thu_high & higher_mon_high].shape[0]
-  print(f'higher thu high, higher mon high {num_higher_thu_higher_mon_high} pct {num_higher_thu_higher_mon_high/num_higher_thu_high:.2%}')
-  num_higher_thu_lower_mon_high = results_df[~lower_thu_high & ~higher_mon_high].shape[0]
-  print(f'higher thu high, lower mon high {num_higher_thu_higher_mon_high} pct {num_higher_thu_higher_mon_high/num_higher_thu_high:.2%}')
-# results_df[(results_df.t_h > results_df.f_h) & (results_df.f_c > results_df.m_l)]
-# results_df[(results_df.t_h > results_df.f_h) & (results_df.f_c > results_df.m_l)].size
-# results_df[(results_df.t_h > results_df.f_h) & (results_df.f_c > results_df.m_l)].shape
-# results_df[(results_df.f_c > results_df.m_l)].shape
-# results_df[(results_df.t_h < results_df.f_h) & (results_df.f_c > results_df.m_l)].shape
-
-#%%
-# Map the custom column names to the required OHLC column names
-column_mapping = list({
-                        'Open': 'o',  # Map "Open" to our custom "Start" column
-                        'High': 'h',  # Map "High" to "Highest"
-                        'Low': 'l',  # Map "Low" to "Lowest"
-                        'Close': 'c',  # Map "Close" to "Ending"
-                        'Volume': 'v'  # Map "Volume" to "Volume_Traded"
-                      }.values())
-#%%
-fig = mpf.figure(style='yahoo', figsize=(20, 12), tight_layout=True)
-fig.suptitle(f'{symbol} thu fri mon')
-
-ax1 = fig.add_subplot(3,1,1)
-ax2 = fig.add_subplot(3,1,2)
-ax3 = fig.add_subplot(3,1,3)
-
-mpf.plot(results_df.set_index('thu'), ax=ax1, type='candle', columns=[f't_{x}' for x in column_mapping], xrotation=0, datetime_format='%y-%m-%d',
-         tight_layout=True, scale_width_adjustment=dict(candle=1.35))
-mpf.plot(results_df.set_index('fri'), ax=ax2, type='candle', columns=[f'f_{x}' for x in column_mapping], xrotation=0, datetime_format='%y-%m-%d',
-         tight_layout=True, scale_width_adjustment=dict(candle=1.35))
-mpf.plot(results_df.set_index('mon'), ax=ax3, type='candle', columns=[f'm_{x}' for x in column_mapping], xrotation=0, datetime_format='%y-%m-%d',
-         tight_layout=True, scale_width_adjustment=dict(candle=1.35))
-# plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
-# plt.savefig(f'finance/_data/dax_plots_mpl/IBDE40_{date_str}.png', dpi=300, bbox_inches='tight')  # High-quality save
-plt.show()
-# plt.close()
-# print(f'finished {symbol} {date_str}')
-#%%
-
-
-#%%
-lower_high_triggered = thu_candle.h.iat[0] > fri_candle.h.iat[0]
-
-result = {'thu': thu, 'fri': fri, 'lower_high_triggered': lower_high_triggered,
-          'lower_high_success': False, 't_high': thu_candle.h.iat[0],
-          'f_high': fri_candle.h.iat[0], 't_low': thu_candle.l.iat[0], 'f_low': fri_candle.l.iat[0],
-          'm_high': np.NAN, 'm_low': np.NAN}
-if lower_high_triggered:
-  if not symbol in mon_influx:
-    print(f'no data for monday {mon.isoformat()}')
-    continue
-  result['lower_high_success'] = mon_candle.l.iat[0] < fri_candle.l.iat[0]
-  result['m_high'] =mon_candle.h.iat[0]
-  result['m_low'] =mon_candle.l.iat[0]
-
-results.append(result)
-##%%
-df_results = pd.DataFrame(results)
-df_results.to_csv(f'{directory}/{symbol}.csv')
-
-num_triggered = df_results.lower_high_triggered.sum()
-num_events = df_results.lower_high_triggered.count()
-num_triggered_with_success = (df_results.lower_high_triggered & df_results.lower_high_success).sum()
-num_triggered_no_success = (df_results.lower_high_triggered & ~df_results.lower_high_success).sum()
-print(f'Symbol {symbol} results:')
-print(f'Lower high on Friday triggered {num_triggered} times out of {num_events} events ({num_triggered/num_events:.2%})')
-print(f'Lower low on Monday success {num_triggered_with_success} times out of {num_triggered} events ({num_triggered_with_success/num_triggered:.2%})')
-
-
-  # #%%
-  # # df_results.plot(x=['fri', 'fri', 'fri', 'fri'], y=['t_high', 'f_high', 'f_low', 'm_low'], kind='scatter')
-  # ax = df_results_triggerd.plot(x='fri', y='t_high', c='blue',kind='scatter')
-  # df_results_triggerd.plot(ax=ax, x='fri', y='f_high', c='green',kind='scatter')
-  # df_results_triggerd.plot(ax=ax, x='fri', y='f_low', c='black',kind='scatter')
-  # df_results_triggerd.plot(ax=ax, x='fri', y='m_low', c='red',kind='scatter')
-  #
-  # plt.show()
   ##%%
-  fig, ax = plt.subplots(figsize=(24, 12), tight_layout=True)
-  fig.suptitle(f'{symbol} Lower High Triggered')
+  # conditions
+  # higher high => lower low
+  # higher high => higher high
 
-  df_results_triggerd = df_results[df_results.lower_high_triggered]
-  df_results_triggerd.plot(x='fri', y='f_low', c='black',kind='scatter', ax=ax)
-  df_results_triggerd[df_results_triggerd.lower_high_success].plot(ax=ax, x='fri', y='m_low', c='green',kind='scatter')
-  df_results_triggerd[~df_results_triggerd.lower_high_success].plot(ax=ax, x='fri', y='m_low', c='red',kind='scatter')
+  df['yst_hh'] = df.shift(2).h < df.shift(1).h
+  df['yst_ll'] = df.shift(2).l > df.shift(1).l
+  # high > close
+  df['hc'] = df.shift(1).c < df.h
+  df['hc_pct'] = (df.h - df.shift(1).c)*100/df.shift(1).c
+  # low < low
+  df['lc'] = df.shift(1).c > df.l
+  df['lc_pct'] = (df.l - df.shift(1).c)*100/df.shift(1).c
+  df['clc'] = df.shift(1).c > df.c
+  df['chc'] = df.shift(1).c < df.c
+  df['cc_pct'] = (df.c - df.shift(1).c)*100/df.shift(1).c
 
-  # Format the major and minor ticks for the x-axis
-  ax.xaxis.set_major_locator(mdates.YearLocator())  # Major ticks for months
-  ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))  # Format months as "Jan 2023"
+  df['hh_hc'] = df.apply(lambda x: np.NAN if not x.yst_hh else x.hc, axis=1)
+  df['hh_lc'] = df.apply(lambda x: np.NAN if not x.yst_hh else x.lc, axis=1)
+  df['ll_hc'] = df.apply(lambda x: np.NAN if not x.yst_ll else x.hc, axis=1)
+  df['ll_lc'] = df.apply(lambda x: np.NAN if not x.yst_ll else x.lc, axis=1)
 
-  ax.xaxis.set_minor_locator(mdates.MonthLocator())  # Minor ticks for days
-  ax.xaxis.set_minor_formatter(mdates.DateFormatter("%b"))  # Format days as just the day number
+  df['n_hh_hc'] = df.apply(lambda x: np.NAN if x.yst_hh else x.hc, axis=1)
+  df['n_hh_lc'] = df.apply(lambda x: np.NAN if x.yst_hh else x.lc, axis=1)
+  df['n_ll_hc'] = df.apply(lambda x: np.NAN if x.yst_ll else x.hc, axis=1)
+  df['n_ll_lc'] = df.apply(lambda x: np.NAN if x.yst_ll else x.lc, axis=1)
 
-  # Rotate date labels for better readability
-  plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
-  plt.setp(ax.xaxis.get_minorticklabels(), rotation=45)
-  ax.grid(visible=True, which="both", linestyle="--", alpha=0.5)  # Grid for major and minor ticks
-  plt.savefig(f'{directory}/{symbol}.png', bbox_inches='tight')
-  plt.show()
+  df['hh_chc'] = df.apply(lambda x: np.NAN if not x.yst_hh else x.chc, axis=1)
+  df['hh_clc'] = df.apply(lambda x: np.NAN if not x.yst_hh else x.clc, axis=1)
+  df['ll_chc'] = df.apply(lambda x: np.NAN if not x.yst_ll else x.chc, axis=1)
+  df['ll_clc'] = df.apply(lambda x: np.NAN if not x.yst_ll else x.clc, axis=1)
 
+  df['hh_ll_hc'] = df.apply(lambda x: np.NAN if not x.yst_hh or not x.yst_ll else x.hc, axis=1)
+  df['hh_ll_lc'] = df.apply(lambda x: np.NAN if not x.yst_hh or not x.yst_ll else x.lc, axis=1)
+  df['n_hh_ll_hc'] = df.apply(lambda x: np.NAN if x.yst_ll or x.yst_ll else x.hc, axis=1)
+  df['n_hh_ll_lc'] = df.apply(lambda x: np.NAN if x.yst_ll or x.yst_ll else x.lc, axis=1)
+
+
+##%%
+  df.to_pickle(f'{directory}/{symbol}_thu_fri_mon.pkl')
+  df.to_csv(f'{directory}/{symbol}_fri_mon.csv')
+  # df.to_excel(f'{directory}/{symbol}_fri_mon.xlsx')
+##%%
+  flt =['hc', 'lc', 'hh_hc', 'hh_lc', 'll_hc', 'll_lc', 'n_hh_hc', 'n_hh_lc', 'n_ll_hc', 'n_ll_lc', 'hh_ll_hc', 'hh_ll_lc', 'n_hh_ll_hc', 'n_hh_ll_lc']
+
+  cm = df[flt].corr()
+  # cm = df[['hh_hc', 'hh_lc', 'll_hc', 'll_lc']].corr()
+  # print(cm)
+  cm.to_csv(f'{directory}/{symbol}_corr.csv')
+  cm.to_excel(f'{directory}/{symbol}_corr.xlsx')
+
+  ##%%
+
+  for f in flt:
+    aggs = df[df[f] == True][f'{f[-2:]}_pct'].agg(['mean', 'median', 'std'])
+    print(f'{f}\n{aggs}')
+
+  print('------------------ Close to Close --------------------')
+##%%
+  plt.close()
+  sigma_mult = 3
+  for wd in weekday_names:
+    fig, axes = plt.subplots(nrows=2, ncols=7, figsize=(24, 13), tight_layout=True)
+    fig.suptitle(f'{symbol} {wd}')
+    axes = axes.flatten()
+    for i,f in enumerate(flt):
+      # aggs = df[(df[f] == True) & (df['weekday']==wd)]['cc_pct'].agg(['mean', 'median', 'std'])
+      # print(f'{f}\n{aggs}')
+      sigma = df[(df[f] == True) & (df['weekday']==wd)]['cc_pct'].std()
+      mean = df[(df[f] == True) & (df['weekday']==wd)]['cc_pct'].mean()
+      df[(df[f] == True) & (mean - sigma_mult*sigma < df.cc_pct) & (df.cc_pct < mean + sigma_mult*sigma )].cc_pct.hist(bins=100, ax=axes[i])
+      num_outliers_above = df[(df[f] == True) & (df.cc_pct > mean + sigma_mult*sigma )].cc_pct.count()
+      num_outliers_below = df[(df[f] == True) & (mean - sigma_mult*sigma > df.cc_pct)].cc_pct.count()
+      sum_outliers_above = df[(df[f] == True) & (df.cc_pct > mean + sigma_mult*sigma )].cc_pct.sum()
+      sum_outliers_below = df[(df[f] == True) & (mean - sigma_mult*sigma > df.cc_pct)].cc_pct.sum()
+      axes[i].set_title(f'{f} Mean {mean:.2f} Std {sigma:.2f} \n #outliers above/below {num_outliers_above}/{num_outliers_below} \n ∑ {sum_outliers_above:.2f}/{sum_outliers_below:.2f}')
+      axes[i].set_xlabel('PCT')
+      axes[i].set_ylabel('num')
+  plt.savefig(f'{directory}/{symbol}_{wd}_pct.png', bbox_inches='tight')  # High-quality save
+  # plt.show()
+
+#%%
+# Create options chain
+# Pick options in 0.1 pct intervals to the downside
+# Imply volatility skew
+pct_test = np.arange(11)*0.1-1
+
+
+
+#%%
+day = None
+for i in range(len(df)):
+  if not df[flt].iloc[i, :].any():
+    continue
+  try:
+    true_column_names = df[flt].columns[df[flt].iloc[i] == True].tolist()
+    day = df.index[i]
+    print(f'{symbol} {day} {true_column_names}')
+    fig = utils.plots.daily_change_plot(symbol, day)
+    st = fig.get_suptitle()
+    fig.suptitle(st + f'\n {true_column_names}')
+
+    date_str = day.strftime('%Y-%m-%d')
+    plt.savefig(f'{directory}/{symbol}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
+  except Exception as e:
+    print(f'{day} {e}')
+  plt.close()
+
+
+##%%
+# evaluation
+def pct(x):
+  return np.round(x.sum()*100/x.count(), 2)
+
+##%%
+print(df.agg({'hh_hc': ['count','sum', pct], 'hh_lc': ['count', 'sum', pct], 'll_hc': ['count', 'sum', pct], 'll_lc': ['count', 'sum', pct]}))
+print(df.groupby(['weekday']).agg({'hh_hc': ['count','sum', pct], 'hh_lc': ['count', 'sum', pct], 'll_hc': ['count', 'sum', pct], 'll_lc': ['count', 'sum', pct]}))
+print(df.groupby(['year', 'weekday']).agg({'hh_hc': ['count','sum', pct], 'hh_lc': ['count', 'sum', pct], 'll_hc': ['count', 'sum', pct], 'll_lc': ['count', 'sum', pct]}))
+
+##%%
+agg_df = df[flt].agg(pct)
+agg_weekday = df.groupby(['weekday'])[flt].agg(pct)
+agg_year_weekday =  df.groupby(['year', 'weekday'])[flt].agg(pct)
+print(agg_df)
+print(agg_weekday)
+print(agg_year_weekday)
+
+agg_df.to_csv(f'{directory}/{symbol}_agg_df.csv')
+agg_weekday.to_csv(f'{directory}/{symbol}_agg_weekday.csv')
+agg_year_weekday.to_csv(f'{directory}/{symbol}_agg_year_weekday.csv')
+
+agg_df.to_excel(f'{directory}/{symbol}_agg_df.xlsx')
+agg_weekday.to_excel(f'{directory}/{symbol}_agg_weekday.xlsx')
+agg_year_weekday.to_excel(f'{directory}/{symbol}_agg_year_weekday.xlsx')
+##%%
+# print(df.agg({'hh_hc': [pct], 'hh_lc': [pct], 'll_hc': [pct], 'll_lc': [pct], 'hh_chc': [pct], 'hh_clc': [pct], 'll_chc': [pct], 'll_clc': [pct]}))
+# print(df.groupby(['weekday']).agg({'hh_hc': [pct], 'hh_lc': [pct], 'll_hc': [pct], 'll_lc': [pct], 'hh_chc': [pct], 'hh_clc': [pct], 'll_chc': [pct], 'll_clc': [pct]}))
+# print(df.groupby(['year', 'weekday']).agg({'hh_hc': [pct], 'hh_lc': [pct], 'll_hc': [pct], 'll_lc': [pct], 'hh_chc': [pct], 'hh_clc': [pct], 'll_chc': [pct], 'll_clc': [pct]}))
+
+##%%
+# Create subplots
+fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(24, 13))
+axes = axes.flatten()
+
+# Loop through each weekday and plot
+for i, weekday in enumerate(weekday_names):
+  agg_year_weekday[agg_year_weekday.index.get_level_values('weekday') == weekday].plot.bar(ax=axes[i])
+
+  # axes[i].axhline(agg_df, color='red', linestyle='--', linewidth=1.5)
+
+  axes[i].set_title(f'{weekday_names[i]} ')
+  axes[i].set_xlabel('year')
+  axes[i].set_ylabel('PCT')
+
+  # Hide x-axis ticks for clarity
+  axes[i].set_xticklabels(agg_year_weekday[agg_year_weekday.index.get_level_values('weekday') == weekday].index.get_level_values('year') , rotation=0)
+
+
+# Remove the empty subplot
+agg_weekday.plot.bar(ax=axes[-1])
+
+plt.suptitle('PCT success rate', fontsize=16)
+plt.tight_layout()
+plt.savefig(f'{directory}/{symbol}_all.png', bbox_inches='tight')  # High-quality save
+# plt.show()
+
+
+#%%
+# df.groupby(['weekday']).agg({'hh_hc': [pct], 'hh_lc': [pct], 'll_hc': [pct], 'll_lc': [pct], 'hh_chc': [pct], 'hh_clc': [pct], 'll_chc': [pct], 'll_clc': [pct]}).plot.bar()
+agg_df.plot.bar()
+agg_weekday.plot.bar()
+agg_year_weekday.plot.bar()
+plt.show()
+
+#%%
