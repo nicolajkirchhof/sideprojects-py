@@ -113,14 +113,14 @@ for symbol in symbols:
 
   print('------------------ Close to Close --------------------')
 ##%%
-  plt.close()
   sigma_mult = 3
   for wd in weekday_names:
     fig, axes = plt.subplots(nrows=2, ncols=7, figsize=(24, 13), tight_layout=True)
     fig.suptitle(f'{symbol} {wd}')
     axes = axes.flatten()
     for i,f in enumerate(flt):
-      # aggs = df[(df[f] == True) & (df['weekday']==wd)]['cc_pct'].agg(['mean', 'median', 'std'])
+      aggs = df[(df[f] == True) & (df['weekday']==wd)]['cc_pct'].agg(['mean', 'median', 'std'])
+
       # print(f'{f}\n{aggs}')
       sigma = df[(df[f] == True) & (df['weekday']==wd)]['cc_pct'].std()
       mean = df[(df[f] == True) & (df['weekday']==wd)]['cc_pct'].mean()
@@ -132,7 +132,8 @@ for symbol in symbols:
       axes[i].set_title(f'{f} Mean {mean:.2f} Std {sigma:.2f} \n #outliers above/below {num_outliers_above}/{num_outliers_below} \n ∑ {sum_outliers_above:.2f}/{sum_outliers_below:.2f}')
       axes[i].set_xlabel('PCT')
       axes[i].set_ylabel('num')
-  plt.savefig(f'{directory}/{symbol}_{wd}_pct.png', bbox_inches='tight')  # High-quality save
+    plt.savefig(f'{directory}/{symbol}_{wd}_pct.png', bbox_inches='tight')  # High-quality save
+    plt.close()
   # plt.show()
 
 #%%
@@ -140,6 +141,7 @@ for symbol in symbols:
 # Pick options in 0.1 pct intervals to the downside
 # Imply volatility skew
 pct_test = np.arange(11)*0.1-1
+
 
 
 

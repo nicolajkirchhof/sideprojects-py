@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import blackscholes as bs
 
-
 def put_credit_spread_pnl(S, atm_put, wing_put):
   # Net credit received
   net_credit = atm_put.price - wing_put.price
@@ -39,13 +38,19 @@ def iron_butterfly_profit_loss(S, wing_call, atm_call, atm_put, wing_put):
     """
   return put_credit_spread_pnl(S, atm_put, wing_put) + call_credit_spread_pnl(S, atm_call, wing_call)
 
-def create_option_chain(date, iv, underlying, strike_offset, expiry_days, sigma, debug=False):
-  eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
-  us_interest=pd.read_csv('finance/US_Interest.csv', index_col='observation_date', parse_dates=True)
+def create_option_chain(region, date, iv, underlying, strike_offset, expiry_days, sigma, debug=False):
+  risk_free_rate_year = None
+  if region == 'EU':
+    eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
+    risk_free_rate_year = eu_interest[eu_interest.index < str(date.date())].iloc[-1].Main/100
+  if region == 'US':
+    us_interest=pd.read_csv('finance/US_Interest.csv', index_col='observation_date', parse_dates=True)
+    risk_free_rate_year = us_interest[us_interest.index <= str(date.date())].tail(1)['THREEFY1'].iat[0]/100
 
-  risk_free_rate_year = us_interest[us_interest.index <= str(date.date())].tail(1)['THREEFY1'].iat[0]/100
-  risk_free_rate_year = eu_interest[eu_interest.index < str(date.date())].iloc[-1].Main/100
-  T = expiry_days / 365
+  if risk_free_rate_year is None:
+    raise ValueError('No risk free rate found for the given date')
+
+  t = expiry_days / 365
   ##%%
   underlying_low = underlying - underlying * sigma * iv * np.sqrt(expiry_days)
   underlying_high = underlying + underlying * sigma * iv * np.sqrt(expiry_days)
@@ -58,8 +63,8 @@ def create_option_chain(date, iv, underlying, strike_offset, expiry_days, sigma,
   opts = []
   for strike in strikes:
     iv_skewed  = estimate_volatility_skew(underlying, strike, iv, 0.02, 0.02, 0.15)
-    call = bs.BlackScholesCall(underlying, strike, T, risk_free_rate_year, iv_skewed)
-    put = bs.BlackScholesPut(underlying, strike, T, risk_free_rate_year, iv_skewed)
+    call = bs.BlackScholesCall(underlying, strike, t, risk_free_rate_year, iv_skewed)
+    put = bs.BlackScholesPut(underlying, strike, t, risk_free_rate_year, iv_skewed)
     v_call = vars(call)
     v_call['right'] = 'C'
     v_put = vars(put)
