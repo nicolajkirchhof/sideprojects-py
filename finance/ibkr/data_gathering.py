@@ -1,0 +1,136 @@
+# %%
+import ib_async as ib
+import pandas as pd
+
+import matplotlib as mpl
+from datetime import datetime
+import dateutil
+from finance import utils
+
+mpl.use('TkAgg')
+mpl.use('QtAgg')
+# noinspection PyStatementEffect
+%load_ext autoreload
+# noinspection PyStatementEffect
+%autoreload 2
+
+## %%
+utils.influx.create_databases()
+influx_client_df, influx_client = utils.influx.get_influx_clients()
+##%%
+ib.util.startLoop()
+ib_con = ib.IB()
+tws_real_port = 7497
+tws_paper_port = 7498
+api_real_port = 4002
+api_paper_port = 4002
+# ib_con.connect('127.0.0.1', api_paper_port, clientId=3, readonly=True)
+ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
+ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
+## %%
+
+# %%
+eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50']]
+us_indices = [ib.Index('SPX', 'CBOE', 'USD'), ib.Index('NDX', 'NASDAQ', 'USD'),
+              ib.Index('RUT', 'RUSSELL', 'USD'), ib.Index('INDU', 'CME', 'USD')]
+fr_index = ib.Index('CAC40', 'MONEP', 'EUR')
+# es_index = ib.Index('IBEX35', 'MEFFRV', 'EUR')
+jp_index = ib.Index('N225', 'OSE.JPN', 'JPY')
+hk_index = ib.Index('HSI', 'HKFE', 'HKD')
+indices = [*eu_indices, *us_indices, jp_index, fr_index, hk_index]
+## %%
+index_cfd_euro = ['IBGB100', 'IBEU50', 'IBDE40', 'IBFR40', 'IBES35', 'IBNL25', 'IBCH20']
+index_cfd_us = ['IBUS500', 'IBUS30', 'IBUST100']
+index_cfd_asia = ['IBHK50', 'IBJP225', 'IBAU200']
+
+index_cfds = [ib.CFD(symbol=symbol, exchange='SMART') for symbol in [*index_cfd_euro, *index_cfd_us, *index_cfd_asia]]
+## %%
+
+forex = [ib.Forex(symbol=sym, exchange='IDEALPRO', currency=cur) for sym, cur in
+         [('EUR', 'USD'), ('EUR', 'GBP'), ('EUR', 'CHF'), ('GBP', 'USD'), ('AUD', 'USD'), ('USD', 'CAD'),
+          ('USD', 'JPY'), ('CHF', 'USD')]]
+
+## %%
+eu_futures = [ib.ContFuture(symbol=x, multiplier='1', exchange='EUREX',currency='EUR') for x in ['DAX', 'ESTX50']]
+us_futures =[*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange='CME',currency='USD') for x in [('MES', '5'), ('MNQ', '2'), ('RTY', '50')]],
+             ib.ContFuture(symbol='MYM', multiplier='0.5', exchange='CBOT',currency='USD'),
+            ib.ContFuture(symbol='VXM', multiplier='100', exchange='CFE',currency='USD')]
+jp_futures = [ib.ContFuture(symbol='N225M', multiplier='100', exchange='OSE.JPN',currency='JPY')]
+swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',currency='SEK')]
+#
+# # contracts = indices
+futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
+
+##%%
+##%% To be evaluated ['QQQ']
+# us_etf_symbols = ['SPY', 'QQQ', 'GLD', 'SLV', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLE', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP', 'SMH']
+# us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
+
+# contracts = [*futures, *indices]
+contracts = [ *indices, *index_cfds, *forex, *futures,]
+
+for contract in contracts:
+  ib_con.qualifyContracts(contract)
+  details = ib_con.reqContractDetails(contract)
+  print(details[0].longName)
+# # # contract_ticker = ib_con.reqMktData(contracts[0], '236, 233, 293, 294, 295, 318, 411, 595', True, False)
+
+## %%
+available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
+                           'OPTION_IMPLIED_VOLATILITY']
+types_of_data = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY','OPTION_IMPLIED_VOLATILITY'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
+rth = False
+##%%
+duration = '10 D'
+offset_days = 9
+barSize = '1 min'
+
+startDateTime = dateutil.parser.parse('2013-06-01')
+# startDateTime = dateutil.parser.parse('2025-03-10')
+# endDateTime=dateutil.parser.parse('2013-06-08')
+endDateTime = datetime.now()
+
+
+def contract_to_fieldname(contract):
+  if contract.secType == 'IND' or contract.secType == 'CFD' or contract.secType == 'STK':
+    return contract.symbol
+  if 'FUT' in contract.secType:
+    return f'F{contract.symbol}'
+  if contract.secType == 'CASH':
+    return contract.symbol + contract.currency
+
+field_name_lu = {
+  'TRADES': {'open': 'o', 'high': 'h', 'low': 'l', 'close': 'c', 'volume': 'v', 'average': 'a', 'barCount': 'bc'},
+  'MIDPOINT': {'open': 'o', 'high': 'h', 'low': 'l', 'close': 'c', 'volume': 'v', 'average': 'a', 'barCount': 'bc'},
+  'HISTORICAL_VOLATILITY': {'open': 'hvo', 'high': 'hvh', 'low': 'hvl', 'close': 'hvc', 'volume': 'hvv', 'average': 'hva', 'barCount': 'hvbc'},
+  'OPTION_IMPLIED_VOLATILITY': {'open': 'ivo', 'high': 'ivh', 'low': 'ivl', 'close': 'ivc', 'volume': 'ivv', 'average': 'iva', 'barCount': 'ivbc'},
+}
+## %%
+
+
+# for stock_name in stock_names:
+current_date = startDateTime
+for contract in contracts:
+  dfs_contract = {}
+  for typ in types_of_data[contract.secType]:
+    field_name = field_name_lu[typ]['close']
+    c_last = influx_client_df.query(f'select last("{field_name}") from {contract_to_fieldname(contract)}',
+                                   database=utils.influx.sec_type_to_database_name(contract.secType))
+    if c_last:
+      current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime()
+    else:
+      current_date = startDateTime
+    while current_date < endDateTime:
+      ##%%
+      current_date = current_date + pd.Timedelta(days=offset_days)
+      endDateTimeString = current_date.strftime('%Y%m%d %H:%M:%S') if not contract.secType == 'CONTFUT' else ""
+      data = ib_con.reqHistoricalData(contract, endDateTime=endDateTimeString, durationStr=duration,
+                                      barSizeSetting=barSize, whatToShow=typ, useRTH=rth)
+      ##%%
+      print(f'{datetime.now()} : {contract_to_fieldname(contract)} => {typ} {current_date} #{len(data)}')
+      if not data:
+        continue
+      dfs_type = ib.util.df(data).rename(columns=field_name_lu[typ]).set_index('date').tz_localize('UTC')
+      influx_client_df.write_points(dfs_type, contract_to_fieldname(contract),
+                                   database=utils.influx.sec_type_to_database_name(contract.secType))
+
