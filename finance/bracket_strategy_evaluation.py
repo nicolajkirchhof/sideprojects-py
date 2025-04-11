@@ -20,6 +20,8 @@ import pytz
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, mean_squared_error, r2_score
+import random
+from functools import partial
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
@@ -33,15 +35,33 @@ index_client_df = idb.DataFrameClient(database='index')
 index_client = idb.InfluxDBClient(database='index')
 index_client.query('show measurements')
 keys = index_client.query('show field keys')
+
 #%%
 symbol = 'DAX'
 tz = pytz.timezone('Europe/Berlin')
-# symbol = 'SPX'
-# tz = pytz.timezone('EST')
 
-eval_range_start = datetime.timedelta(hours=9, minutes=0)
-eval_range_end = datetime.timedelta(hours=16, minutes=0)
-time_range = '2m'
+def create_interactive_plot(ax, df, day):
+  fplt.candlestick_ochl(df[['o', 'c', 'h', 'l']], ax=ax)
+  hover_label = fplt.add_legend(f'<span style="font-size:15px;color:darkgreen;background-color:#fff">{day}</span>', ax=ax, )
+
+  #######################################################
+  ## update crosshair and legend when moving the mouse ##
+  def update_legend_text(df_ul, hover_label_ul, x, y):
+    # print(x)
+    row = df_ul.loc[pd.to_datetime(x, unit='ns', utc=True)]
+    # print(row)
+    # format html with the candle and set legend
+    fmt = '<span style="font-size:15px;color:#%s;background-color:#fff">%%.2f</span>' % ('0d0' if (row.o<row.c).all() else 'd00')
+    rawtxt = '<span style="font-size:14px">%%s %%s</span> &nbsp; O%s C%s H%s L%s' % (fmt, fmt, fmt, fmt)
+    values = [row.o, row.c, row.h, row.l]
+    hover_label_ul.setText(rawtxt % tuple([symbol, day.upper()] + values))
+
+  def update_crosshair_text(df_ch, x, y, xtext, ytext):
+    ytext = '%s (Close%+.2f)' % (ytext, (y - df_ch.iloc[x].c))
+    return xtext, ytext
+
+  fplt.set_mouse_callback(partial(update_legend_text, df, hover_label), ax=ax, when='hover')
+  fplt.add_crosshair_info(partial(update_crosshair_text, df), ax=ax)
 
 def get_candles_range(start, end, symbol, group_by_time=None):
   base_query = f'select first(o) as o, last(c) as c, max(h) as h, min(l) as l from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
@@ -49,146 +69,91 @@ def get_candles_range(start, end, symbol, group_by_time=None):
     return base_query
   return base_query + f' group by time({group_by_time})'
 
-
-dfs_ref_range = []
-dfs_closing = []
-first_day = tz.localize(dateutil.parser.parse('2025-02-05T00:00:00'))
+#%%
+first_day = tz.localize(dateutil.parser.parse('2023-01-01T00:00:00'))
 last_day = tz.localize(dateutil.parser.parse('2025-02-07T00:00:00'))
-while first_day < last_day:
-  day_end = first_day + datetime.timedelta(days=1)
-  ref_range_start = first_day + eval_range_start
-  ref_range_end = first_day + eval_range_end
-  # print(
-  #   f"getting data for {ref_range_start.isoformat()} - {ref_range_end.isoformat()}"
-  # )
-  df_ref_range = index_client_df.query(get_candles_range(ref_range_start, ref_range_end, symbol, time_range))
 
-  if df_ref_range:
-    dfs_ref_range.append(df_ref_range[symbol].tz_convert(tz))
-  first_day = day_end
-
+df_day = index_client_df.query(get_candles_range(first_day, last_day, symbol, '1d'))
+df_day_clean = df_day[symbol].tz_convert(tz).dropna()
 #%%
-df_test = dfs_ref_range[0]
-
-df_change_hh = df_test.h.shift(-1) - df_test.h
-df_change_ll = df_test.l.shift(-1) - df_test.l
-
-df_change = pd.concat([df_change_hh, df_change_ll], axis=1)
-df_change['pos'] = df_change.apply(lambda x: -1 if x.h < 0 and x.l < 0 else 1 if x.h > 0 and x.l > 0 else 0, axis=1)
-
-#%%
-dfs_diff = []
-df_result = []
-for df_in, df_out in zip(dfs_ref_range, dfs_closing):
-  df_input = (df_in.c - df_in.o) / (df_in.h - df_in.l)
-  if not df_input.isna().any():
-    dfs_diff.append(df_input.reset_index(drop=True))
-    df_result.append(percentage_change(df_out.c.iat[0],df_in.iloc[-1].c))
-
-
-##%%
-dfs_diff_df = pd.concat(dfs_diff, axis=1).T
-dfs_diff_df_pn = dfs_diff_df.map(lambda x: 1 if x > 0 else 0)
-df_result_logreg = [0 if r < 0 else 1 for r in  df_result]
-
-#%%
-X_train, X_test, y_train, y_test = train_test_split(dfs_diff_df, df_result_logreg, test_size=0.5, random_state=42)
-
-# Create and train Logistic Regression model
-model = LogisticRegression()
-model.fit(X_train, y_train)
-
-# Predictions
-y_pred = model.predict(X_test)
-
-# Evaluate the model
-print("Accuracy Score:", accuracy_score(y_test, y_pred))
-print("\nClassification Report:\n", classification_report(y_test, y_pred))
-print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
-
-# Extract coefficients (model.coef_) and feature names
-coefficients = model.coef_[0]
-features = dfs_diff_df.columns
-
-# Pair features with their absolute coefficients
-feature_importance = pd.DataFrame({
-  'Feature': features,
-  'Coefficient': coefficients,
-  'Absolute Importance': np.abs(coefficients)
-}).sort_values(by='Absolute Importance', ascending=False)
-
-print(feature_importance)
-
+axs = fplt.create_plot(symbol, rows=3)
+create_interactive_plot(axs[0], df_day_clean, '1d')
+fplt.plot(df_day_clean.h-df_day_clean.l, legend='diff', ax=axs[1])
+fplt.plot(df_day_clean.o-df_day_clean.c, legend='oc', ax=axs[2])
+fplt.show()
 
 #%%
 
-# 2. Split Data into Training and Testing Sets
-X_train, X_test, Y_train, Y_test = train_test_split(dfs_diff_df, df_result, test_size=0.25, random_state=42)
-
-# Train Logistic Regression Model
-# model = LogisticRegression()
-model = LinearRegression()
-model.fit(X_train, Y_train)
-
-# Evaluate
-Y_pred = model.predict(X_test)
-print(f"Accuracy: {accuracy_score(Y_test, Y_pred):.2f}")
+# df_diff = df_day_clean.o-df_day_clean.c
+df_diff = ((df_day_clean.o-df_day_clean.c) / df_day_clean.o )*100
+df_diff.plot.hist(bins=100, alpha=0.7, color='blue', title='Histogram of Values')
+fplt.show()
 
 #%%
-# 2. Split Data into Training and Testing Sets
-X_train, X_test, y_train, y_test = train_test_split(dfs_diff_df, df_result, test_size=0.25, random_state=42)
 
-# 3. Train the Linear Regression Model
-model = LinearRegression()  # Initialize the model
-model.fit(X_train, y_train)  # Train the model on the training data
+df_diff[(df_diff > -1.3) & (df_diff < 1.3) ].count()
 
-# 4. Make Predictions
-y_pred = model.predict(X_test)  # Predict on the test data
-
-# 5. Evaluate the Model
-mse = mean_squared_error(y_test, y_pred)  # Calculate Mean Squared Error
-r2 = r2_score(y_test, y_pred)  # Calculate R² Score
-
-print(f"Model Coefficients (slope): {model.coef_[0][0]:.2f}")
-print(f"Model Intercept: {model.intercept_[0]:.2f}")
-print(f"Mean Squared Error: {mse:.2f}")
-print(f"R² Score: {r2:.2f}")
-
-
-# Get DAX Data for one day to find alignment
-# day_start = dateutil.parser.parse('2024-10-29T00:00:00+01:00')
-# day_end = day_start + datetime.timedelta(days=1)
-
-
-# data = index_client_df.query(query)
-# dax_df = data['DAX']
-# dax_df = dax_df.tz_convert(tz)
+22435 * 1.013
 #%%
+# eval_range_start = datetime.timedelta(hours=0, minutes=0)
+# eval_range_end = datetime.timedelta(hours=23, minutes=0)
+time_ranges = ['2m', '4m', '8m', '16m', '32m', '64m']
+
+first_date_str = index_client.query(f'select first(o) from {symbol}').raw['series'][0]['values'][0][0]
+last_date_str = index_client.query(f'select last(o) from {symbol}').raw['series'][0]['values'][0][0]
+
+first_date = dateutil.parser.parse(first_date_str)
+last_date = dateutil.parser.parse(last_date_str)
+num_days = (last_date - first_date).days
+
+# last_day = tz.localize(dateutil.parser.parse('2025-02-07T00:00:00'))
+# while first_day < last_day:
+while True:
+  selected_day_dist = random.randint(0, num_days)
+  ref_range_start = first_date + datetime.timedelta(days=selected_day_dist)
+  ref_range_end = ref_range_start + datetime.timedelta(days=1)
+  dfs_day = []
+  for time_range in time_ranges:
+    # day_end = selected_day + datetime.timedelta(days=1)
+    # print(
+    #   f"getting data for {ref_range_start.isoformat()} - {ref_range_end.isoformat()}"
+    # )
+    df_day = index_client_df.query(get_candles_range(ref_range_start, ref_range_end, symbol, time_range))
+
+    if df_day:
+      dfs_day.append(df_day[symbol].tz_convert(tz).dropna())
+    # selected_day = day_end
+
+  if not dfs_day:
+    print(f"no data for {ref_range_start.isoformat()} - {ref_range_end.isoformat()}")
+    continue
+
+  axs = fplt.create_plot(symbol, rows=len(dfs_day))
+  for (ax, df) in zip(axs, dfs_day):
+    create_interactive_plot(ax, df, ref_range_start.strftime('%Y-%m-%d'))
+
+  fplt.show()
+
+#%%
+df_change = dfs_ref_range[0]
+
+df_change['hh'] = df_change.h.shift(-1) - df_change.h
+df_change['ll'] = df_change.l.shift(-1) - df_change.l
+
+# df_change = pd.concat([df_change['hh'], df_change['ll']], axis=1)
+df_change['pos'] = df_change.apply(lambda x: -1 if x.hh < 0 and x.ll < 0 else 1 if x.hh > 0 and x.ll > 0 else 0, axis=1)
+
+
+
+# fplt.plot(df_change.hh, legend='HH', ax=ax[1])
+# fplt.plot(df_change.ll, legend='LL', ax=ax[2])
+# fplt.plot(df_change.pos, legend='pos', ax=ax[3])
+
+
+# dax_df = df_change
 symbol = 'DAX'
 interval = '10m'
-ax = fplt.create_plot('DAX', rows=1)
-fplt.candlestick_ochl(dax_df[['o', 'c', 'h', 'l']])
-fplt.add_legend('', ax=ax)
-
-hover_label = fplt.add_legend('', ax=ax)
-
-#######################################################
-## update crosshair and legend when moving the mouse ##
-
-def update_legend_text(x, y):
-  # print(x)
-  row = dax_df.loc[pd.to_datetime(x, unit='ns', utc=True)]
-  # print(row)
-  # format html with the candle and set legend
-  fmt = '<span style="font-size:15px;color:#%s;background-color:#fff">%%.2f</span>' % ('0d0' if (row.o<row.c).all() else 'd00')
-  rawtxt = '<span style="font-size:14px">%%s %%s</span> &nbsp; O%s C%s H%s L%s' % (fmt, fmt, fmt, fmt)
-  values = [row.o, row.c, row.h, row.l]
-  hover_label.setText(rawtxt % tuple([symbol, interval.upper()] + values))
-
-def update_crosshair_text(x, y, xtext, ytext):
-  ytext = '%s (Close%+.2f)' % (ytext, (y - dax_df.iloc[x].c))
-  return xtext, ytext
-
-fplt.set_mouse_callback(update_legend_text, ax=ax, when='hover')
-fplt.add_crosshair_info(update_crosshair_text, ax=ax)
+axs = fplt.create_plot('DAX', rows=len(dfs_day))
+for (ax, df) in zip(axs, dfs_day):
+  create_interactive_plot(ax, df)
 fplt.show()
