@@ -32,9 +32,9 @@ option_portfolio_positions = [position for position in portfolio if position.con
 SEP = ';'
 
 actions = 'Actions: None/Roll/BuySold/TakeProfit/TakeLoss'
-plain = f'Date {SEP} Symbol {SEP} Date {SEP} Right {SEP} Strike {SEP} Pos {SEP} P/L {SEP} Last {SEP} IV {SEP} Δ {SEP} Θ {SEP} Γ {SEP} ν {SEP} Action {SEP} Comment\n'
+plain = f'Date {SEP} Symbol {SEP} Date {SEP} Right {SEP} Strike {SEP} Pos {SEP} P/L {SEP} Last {SEP} Price {SEP} Mult {SEP} IV {SEP} Δ {SEP} Θ {SEP} Γ {SEP} ν {SEP} Action {SEP} Comment\n'
 html = '''<table class="table table-bordered"><tbody>
-<tr><th>Date</th><th>Symbol</th><th>Pos</th><th>P/L</th><th>Last</th><th>IV</th><th>Δ</th><th>Θ</th><th>Γ</th><th>ν</th><th>Action</th><th>Comment</th></tr>'''
+<tr><th>Date</th><th>Symbol</th><th>Pos</th><th>P/L</th><th>Last</th><th>Price</th><th>Mult</th><th>IV</th><th>Δ</th><th>Θ</th><th>Γ</th><th>ν</th><th>Action</th><th>Comment</th></tr>'''
 # position = option_portfolio_positions[3]
 for position in option_portfolio_positions:
   print(f'Processing {position.contract.symbol}...')
@@ -70,13 +70,14 @@ for position in option_portfolio_positions:
   # pnl = position.position * (mkt_price - position.avgCost)
   # pnl = position.unrealizedPNL + position.realizedPNL
   pnl = position.unrealizedPNL
+  mult = float(position.contract.multiplier)
   plain += f'{datetime.now().strftime("%Y-%m-%d %H:%M")} {SEP} {position.contract.symbol} {SEP} {position.contract.lastTradeDateOrContractMonth} {SEP} {position.contract.right} {SEP} {position.contract.strike} {SEP} '
-  plain += f'{position.position} {SEP} {pnl:.2f} {SEP} {umd.close} {SEP}'
+  plain += f'{position.position} {SEP} {pnl:.2f} {SEP} {umd.close} {SEP} {position.averageCost/mult:.2f} {SEP} {mult} {SEP}'
   plain += f'{iv * 100:.2f}, {daily_iv * 100:.2f} {SEP} {greeks_to_str(greeks.delta)} {SEP} {greeks_to_str(greeks.theta)} {SEP} '
   plain += f'{greeks_to_str(greeks.gamma)} {SEP} {greeks_to_str(greeks.vega)} {SEP}\n'
 
   html += f'<tr><td>{datetime.now().strftime("%Y-%m-%d %H:%M")}</td><td>{position.contract.symbol} {position.contract.lastTradeDateOrContractMonth} {position.contract.right} {position.contract.strike}</td><td>'
-  html += f'{position.position}</td><td>{pnl:.2f}</td><td>{umd.close}</td><td>'
+  html += f'{position.position}</td><td>{pnl:.2f}</td><td>{umd.close}</td><td>{position.averageCost/mult:.2f}</td><td>{mult}</td><td>'
   html += f'{iv * 100:.2f}, {daily_iv * 100:.2f}</td><td>{greeks_to_str(greeks.delta)}</td><td>{greeks_to_str(greeks.theta)}</td><td>'
   html += f'{greeks_to_str(greeks.gamma)}</td><td>{greeks_to_str(greeks.vega)}</td><td></td><td></td></tr>\n'
 
