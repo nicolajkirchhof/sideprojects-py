@@ -38,17 +38,9 @@ def iron_butterfly_profit_loss(S, wing_call, atm_call, atm_put, wing_put):
     """
   return put_credit_spread_pnl(S, atm_put, wing_put) + call_credit_spread_pnl(S, atm_call, wing_call)
 
-def create_option_chain(region, date, iv, underlying, strike_offset, expiry_days, sigma, debug=False):
-  risk_free_rate_year = None
-  if region == 'EU':
-    eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
-    risk_free_rate_year = eu_interest[eu_interest.index < str(date.date())].iloc[-1].Main/100
-  if region == 'US':
-    us_interest=pd.read_csv('finance/US_Interest.csv', index_col='observation_date', parse_dates=True)
-    risk_free_rate_year = us_interest[us_interest.index <= str(date.date())].tail(1)['THREEFY1'].iat[0]/100
 
-  if risk_free_rate_year is None:
-    raise ValueError('No risk free rate found for the given date')
+def create_option_chain(region, date, iv, underlying, strike_offset, expiry_days, sigma, debug=False):
+  risk_free_rate_year = risk_free_rate(date, region)
 
   t = expiry_days / 365
   ##%%
@@ -75,6 +67,20 @@ def create_option_chain(region, date, iv, underlying, strike_offset, expiry_days
       print(f'{call.vega():.3f} ν {call.gamma():.3f} Γ {call.theta():.3f} Θ {call.delta():.3f} Δ {call.price():.3f} C -- {strike} -- P {put.price():.3f} Δ {put.delta():.3f} Θ {put.theta():.3f} Γ {put.gamma():.3f} ν {put.vega():.3f} ')
 
   return opts
+
+
+def risk_free_rate(date, region):
+  risk_free_rate_year = None
+  if region == 'EU':
+    eu_interest = pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
+    risk_free_rate_year = eu_interest[eu_interest.index < str(date.date())].iloc[-1].Main / 100
+  if region == 'US':
+    us_interest = pd.read_csv('finance/US_Interest.csv', index_col='observation_date', parse_dates=True)
+    risk_free_rate_year = us_interest[us_interest.index <= str(date.date())].tail(1)['THREEFY1'].iat[0] / 100
+  if risk_free_rate_year is None:
+    raise ValueError('No risk free rate found for the given date')
+  return risk_free_rate_year
+
 
 def estimate_volatility_skew(S, K, sigma_ATM, skew_down, skew_up, smile_width):
   """

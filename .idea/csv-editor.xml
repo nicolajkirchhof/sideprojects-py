@@ -3,13 +3,6 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="C:\Users\nicol\Downloads\ECB Data Portal_20250322231503.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\DAV\DAV.csv">
           <value>
             <Attribute>
@@ -24,14 +17,21 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\THREEFY1.csv">
+        <entry key="\finance\US_Interest.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\US_Interest.csv">
+        <entry key="\finance\_data\Options Strategies - NoonIronButterfly.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\_data\OptionsStrategiesNoonIronButterfly.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

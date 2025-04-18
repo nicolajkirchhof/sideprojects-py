@@ -70,12 +70,12 @@ def get_candles_range_aggregate(start, end, symbol, group_by_time=None):
     return None
   return influx_data[symbol].tz_convert(symbol_def['EX']['TZ'])
 
-def get_candles_range_raw(start, end, symbol):
+def get_candles_range_raw(start, end, symbol, with_volatility=False):
   symbol_def = SYMBOLS[symbol]
   if symbol_def is None:
     return None
   influx_client_df = idb.DataFrameClient()
-  query = get_candles_range_raw_query(start, end, symbol)
+  query = get_candles_range_raw_query(start, end, symbol, with_volatility)
   influx_data = influx_client_df.query(query, database=symbol_def['DB'])
   if symbol not in influx_data:
     return None
@@ -90,8 +90,9 @@ def get_candles_range_aggregate_query(start, end, symbol, group_by_time=None, wi
   return base_query + f' group by time({group_by_time}, {timezone_offset_h:.0f}h) fill(none)'
 
 
-def get_candles_range_raw_query(start, end, symbol):
-  return f'select o, c, h, l from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
+def get_candles_range_raw_query(start, end, symbol, with_volatility):
+  volatility_query_addon = ', hvo, hvc, hvh, hvl, ivo, ivc, ivl, ivh' if with_volatility else ''
+  return f'select o, c, h, l {volatility_query_addon} from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
 
 
 def create_databases():
