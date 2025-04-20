@@ -2,6 +2,10 @@ import numpy as np
 import pandas as pd
 import blackscholes as bs
 
+SKEW = {
+  'DAX': {'ATM': [ 0.40375593,  6.95075883, -0.8375398 ,  0.17255903], 'OTM': [ 3.67816432e-01,  4.30107676e+02, -3.00228684e-01,  4.94081049e-01]}
+}
+
 def put_credit_spread_pnl(S, atm_put, wing_put):
   # Net credit received
   net_credit = atm_put.price - wing_put.price
@@ -107,3 +111,6 @@ def estimate_volatility_skew(S, K, sigma_ATM, skew_down, skew_up, smile_width):
   # Adjust volatility based on skew and smile width
   iv = sigma_ATM + skew * log_moneyness + smile_width * log_moneyness ** 2
   return iv
+
+def option_bs_price_correction(bs_price, price_diff_pct):
+  return bs_price / (1 - price_diff_pct)
