@@ -1,4 +1,5 @@
 #%%
+import re
 from datetime import datetime, timedelta
 
 
@@ -43,7 +44,28 @@ for symbol in symbols:
   dfs_ref_range = []
   dfs_closing = []
   first_day = tz.localize(dateutil.parser.parse('2022-01-03T00:00:00'))
-  # first_day = tz.localize(dateutil.parser.parse('2025-03-06T00:00:00'))
+
+  files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+  # Sort files by name in descending order
+  files_sorted = sorted(files, reverse=True)
+
+  first_file = files_sorted[0] if files_sorted else None
+
+  if first_file is not None:
+    # Define a regex pattern to extract the date (format: YYYY-MM-DD)
+    date_pattern = r'\d{4}-\d{2}-\d{2}'  # Adjust the pattern to match your date format
+
+    # Find the date in the filename
+    match = re.search(date_pattern, first_file)
+    if match:
+      date_str = match.group()  # Extract the date string
+      parsed_date = datetime.strptime(date_str, "%Y-%m-%d")  # Parse into a datetime object
+      first_day = tz.localize(parsed_date)
+      print(f"Date string: {date_str}")
+      print(f"Parsed date: {parsed_date}")
+    else:
+      print("No date found in filename.")
+
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
 
