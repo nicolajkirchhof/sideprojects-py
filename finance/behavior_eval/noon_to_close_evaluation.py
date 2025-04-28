@@ -38,7 +38,7 @@ mpl.use('QtAgg')
 directory = f'N:/My Drive/Projects/Trading/Research/Strategies/noon_to_close'
 os.makedirs(directory, exist_ok=True)
 symbols = ['DAX', 'ESTX50', 'SPX']
-symbol = symbols[1]
+symbol = symbols[0]
 
 #%%
 file = f'{directory}/{symbol}_noon_to_close.pkl'
@@ -62,7 +62,7 @@ for row in df.itertuples():
 
 # row = list(pd.DataFrame([{'noon_iv': 0.1761, 'noon':22987, 'close_iv':0.18091, 'close':22847, 'date':datetime.now()}]).itertuples())[0]
 # row = list(pd.DataFrame([{'noon_iv': 0.17667, 'noon':23080, 'close_iv':0.18091, 'close':23014, 'date':datetime.now()}]).itertuples())[0]
-row = list(pd.DataFrame([{'noon_iv': 0.29, 'noon':5390.4, 'close_iv':0.18091, 'close':5390, 'date':datetime.now()}]).itertuples())[0]
+# row = list(pd.DataFrame([{'noon_iv': 0.29, 'noon':5390.4, 'close_iv':0.18091, 'close':5390, 'date':datetime.now()}]).itertuples())[0]
 #%%
   eu_interest=pd.read_csv('finance/ECB_Interest.csv', index_col='DATE', parse_dates=True)
 

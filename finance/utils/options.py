@@ -2,8 +2,11 @@ import numpy as np
 import pandas as pd
 import blackscholes as bs
 
+from finance.utils.fitlog import log_function_with_offset
+
 SKEW = {
-  'DAX': {'ATM': [ 0.40375593,  6.95075883, -0.8375398 ,  0.17255903], 'OTM': [ 3.67816432e-01,  4.30107676e+02, -3.00228684e-01,  4.94081049e-01]}
+  'DAX': {'ATM': [ 0.40375593,  6.95075883, -0.8375398 ,  0.17255903], 'OTM': [ 3.67816432e-01,  4.30107676e+02, -3.00228684e-01,  4.94081049e-01]},
+  'ESTX50': {'ATM': [2.72508214e+02, 2.50274938e-03, 9.96007080e-01, 9.88537431e-01], 'OTM': [6.16779131e-01, 3.69403318e+02, 7.34503531e-02, 3.48376546e-01]}
 }
 
 def put_credit_spread_pnl(S, atm_put, wing_put):
@@ -43,7 +46,7 @@ def iron_butterfly_profit_loss(S, wing_call, atm_call, atm_put, wing_put):
   return put_credit_spread_pnl(S, atm_put, wing_put) + call_credit_spread_pnl(S, atm_call, wing_call)
 
 
-def create_option_chain(region, date, iv, underlying, strike_offset, expiry_days, sigma, debug=False):
+def create_option_chain(region, date, iv, underlying, strike_offset, expiry_days, sigma, symbol, debug=False):
   risk_free_rate_year = risk_free_rate(date, region)
 
   t = expiry_days / 365
@@ -58,7 +61,8 @@ def create_option_chain(region, date, iv, underlying, strike_offset, expiry_days
 
   opts = []
   for strike in strikes:
-    iv_skewed  = estimate_volatility_skew(underlying, strike, iv, 0.02, 0.02, 0.15)
+    pct = (underlying - strike) / underlying
+    iv_skewed = estimate_skew(pct, iv, strike, symbol)
     call = bs.BlackScholesCall(underlying, strike, t, risk_free_rate_year, iv_skewed)
     put = bs.BlackScholesPut(underlying, strike, t, risk_free_rate_year, iv_skewed)
     v_call = vars(call)
@@ -113,4 +117,61 @@ def estimate_volatility_skew(S, K, sigma_ATM, skew_down, skew_up, smile_width):
   return iv
 
 def option_bs_price_correction(bs_price, price_diff_pct):
+  if price_diff_pct >= 1:
+    return bs_price
   return bs_price / (1 - price_diff_pct)
+
+def estimate_skew(pct, iv, bs_price, symbol):
+  skew = SKEW[symbol]
+  if iv * pct < 0.0005:
+    pct_diff_fct = log_function_with_offset(iv, *skew['ATM'])
+    return option_bs_price_correction(bs_price, pct_diff_fct)
+  else:
+    pct_diff_fct = log_function_with_offset(min(0.008, iv*pct), *skew['OTM'])
+    return option_bs_price_correction(bs_price, pct_diff_fct)
+
+def implied_volatility(S, K, T, r, market_price, right, tol=1e-6, max_iter=1000):
+  """
+  Calculate implied volatility using the bisection method.
+
+  Parameters:
+  - S: Current stock price (float)
+  - K: Strike price (float)
+  - T: Time to maturity in years (float)
+  - r: Risk-free interest rate (float, e.g., 0.05 for 5%)
+  - market_price: The actual (market) price of the option (float)
+  - option_type: "call" or "put" (default="call")
+  - tol: Tolerance for stopping the iteration (default=1e-6)
+  - max_iter: Maximum number of iterations (default=1000)
+
+  Returns:
+  - Implied volatility (float).
+  """
+  # Initial bounds for volatility
+  lower_vol = 1e-5    # Volatility cannot be zero
+  upper_vol = 5.0     # Arbitrary high value for initial upper bound
+
+  for i in range(max_iter):
+    # Calculate the midpoint
+    mid_vol = (lower_vol + upper_vol) / 2.0
+    # Calculate the theoretical price with the mid volatility
+    option = bs.BlackScholesCall(S, K, T, r, mid_vol) if right == "C" else bs.BlackScholesPut(S, K, T, r, mid_vol)
+    theoretical_price = option.price()
+
+    # Check the difference between theoretical price and market price
+    price_diff = theoretical_price - market_price
+
+    # If the difference is within the tolerance, return the implied volatility
+    if abs(price_diff) < tol:
+      return mid_vol
+
+    # Adjust the bounds
+    if price_diff > 0:
+      # If theoretical price is too high, reduce upper bound
+      upper_vol = mid_vol
+    else:
+      # If theoretical price is too low, raise lower bound
+      lower_vol = mid_vol
+
+  # If no result is found, raise an exception
+  raise ValueError("Implied volatility did not converge within the given iterations.")

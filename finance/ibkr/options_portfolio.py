@@ -69,7 +69,10 @@ for position in option_portfolio_positions:
   # mkt_price = market_data.last * float(market_data.contract.multiplier)
   # pnl = position.position * (mkt_price - position.avgCost)
   # pnl = position.unrealizedPNL + position.realizedPNL
+  inthemny = umd.close - position.contract.strike if position.contract.right == 'C' else position.contract.strike - umd.close
   pnl = position.unrealizedPNL
+  # if position.position == -1 and inthemny > 0:
+   # pnl = pnl + inthemny
   mult = float(position.contract.multiplier)
   plain += f'{datetime.now().strftime("%Y-%m-%d %H:%M")} {SEP} {position.contract.symbol} {SEP} {position.contract.lastTradeDateOrContractMonth} {SEP} {position.contract.right} {SEP} {position.contract.strike} {SEP} '
   plain += f'{position.position} {SEP} {pnl:.2f} {SEP} {umd.close} {SEP} {position.averageCost/mult:.2f} {SEP} {mult} {SEP}'

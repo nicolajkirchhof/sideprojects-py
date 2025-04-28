@@ -24,13 +24,13 @@
             </Attribute>
           </value>
         </entry>
-          <entry key="\finance\US_Interest.csv">
-              <value>
-                  <Attribute>
-                      <option name="separator" value="," />
-                  </Attribute>
-              </value>
-          </entry>
+        <entry key="\finance\US_Interest.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\_data\Options Strategies - NoonIronButterfly.csv">
           <value>
             <Attribute>
@@ -39,6 +39,13 @@
           </value>
         </entry>
         <entry key="\finance\_data\OptionsStrategiesNoonIronButterfly.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\_data\ibkr\DUE299894_20250303_20250414.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

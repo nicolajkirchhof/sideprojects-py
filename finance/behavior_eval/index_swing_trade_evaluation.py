@@ -16,6 +16,7 @@ import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import mplfinance as mpf
+from scipy.stats import linregress
 
 import finance.utils as utils
 
@@ -30,7 +31,7 @@ symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500
 # symbol = symbols[0]
 for symbol in symbols:
   # Create a directory
-  directory = f'N:/My Drive/Projects/Trading/Research/Plots/{symbol}_mpf_1m_5m_30m'
+  directory = f'N:/My Drive/Projects/Trading/Research/Plots/swing/{symbol}_5m_9ema_ama_slope'
   os.makedirs(directory, exist_ok=True)
 
   # Create a directory
@@ -52,8 +53,7 @@ for symbol in symbols:
   ##%%
   offset = timedelta(hours=0)
   while day_start < last_day:
-    # offset = timedelta(hours=-1) if tz.zone =='America/Chicago' and day_start > tz.localize(dateutil.parser.parse('2025-03-09T00:00:00')) and day_start < tz.localize(dateutil.parser.parse('2025-03-31T00:00:00')) else timedelta(hours=0)
-    ##%%
+    #%%
     day_end = day_start + exchange['Close'] + timedelta(hours=1) + offset
     # get the following data for daily assignment
     day_candles = utils.influx.get_candles_range_raw(day_start+exchange['Open']-timedelta(hours=1, minutes=0)+offset, day_end, symbol)
@@ -77,15 +77,26 @@ for symbol in symbols:
     # Calculate the Adaptive Moving Average (AMA / KAMA)
     df_5m['AMA'] = utils.indicators.adaptive_moving_average(df_5m['c'], period=10, fast=2, slow=30)
 
-  ##%%
+    # Define a rolling window size (e.g., 10 days)
+    window_size = 3
+
+    # Function to calculate the slope for a window
+    def calculate_slope(x):
+      indices = np.arange(len(x))  # Create a simple index for regression (0, 1, 2, ...)
+      slope, intercept, r_value, p_value, std_err = linregress(indices, x)
+      return slope
+
+    # Apply a rolling window to calculate the slope
+    df_5m["SL_9EMA"] = df_5m["9EMA"].rolling(window=window_size).apply(calculate_slope, raw=True)
+    df_5m["SL_AMA"] = df_5m["AMA"].rolling(window=window_size).apply(calculate_slope, raw=True)
+  #%%
     try:
       # %%
       fig = mpf.figure(style='yahoo', figsize=(16,9), tight_layout=True)
 
       date_str = day_start.strftime('%Y-%m-%d')
-      ax1 = fig.add_subplot(3,1,1)
-      ax2 = fig.add_subplot(3,1,2)
-      ax3 = fig.add_subplot(3,1,3)
+      ax1 = fig.add_subplot(2,1,1)
+      ax2 = fig.add_subplot(2,1,2)
 
       overnight_h = overnight_candle.h.iat[0] if overnight_candle is not None else np.nan
       overnight_l = overnight_candle.l.iat[0] if overnight_candle is not None else np.nan
@@ -95,42 +106,21 @@ for symbol in symbols:
 
       hlines=dict(hlines=indicator_hlines, colors=['#bf42f5'], linewidths=[0.5, 1, 1, 0.5, 0.5], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
 
-      ema_plot = mpf.make_addplot(df_5m['9EMA'], ax=ax2, width=0.4, color="turquoise")
-      ama_plot = mpf.make_addplot(df_5m['AMA'], ax=ax2, width=0.4, color='gold')
+      ema_plot = mpf.make_addplot(df_5m['9EMA'], ax=ax1, width=1, color="turquoise")
+      ama_plot = mpf.make_addplot(df_5m['AMA'], ax=ax1, width=1, color='gold')
 
-      mpf.plot(df_1m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%H:%M', tight_layout=True, hlines=hlines, warn_too_much_data=700)
-      mpf.plot(df_5m, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ama_plot, ema_plot])
-      mpf.plot(df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines)
+      mpf.plot(df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ama_plot, ema_plot])
 
-      ticks = pd.date_range(df_1m.index.min(),df_1m.index.max()+timedelta(minutes=1),freq='30min')
-      ticklabels = [ tick.time().strftime('%H:%M') for tick in ticks ]
-      loc_1m = [df_1m.index.get_loc(tick) for tick in ticks[:-1]]
-      last_tick_1m = 2* loc_1m[-1] - loc_1m[-2]
-      loc_1m.append(last_tick_1m)
-      ax1.set_xticks(loc_1m)
-      ax1.set_xticklabels(ticklabels)
-      ax1.set_xlim(-2.5, last_tick_1m + 2.5)
+      ema_slope_plot = mpf.make_addplot(df_5m['SL_9EMA'], ax=ax2, width=1, color="turquoise")
+      ama_slope_plot = mpf.make_addplot(df_5m['SL_AMA'], ax=ax2, width=1, color='gold')
+      slope_df = df_5m.copy()
 
-      ticklabels = [ (tick+timedelta(minutes=2.5)).strftime('%H:%M') for tick in ticks ]
-      loc_5m = [df_5m.index.get_loc(tick) for tick in ticks[:-1]]
-      last_tick_5m = 2*loc_5m[-1] - loc_5m[-2]
-      loc_5m.append(last_tick_5m)
-      ax2.set_xticks(loc_5m)
-      ax2.set_xticklabels(ticklabels)
-      ax2.set_xlim(-1, last_tick_5m )
+      mpf.plot(slope_df, type='line', ax=ax2,columns=['SL_AMA']*5,  xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ema_slope_plot, ama_slope_plot])
 
-      ticklabels = [ (tick+timedelta(minutes=15)).time().strftime('%H:%M') for tick in ticks ]
-      loc_30m = [df_30m.index.get_loc(tick) for tick in ticks[:-1]]
-      last_tick_30m = 2*loc_30m[-1] - loc_30m[-2]
-      loc_30m.append(last_tick_30m)
-      ax3.set_xticks(loc_30m)
-      ax3.set_xticklabels(ticklabels)
-      ax3.set_xlim(-0.583, last_tick_30m - 0.45)
-
-      plt.show()
+      # plt.show()
       ## %%
-      # plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
-      # plt.close()
+      plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
+      plt.close()
       print(f'{symbol} finished {date_str}')
       #%%
     except Exception as e:
