@@ -38,6 +38,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\finance\_data\ibkr\U16408041_20250324_20250326.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\etf_symbols.csv">
           <value>
             <Attribute>

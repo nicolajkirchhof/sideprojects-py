@@ -1,4 +1,6 @@
-from datetime import timedelta
+import os
+import re
+from datetime import timedelta, datetime
 
 import mplfinance as mpf
 import numpy as np
@@ -95,3 +97,24 @@ def daily_change_plot(symbol, day):
   except Exception as e:
     print(f'{symbol} error: {e}')
     return None
+
+def last_date_from_files(directory):
+  files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+  # Sort files by name in descending order
+  files_sorted = sorted(files, reverse=True)
+  first_file = files_sorted[0] if files_sorted else None
+  if first_file is not None:
+    # Define a regex pattern to extract the date (format: YYYY-MM-DD)
+    date_pattern = r'\d{4}-\d{2}-\d{2}'  # Adjust the pattern to match your date format
+
+    # Find the date in the filename
+    match = re.search(date_pattern, first_file)
+    if match:
+      date_str = match.group()  # Extract the date string
+      parsed_date = datetime.strptime(date_str, "%Y-%m-%d")  # Parse into a datetime object
+      print(f"Date string: {date_str}")
+      print(f"Parsed date: {parsed_date}")
+      return parsed_date
+    else:
+      print("No date found in filename.")
+  return None

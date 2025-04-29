@@ -21,6 +21,7 @@ from scipy.stats import linregress
 
 import finance.utils as utils
 
+import scipy.signal as signal
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
@@ -29,8 +30,13 @@ mpl.use('QtAgg')
 
 #%%
 symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
-# symbol = symbols[0]
+symbol = symbols[0]
+
+
+
+
 for symbol in symbols:
+  #%%
   # Create a directory
   directory = f'N:/My Drive/Projects/Trading/Research/Plots/swing/{symbol}_5m_9ema_ama_slope'
   os.makedirs(directory, exist_ok=True)
@@ -45,26 +51,9 @@ for symbol in symbols:
   dfs_closing = []
   first_day = tz.localize(dateutil.parser.parse('2022-01-03T00:00:00'))
 
-  files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-  # Sort files by name in descending order
-  files_sorted = sorted(files, reverse=True)
-
-  first_file = files_sorted[0] if files_sorted else None
-
-  if first_file is not None:
-    # Define a regex pattern to extract the date (format: YYYY-MM-DD)
-    date_pattern = r'\d{4}-\d{2}-\d{2}'  # Adjust the pattern to match your date format
-
-    # Find the date in the filename
-    match = re.search(date_pattern, first_file)
-    if match:
-      date_str = match.group()  # Extract the date string
-      parsed_date = datetime.strptime(date_str, "%Y-%m-%d")  # Parse into a datetime object
-      first_day = tz.localize(parsed_date)
-      print(f"Date string: {date_str}")
-      print(f"Parsed date: {parsed_date}")
-    else:
-      print("No date found in filename.")
+  # first_day_from_file = utils.plots.last_date_from_files(directory)
+  # if first_day_from_file is not None:
+  #   first_day = tz.localize(first_day_from_file)
 
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
@@ -72,8 +61,8 @@ for symbol in symbols:
   prior_day = first_day
   day_start = first_day + timedelta(days=1)
 
-  ##%%
   offset = timedelta(hours=0)
+  #%%
   while day_start < last_day:
     #%%
     day_end = day_start + exchange['Close'] + timedelta(hours=1) + offset
@@ -82,8 +71,8 @@ for symbol in symbols:
     if day_candles is None or len(day_candles) < 100:
       day_start = day_start + timedelta(days=1)
       print(f'{symbol} no data for {day_start.isoformat()}')
-      # raise Exception('no data')
-      continue
+      raise Exception('no data')
+      # continue
     prior_day_candle = utils.influx.get_candles_range_aggregate(prior_day + exchange['Open'] + offset, prior_day + exchange['Close'] + offset, symbol)
     overnight_candle= utils.influx.get_candles_range_aggregate(day_start + offset, day_start + exchange['Open'] - timedelta(hours=1) + offset, symbol)
 
@@ -95,9 +84,12 @@ for symbol in symbols:
     df_5m = df_1m.resample('5min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last'))
     df_30m = df_1m.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last'))
 
+    df_5m['VWAP3'] = (df_5m['c']+df_5m['h']+df_5m['l'])/3
     df_5m['9EMA'] = df_5m['c'].ewm(span=9, adjust=False).mean()
     # Calculate the Adaptive Moving Average (AMA / KAMA)
     df_5m['AMA'] = utils.indicators.adaptive_moving_average(df_5m['c'], period=10, fast=2, slow=30)
+    df_5m['AMA_VWAP'] = utils.indicators.adaptive_moving_average(df_5m['VWAP3'], period=10, fast=2, slow=30)
+    df_5m['9EMA_VWAP'] = df_5m['VWAP3'].ewm(span=9, adjust=False).mean()
 
     # Define a rolling window size (e.g., 10 days)
     window_size = 3
@@ -108,12 +100,61 @@ for symbol in symbols:
       slope, intercept, r_value, p_value, std_err = linregress(indices, x)
       return slope
 
+    def trend_estimation(h_1, l_1, h, l):
+      # new lows and an overlap of at most 75 pct
+      atr = (h_1 - l_1)
+      if h_1 > h and l_1 > l and (atr - (h - l_1))/atr > 0.25:
+        return -1
+      elif h_1 < h and l_1 < l and (atr - (h_1 - l))/atr > 0.25:
+        return 1
+      else:
+        return 0
+
+
     # Apply a rolling window to calculate the slope
     df_5m["SL_9EMA"] = df_5m["9EMA"].rolling(window=window_size).apply(calculate_slope, raw=True)
     df_5m["SL_AMA"] = df_5m["AMA"].rolling(window=window_size).apply(calculate_slope, raw=True)
-  #%%
+    df_5m["SL_9EMA_VWAP"] = df_5m["9EMA_VWAP"].rolling(window=window_size).apply(calculate_slope, raw=True)
+    df_5m["SL_AMA_VWAP"] = df_5m["AMA_VWAP"].rolling(window=window_size).apply(calculate_slope, raw=True)
+    # df_5m['TREND'] = df_5m.rolling(window=2).apply(lambda x: trend_estimation(x.iloc[0]['h'], x.iloc[0].l, x.iloc[-1].h, x.iloc[-1].l))
+    # df_5m['TREND'] = df_5m.rolling(2).apply(lambda x: trend_estimation(x.iloc[0]['h'], x.iloc[0]['l'], x.iloc[1]['h'], x.iloc[1]['l']))
+    #%%
+    micro_trend = 0
+    macro_trend = 0
+    micro_trend_series = [0]
+    macro_trend_series = [0]
+    macro_low = df_5m.iloc[0]['l']
+    macro_high = df_5m.iloc[0]['h']
+    for i in range(1, len(df_5m)):
+      micro_trend = trend_estimation(df_5m.iloc[i-1]['h'], df_5m.iloc[i-1]['l'], df_5m.iloc[i]['h'], df_5m.iloc[i]['l'])
+      micro_trend_series.append(micro_trend)
+      # macro trend not yet decided or micro trend in the same direction
+      if micro_trend == macro_trend or macro_trend == 0:
+        macro_high = max(macro_high, df_5m.iloc[i]['h'])
+        macro_low = min(macro_low, df_5m.iloc[i]['l'])
+        macro_trend = micro_trend
+      # micro trend changed the direction
+      elif micro_trend == -1*macro_trend:
+        # see how far the micro direction has changed against the macro trend
+        if macro_trend == -1:
+          macro_trend = trend_estimation(macro_high, macro_low, df_5m.iloc[i]['h'], macro_low)
+        else: #macro_trend == 1:
+          macro_trend = trend_estimation(macro_high, macro_low, macro_high, df_5m.iloc[i]['l'])
+
+        if macro_trend != macro_trend_series[-1]:
+          macro_high = df_5m.iloc[i]['h']
+          macro_low = df_5m.iloc[i]['l']
+      macro_trend_series.append(macro_trend)
+      print(f'{i}: macro {macro_trend} micro {micro_trend} [{macro_low} {macro_high}] [{df_5m.iloc[i].l} {df_5m.iloc[i].h}]')
+
+    df_5m['MICRO_TREND'] = micro_trend_series
+    df_5m['MACRO_TREND'] = macro_trend_series
+
+    # # df_5m["SL_9EMA_VWAP_PEAKS"] = df_5m["SL_9EMA_VWAP"].copy().where(df_5m["SL_9EMA_VWAP"].abs() > 4, 0) + df_5m["SL_AMA_VWAP"].copy().where(df_5m["SL_AMA_VWAP"].abs() > 4, 0)
+    # signal.find_peaks(df_5m["SL_9EMA_VWAP_PEAKS"], distance=3, prominence=4)
+    #%%
     try:
-      # %%
+      ## %%
       fig = mpf.figure(style='yahoo', figsize=(16,9), tight_layout=True)
 
       date_str = day_start.strftime('%Y-%m-%d')
@@ -128,24 +169,61 @@ for symbol in symbols:
 
       hlines=dict(hlines=indicator_hlines, colors=['#bf42f5'], linewidths=[0.5, 1, 1, 0.5, 0.5], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
 
-      ema_plot = mpf.make_addplot(df_5m['9EMA'], ax=ax1, width=1, color="turquoise")
-      ama_plot = mpf.make_addplot(df_5m['AMA'], ax=ax1, width=1, color='gold')
+      # ema_plot = mpf.make_addplot(df_5m['9EMA'], ax=ax1, width=0.5, color="turquoise")
+      ema_vwap_plot = mpf.make_addplot(df_5m['9EMA_VWAP'], ax=ax1, width=1, color="darkturquoise")
+      # ama_plot = mpf.make_addplot(df_5m['AMA'], ax=ax1, width=0.5, color='gold')
+      ama_vwap_plot = mpf.make_addplot(df_5m['AMA_VWAP'], ax=ax1, width=1, color='goldenrod')
+      vwap3_plot = mpf.make_addplot(df_5m['VWAP3'], ax=ax1, width=1, color='darkgoldenrod')
+      addplots = [vwap3_plot, ama_vwap_plot, ema_vwap_plot]
 
-      mpf.plot(df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ama_plot, ema_plot])
+      mpf.plot(df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=addplots)
 
-      ema_slope_plot = mpf.make_addplot(df_5m['SL_9EMA'], ax=ax2, width=1, color="turquoise")
-      ama_slope_plot = mpf.make_addplot(df_5m['SL_AMA'], ax=ax2, width=1, color='gold')
+      # ema_slope_plot = mpf.make_addplot(df_5m['SL_9EMA'], ax=ax2, width=1, color="turquoise")
+      # ama_slope_plot = mpf.make_addplot(df_5m['SL_AMA'], ax=ax2, width=1, color='gold')
+      ama_vwap_slope_plot = mpf.make_addplot(df_5m['SL_AMA_VWAP'], ax=ax2, width=1, color='goldenrod')
+      ema_vwap_slope_plot = mpf.make_addplot(df_5m['SL_9EMA_VWAP'], ax=ax2, width=1, color="darkturquoise")
+      micro_trend_plot = mpf.make_addplot(df_5m['MICRO_TREND'], ax=ax2, width=1, color="gainsboro")
+      macro_trend_plot= mpf.make_addplot(df_5m['MACRO_TREND'], ax=ax2, width=1, color="gray", linestyle='--')
       slope_df = df_5m.copy()
+      slope_addplots = [ama_vwap_slope_plot, ema_vwap_slope_plot, micro_trend_plot, macro_trend_plot]
 
-      mpf.plot(slope_df, type='line', ax=ax2,columns=['SL_AMA']*5,  xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ema_slope_plot, ama_slope_plot])
+      mpf.plot(slope_df, type='line', ax=ax2,columns=['SL_AMA_VWAP']*5,  xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=slope_addplots)
 
-      # plt.show()
+      plt.show()
       ## %%
-      plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
-      plt.close()
+      # plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
+      # plt.close()
       print(f'{symbol} finished {date_str}')
-      #%%
+      ##%%
     except Exception as e:
       print(f'{symbol} error: {e}')
-      continue
+      # continue
+
+#%%
+def trend_estimation(h_1, l_1, h, l):
+  # new lows and an overlap of at most 75 pct
+  atr = (h_1 - l_1)
+  if h_1 > h and l_1 > l and (atr - (h - l_1))/atr > 0.25:
+    return -1
+  elif h_1 < h and l_1 < l and (atr - (h_1 - l))/atr > 0.25:
+    return 1
+  else:
+    return 0
+
+h_1 = 16076.91
+l_1 = 16031.36
+h = 16052.88
+l = 16026.86
+print(trend_estimation( 16076.91,16031.36, 16052.88,16026.86 ))
+
+#%%
+
+# Expecting ohcl & vwap
+def candle_following(series):
+  macro_trend = 0
+  micro_trend = 0
+  for i in range(2, len(series)):
+    if series.vwap.iloc[i-1] > series.vwap.iloc[i]:
+
+
 
