@@ -32,9 +32,6 @@ mpl.use('QtAgg')
 symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
 symbol = symbols[0]
 
-
-
-
 for symbol in symbols:
   #%%
   # Create a directory
@@ -103,9 +100,9 @@ for symbol in symbols:
     def trend_estimation(h_1, l_1, h, l):
       # new lows and an overlap of at most 75 pct
       atr = (h_1 - l_1)
-      if h_1 > h and l_1 > l and (atr - (h - l_1))/atr > 0.25:
+      if h_1 > h and l_1 > l and (atr - (h - l_1))/atr > 0.1:
         return -1
-      elif h_1 < h and l_1 < l and (atr - (h_1 - l))/atr > 0.25:
+      elif h_1 < h and l_1 < l and (atr - (h_1 - l))/atr > 0.1:
         return 1
       else:
         return 0
@@ -121,31 +118,55 @@ for symbol in symbols:
     #%%
     micro_trend = 0
     macro_trend = 0
-    micro_trend_series = [0]
-    macro_trend_series = [0]
+    micro_trend_series = np.zeros(len(df_5m), dtype=int)
+    macro_trend_series = np.zeros(len(df_5m), dtype=int)
     macro_low = df_5m.iloc[0]['l']
     macro_high = df_5m.iloc[0]['h']
-    for i in range(1, len(df_5m)):
+    last_macro_low_id = 0
+    last_macro_high_id = 0
+    i = 1
+    backtracked = []
+    while i < len(df_5m):
+    # for i in range(1, len(df_5m)):
       micro_trend = trend_estimation(df_5m.iloc[i-1]['h'], df_5m.iloc[i-1]['l'], df_5m.iloc[i]['h'], df_5m.iloc[i]['l'])
-      micro_trend_series.append(micro_trend)
+      micro_trend_series[i] = micro_trend
       # macro trend not yet decided or micro trend in the same direction
-      if micro_trend == macro_trend or macro_trend == 0:
+      if micro_trend == macro_trend or macro_trend == 0 or micro_trend == 0:
+        last_macro_low_id = last_macro_low_id if macro_low < df_5m.iloc[i]['l'] else i
+        last_macro_high_id = last_macro_high_id if macro_high > df_5m.iloc[i]['h'] else i
         macro_high = max(macro_high, df_5m.iloc[i]['h'])
         macro_low = min(macro_low, df_5m.iloc[i]['l'])
-        macro_trend = micro_trend
+        macro_trend = micro_trend if micro_trend != 0 else macro_trend
       # micro trend changed the direction
       elif micro_trend == -1*macro_trend:
         # see how far the micro direction has changed against the macro trend
+        macro_trend_change = False
+        macro_atr = macro_high - macro_low
         if macro_trend == -1:
-          macro_trend = trend_estimation(macro_high, macro_low, df_5m.iloc[i]['h'], macro_low)
+          changed_atr = (df_5m.iloc[i]['h'] - macro_low)
+          macro_trend_change = changed_atr / macro_atr > 0.9
         else: #macro_trend == 1:
-          macro_trend = trend_estimation(macro_high, macro_low, macro_high, df_5m.iloc[i]['l'])
+          changed_atr = (macro_high - df_5m.iloc[i]['l'])
+          macro_trend_change = changed_atr / macro_atr > 0.9
 
-        if macro_trend != macro_trend_series[-1]:
-          macro_high = df_5m.iloc[i]['h']
-          macro_low = df_5m.iloc[i]['l']
-      macro_trend_series.append(macro_trend)
-      print(f'{i}: macro {macro_trend} micro {micro_trend} [{macro_low} {macro_high}] [{df_5m.iloc[i].l} {df_5m.iloc[i].h}]')
+        print(f'{i} macro_atr={macro_atr:.2f} changed_atr={changed_atr:.2f} macro_trend_change {macro_trend_change}')
+        # traceback to the last macro extrema to follow the opposite trend
+        if macro_trend_change:
+          last_extrema_id = max(last_macro_low_id, last_macro_high_id)
+
+          if last_extrema_id in backtracked:
+            print('infinite loop detected')
+            break
+          macro_high = df_5m.iloc[last_extrema_id]['h']
+          macro_low = df_5m.iloc[last_extrema_id]['l']
+          i = last_extrema_id
+          macro_trend = 0
+          print(f'back to {i}')
+          backtracked.append(i)
+
+      macro_trend_series[i] = macro_trend
+      print(f'{i}: macro {macro_trend} micro {micro_trend}  [{macro_low} {macro_high}] [{df_5m.iloc[i].l} {df_5m.iloc[i].h}] [{last_macro_low_id} {last_macro_high_id}]')
+      i = i + 1
 
     df_5m['MICRO_TREND'] = micro_trend_series
     df_5m['MACRO_TREND'] = macro_trend_series
