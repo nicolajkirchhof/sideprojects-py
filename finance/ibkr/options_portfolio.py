@@ -15,8 +15,8 @@ tws_paper_port = 7498
 api_real_port = 4001
 api_paper_port = 4002
 # ib_con.connect('127.0.0.1', tws_real_port, clientId=11, readonly=True)
-ib_con.connect('127.0.0.1', api_paper_port, clientId=11, readonly=True)
-# ib_con.connect('127.0.0.1', tws_paper_port, clientId=11, readonly=True)
+# ib_con.connect('127.0.0.1', api_paper_port, clientId=11, readonly=True)
+ib_con.connect('127.0.0.1', tws_paper_port, clientId=11, readonly=True)
 # ib_con.connect('127.0.0.1', api_real_port, clientId=11, readonly=True)
 ib_con.reqMarketDataType(2)
 
