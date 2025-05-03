@@ -9,9 +9,7 @@ from finance import utils
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
-# noinspection PyStatementEffect
 %load_ext autoreload
-# noinspection PyStatementEffect
 %autoreload 2
 
 ## %%
