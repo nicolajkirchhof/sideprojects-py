@@ -29,7 +29,7 @@ underlying_market_data = {}
 MAX_TRIES = 10
 ## %%
 option_portfolio_positions = [position for position in portfolio if position.contract.secType == 'OPT']
-SEP = ';'
+SEP = ','
 
 actions = 'Actions: None/Roll/BuySold/TakeProfit/TakeLoss'
 plain = f'Date {SEP} Symbol {SEP} Date {SEP} Right {SEP} Strike {SEP} Pos {SEP} P/L {SEP} Last {SEP} Price {SEP} Mult {SEP} IV {SEP} Δ {SEP} Θ {SEP} Γ {SEP} ν {SEP} Action {SEP} Comment\n'
