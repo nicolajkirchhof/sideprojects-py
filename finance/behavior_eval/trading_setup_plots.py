@@ -28,9 +28,9 @@ mpl.use('QtAgg')
 
 #%%
 symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
-#symbol = symbols[0]
-for symbol in symbols:
-  #%% Create a directory
+#symbol = symbols[5]
+for symbol in symbols[5:]:
+  ##%% Create a directory
   directory = f'N:/My Drive/Projects/Trading/Research/Plots/5m_30m_d_w/{symbol}'
   os.makedirs(directory, exist_ok=True)
 
@@ -55,38 +55,39 @@ for symbol in symbols:
   df_5m_two_weeks = utils.influx.get_candles_range_aggregate(day_start-timedelta(days=14), day_start+timedelta(days=1), symbol, '5m')
   df_day_two_weeks = None
   df_30m_two_weeks = None
-  #%%
+  ##%%
   while day_start < last_day:
-    #%%
+    ##%%
     if df_5m_two_weeks.index.max() < day_start + timedelta(days=5):
-      #%%
+      ##%%
       df_5m_two_weeks = df_5m_two_weeks[df_5m_two_weeks.index > day_start - timedelta(days=14)].copy()
       df_5m_two_weeks = pd.concat([df_5m_two_weeks, utils.influx.get_candles_range_aggregate(df_5m_two_weeks.index.max(), df_5m_two_weeks.index.max()+timedelta(days=14), symbol, '5m')])
+      df_day_two_weeks = df_5m_two_weeks.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
+      df_30m_two_weeks = df_5m_two_weeks.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
       df_5m_two_weeks['20EMA'] = df_5m_two_weeks['c'].ewm(span=20, adjust=False).mean()
       df_5m_two_weeks['240EMA'] = df_5m_two_weeks['c'].ewm(span=240, adjust=False).mean()
-      df_30m_two_weeks = df_5m_two_weeks.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
       df_30m_two_weeks['20EMA'] = df_30m_two_weeks['c'].ewm(span=20, adjust=False).mean()
       df_30m_two_weeks['40EMA'] = df_30m_two_weeks['c'].ewm(span=40, adjust=False).mean()
-      df_day_two_weeks = df_5m_two_weeks.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
       df_day_two_weeks['20EMA'] = df_day_two_weeks['c'].ewm(span=20, adjust=False).mean()
-      df_5m_two_weeks.dropna(inplace=True)
-      df_30m_two_weeks.dropna(inplace=True)
-      df_day_two_weeks.dropna(inplace=True)
+      df_5m_two_weeks.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
+      df_30m_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+      df_day_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
 
-    #%%
+    ##%%
     day_end = day_start + exchange['Close'] + timedelta(hours=1)
 
     # get the following data for daily assignment
+    ##%%
 
     df_5m = df_5m_two_weeks[(df_5m_two_weeks.index >= day_start+exchange['Open']-timedelta(hours=1, minutes=0)) & (df_5m_two_weeks.index <= day_end)].copy()
     df_30m = df_30m_two_weeks[(df_30m_two_weeks.index >= day_start+exchange['Open']-timedelta(hours=1, minutes=0)) & (df_30m_two_weeks.index <= day_end)].copy()
     df_day = df_day_two_weeks[(df_day_two_weeks.index >= day_start - timedelta(days=14)) & (df_day_two_weeks.index <= day_start + timedelta(days=14))]
 
-    if df_5m is None or len(df_5m) < 100:
+    if df_5m is None or len(df_5m) < 30:
       day_start = day_start + timedelta(days=1)
       print(f'{symbol} no data for {day_start.isoformat()}')
-      raise Exception('no data')
-      # continue
+      # raise Exception('no data')
+      continue
     last_saturday = utils.time.get_last_saturday(day_start)
     current_week_candle = df_5m_two_weeks[(df_5m_two_weeks.index >= last_saturday) & (df_5m_two_weeks.index <= prior_day + exchange['Close'])]
     prior_week_candle = df_5m_two_weeks[(df_5m_two_weeks.index >= last_saturday-timedelta(days=7)) & (df_5m_two_weeks.index <= last_saturday)]
@@ -94,7 +95,7 @@ for symbol in symbols:
     overnight_candle = df_5m_two_weeks[(df_5m_two_weeks.index >= day_start) & (df_5m_two_weeks.index <= day_start + exchange['Open'] - timedelta(hours=1))]
 
 
-    #%%
+    ##%%
     pdh = prior_day_candle.h.max()
     pdl = prior_day_candle.l.min()
     pdc = prior_day_candle.c.iat[-1]
@@ -105,9 +106,9 @@ for symbol in symbols:
     onh = overnight_candle.h.max() if not overnight_candle.empty else np.nan
     onl = overnight_candle.l.min() if not overnight_candle.empty else np.nan
 
-  #%%
+  ##%%
     try:
-#%%
+##%%
 # New setup
 # |-------------------------|
 # |           5m            |
@@ -129,7 +130,7 @@ for symbol in symbols:
              f'PriorDay: H {pdh:.2f} C {pdc:.2f} L {pdl:.2f}  On: H {onh:.2f} L {onl:.2f} \n' +
              f'CurrentWeek: H {cwh:.2f} L {cwl:.2f}  PriorWeek: H {pwh:.2f} L {pwl:.2f}')
 
-      hlines=dict(hlines=indicator_hlines, colors=[*['#bf42f5']*5, *['#3179f5']*4], linewidths=[0.5, 1, 1, 0.5, 0.5], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
+      hlines=dict(hlines=indicator_hlines, colors=[*['#bf42f5']*5, *['#3179f5']*4], linewidths=[0.5, 0.75, 0.75, 0.5, 0.5], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
 
       ind_5m_ema20_plot = mpf.make_addplot(df_5m['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
       ind_5m_ema240_plot = mpf.make_addplot(df_5m['240EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
@@ -151,12 +152,12 @@ for symbol in symbols:
       ax1.xaxis.set_major_locator(mticker.MaxNLocator(nbins=20))  # Increase number of ticks on x-axis
       ax1.yaxis.set_major_locator(mticker.MaxNLocator(nbins=10))  # Increase number of ticks on y-axis
 
-      plt.show()
+      # plt.show()
       ## %%
-      # plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
-      # plt.close()
+      plt.savefig(f'{directory}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
+      plt.close()
       print(f'{symbol} finished {date_str}')
-      #%%
+      ##%%
       prior_day = day_start
       day_start = day_start + timedelta(days=1)
     except Exception as e:
