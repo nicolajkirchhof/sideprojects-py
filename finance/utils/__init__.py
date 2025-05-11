@@ -9,3 +9,4 @@ from . import options
 from . import indicators
 from . import plots
 from . import fitlog
+from . import geometry

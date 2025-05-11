@@ -32,8 +32,8 @@ symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500
 symbol = symbols[0]
 for symbol in symbols:
   #%% Create a directory
-  directory_evals = f'N:/My Drive/Projects/Trading/Research/Strategies/swing/{symbol}_swings'
-  directory_plots = f'N:/My Drive/Projects/Trading/Research/Plots/swing/{symbol}_swings'
+  directory_evals = f'N:/My Drive/Projects/Trading/Research/Strategies/swing_ohcl/{symbol}'
+  directory_plots = f'N:/My Drive/Projects/Trading/Research/Plots/swing_ohcl/{symbol}'
   os.makedirs(directory_evals, exist_ok=True)
   os.makedirs(directory_plots, exist_ok=True)
 
@@ -45,7 +45,7 @@ for symbol in symbols:
 
   dfs_ref_range = []
   dfs_closing = []
-  first_day = tz.localize(dateutil.parser.parse('2020-01-03T00:00:00'))
+  first_day = tz.localize(dateutil.parser.parse('2020-01-02T00:00:00'))
   # first_day = tz.localize(dateutil.parser.parse('2025-03-06T00:00:00'))
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
@@ -63,7 +63,6 @@ for symbol in symbols:
 
     ##%%
     day_end = day_start + exchange['Close'] + timedelta(hours=1)
-
     # get the following data for daily assignment
     ##%%
 
@@ -96,7 +95,7 @@ for symbol in symbols:
     cdh = df_5m.h.max()
     cdl = df_5m.l.min()
     cdo = df_5m.o.iat[0]
-    cdc = df_5m.c.iat[-1]
+    cdc = df_5m.c.iloc[-1]
     pdh = prior_day_candle.h.max()
     pdl = prior_day_candle.l.min()
     pdc = prior_day_candle.c.iat[-1]
@@ -107,81 +106,128 @@ for symbol in symbols:
     onh = overnight_candle.h.max() if not overnight_candle.empty else np.nan
     onl = overnight_candle.l.min() if not overnight_candle.empty else np.nan
 
+    def calculate_offssets(x):
+      return {"dpdh": pdh - x, "dpdl": pdl - x, "dcwh": cwh - x, "dcwl": cwl - x, "dpwh": pwh - x, "dpwl": pwl - x, "donh": onh - x, "donl": onl - x}
+
     start = df_5m.iloc[0]
     low = df_5m['l'].min()
-    extreme_low = {"ts": df_5m['l'].idxmin(), "type": 'l', "value": low, "dpdh": pdh-low, "dpdl": pdl-low,
-                   "dcwh": cwh-low, "dcwl": cwl-low, "dpwh": pwh-low, "dpwl": pwl-low, "donh": onh-low, "donl": onl-low}
+    extreme_low = {"ts": df_5m['l'].idxmin(), "type": 'l', "value": low, **calculate_offssets(low)}
     high = df_5m['h'].max()
-    extreme_high = {"ts": df_5m['h'].idxmax(), "type": 'h', "value":high, "dpdh": pdh-high, "dpdl": pdl-high,
-                    "dcwh": cwh-high, "dcwl": cwl-low, "dpwh": pwh-high, "dpwl": pwl-high, "donh": onh-high, "donl": onl-high}
+    extreme_high = {"ts": df_5m['h'].idxmax(), "type": 'h', "value":high, **calculate_offssets(high)}
     end = df_5m.iloc[-1]
 
     is_up_move_day = extreme_low['ts'] < extreme_high['ts']
-    extrema_lh = [extreme_low, extreme_high] if is_up_move_day else [extreme_high, extreme_low]
+    extrema = [extreme_low, extreme_high] if is_up_move_day else [extreme_high, extreme_low]
 
-    is_open_extreme = extrema_lh[0]['ts'] == start.name
-    is_close_extreme = extrema_lh[-1]['ts'] == end.name
+    is_open_extreme = extrema[0]['ts'] == start.name
+    is_close_extreme = extrema[-1]['ts'] == end.name
+
+
+    if not is_open_extreme:
+      extrema.insert(0,{"ts": df_5m.index[0], "type": 'o', "value":cdo, **calculate_offssets(cdo)})
+      
+    if not is_close_extreme:
+      extrema.append({"ts": df_5m.index[-1], "type": 'c', "value":cdc, **calculate_offssets(cdc)})
+
+    df_extrema = pd.DataFrame(extrema)
+    ##%%
+    # prior_day = prior_day + timedelta(days=-1)
+    # day_start = day_start + timedelta(days=-1)
 
     ##%%
-    def get_extrema(df, is_next_high, begin, stop):
-      current_direction = -1 if is_next_high else 1
-      current = begin
-      extrema = []
-      while current < stop if begin < stop else current > stop:
-        slice_index = (df.index > current) & (df.index <= stop) if begin < stop else (df.index < current) & (df.index >= stop)
-        if not any(slice_index):
-          return extrema
-        if current_direction < 0:
-          next_extrema = df[slice_index]['l'].idxmin()
-          value = df[slice_index]['l'].min()
-        else:
-          next_extrema = df[slice_index]['h'].idxmax()
-          value = df[slice_index]['h'].max()
+    # go thought all start < points < end and check distance to the nearest trendline
+    is_new_extrema = True
+    while is_new_extrema:
+      #%%
+      for i in range(1, len(df_extrema)):
+        ##%%
+        day_range = cdh - cdl
+        is_new_extrema = False
+        ##%%
+        start_extrema = df_extrema.iloc[i-1]
+        end_extrema = df_extrema.iloc[i]
 
-        extrema.append({"ts": next_extrema, "type": 'h' if current_direction > 0 else 'l', "value": value,
-                        "dpdh": pdh-value, "dpdl": pdl-value, "dcwh": cwh-value, "dcwl": cwl-value, "dpwh": pwh-value,
-                        "dpwl": pwl-value, "donh": onh-value, "donl": onl-value})
-        current = next_extrema
-        current_direction = -1*current_direction
-      return extrema
+        df_dir = df_5m[(df_5m.index > start_extrema['ts']) & (df_5m.index < end_extrema['ts'])].copy()
+        # if df_dir.empty:
+          # continue
+        df_dir['dist_h'] = utils.geometry.calculate_y_distance([start_extrema['ts'], start_extrema['value']], [end_extrema['ts'], end_extrema['value']], list(zip(df_dir.index, df_dir['h'])))
+        df_dir['dist_l'] = utils.geometry.calculate_y_distance([start_extrema['ts'], start_extrema['value']], [end_extrema['ts'], end_extrema['value']], list(zip(df_dir.index, df_dir['l'])))
+        df_dir['dist_h'] = df_dir['dist_h'].abs()
+        df_dir['dist_l'] = df_dir['dist_l'].abs()
+        df_dir['dist'] = df_dir[['dist_h', 'dist_l']].max(axis=1)
+
+        max_dev = df_dir[df_dir['dist'] > 0.4*day_range]
+        if not max_dev.empty:
+        # for index, row in max_dev.iterrows():
+          time_diff = max_dev.index.diff().fillna(pd.Timedelta(seconds=0))
+          group = (time_diff > pd.Timedelta('5m')).cumsum()
+          dist_agg = max_dev[group == 0].dist.agg(["idxmax", "max"])
+          max_candle = max_dev[max_dev.index == dist_agg['idxmax']]
+          value = max_candle.h.iat[0] if max_candle.dist_h.iat[0] > max_candle.dist_l.iat[0] else max_candle.l.iat[0]
+          dev_dict = {"ts": dist_agg['idxmax'], "type": 'dev', 'value': value, 'dist': max_candle.dist, **calculate_offssets(value)}
+          is_new_extrema = True
+          df_extrema = pd.concat([df_extrema, pd.DataFrame([dev_dict])]).sort_values(by='ts')
+          df_extrema.reset_index(drop=True, inplace=True)
+          break
+
+
+      # if not is_new_extrema:
+      #   continue
+      # df_dev = pd.DataFrame(deviations)
+      # time_diff = df_dev.ts.diff().fillna(pd.Timedelta(seconds=0))
+      # group = (time_diff > pd.Timedelta('5m')).cumsum()
+      #
+      # ##%%
+      # # Aggregate rows by group (example: summing values)
+      # df_dev_agg = df_dev.groupby(group).agg(
+      #   dist=("dist", "max"),  # You can use other aggregation functions like 'mean', 'max', etc.
+      #   ts=("dist", lambda x: df_dev.iloc[x.idxmax()].ts),
+      # )
+      # df_dev_max = df_dev[df_dev.ts.isin(df_dev_agg.ts)]
 
     ##%%
-    start_extrema = [] if is_open_extreme else get_extrema(df_5m, ~is_up_move_day, extrema_lh[0]['ts'], start.name)
-    start_extrema.reverse()
-    end_extrema = [] if is_close_extreme else get_extrema(df_5m, is_up_move_day, extrema_lh[-1]['ts'], end.name)
-    extrema_ordered = [*start_extrema, *extrema_lh, *end_extrema]
+    # Filter wrongly selected dev extrema
+    is_obsolete = True
+    while is_obsolete and any(df_extrema.type == 'dev'):
+      for i in range(2, len(df_extrema)):
+        start_extrema = df_extrema.iloc[i-2]
+        current_extrema = df_extrema.iloc[i-1]
+        end_extrema = df_extrema.iloc[i]
+        if current_extrema.type != 'dev':
+          continue
+        is_obsolete = start_extrema.value > current_extrema.value > end_extrema.value or start_extrema.value < current_extrema.value < end_extrema.value
+        if is_obsolete:
+          df_extrema.drop(i-1, inplace=True)
+          df_extrema.reset_index(drop=True, inplace=True)
+          break
+
 
     # Follow algorithm
     # 1. Start with a candle range defined as [start end] whereas start['l'] is the lowest value and end['h'] is the highest value
-    # 2. Follow the lows of the candles as long as the last candle low C_1l is <= current candle low C_l continue
-    # 3. If C_l < C_1l follow the pullback until C_l > C_1l again.
-    #    a. Determine the duration of the pullback as well as the difference from the first pullback candle high to the last pullback candle low
-    #       and the first pullback candle opens to the last pullback candle close.
+    # 2. Count every succession of negative candles
 
     ##%%
-    # SC = SingleCandle in the opposite direction
-    # PB = Pullback that breaks the continuation of the previous candle following
     # pullback = {"start": , "end": , "duration": , "h": , "l": , "o": , "c": , "type": 'SC', "direction": 1 | -1"}"
     ##%%
     pullbacks = []
-    for i in range(1, len(extrema_ordered)):
-      start_extrema = extrema_ordered[i-1]
-      end_extrema = extrema_ordered[i]
-      direction = 1 if start_extrema['type'] == 'l' else -1
-      df_dir = df_5m[(df_5m.index > start_extrema['ts']) & (df_5m.index < end_extrema['ts'])]
+    for i in range(1, len(df_extrema)):
+      start_extrema = df_extrema.iloc[i-1]
+      end_extrema = df_extrema.iloc[i]
+      direction = 1 if start_extrema.value < end_extrema.value else -1
+      df_dir = df_5m[(df_5m.index > start_extrema.ts) & (df_5m.index < end_extrema['ts'])]
       current_pullback = None
+      j_start = 0
       for j in range(1, len(df_dir)):
         if direction > 0:
-          is_continuation = df_dir.iloc[j-1]['l'] <= df_dir.iloc[j]['l']
+          is_opposite = df_dir.iloc[j]['o'] >= df_dir.iloc[j]['c']
         else:
-          is_continuation = df_dir.iloc[j-1]['h'] >= df_dir.iloc[j]['h']
-        if is_continuation and current_pullback is not None:
+          is_opposite = df_dir.iloc[j]['o'] <= df_dir.iloc[j]['c']
+        if not is_opposite and current_pullback is not None:
           current_pullback['end'] = df_dir.iloc[j-1].name
-          if direction > 0:
-            current_pullback['l'] = df_dir.iloc[j-1]['l']
-          else:
-            current_pullback['h'] = df_dir.iloc[j-1]['h']
+          current_pullback['l'] = df_dir.iloc[j_start:j].l.min()
+          current_pullback['h'] = df_dir.iloc[j_start:j].h.max()
           current_pullback['c'] = df_dir.iloc[j-1]['c']
+
           pullbacks.append(current_pullback)
           current_pullback = None
 
@@ -190,12 +236,9 @@ for symbol in symbols:
         #   pullbacks.append({"start": df_dir.iloc[j-1].name, "end": df_dir.iloc[j].name, "h": df_dir.iloc[j]['h'],
         #                     "l": df_dir.iloc[j]['l'], "o": df_dir.iloc[j]['o'], "c": df_dir.iloc[j]['c'], "type": 'SC', "direction": direction})
 
-        if not is_continuation and current_pullback is None:
-          current_pullback = {"start": df_dir.iloc[j-1].name, "o": df_dir.iloc[j-1]['o'], "type": 'PB', "direction": direction}
-          if direction > 0:
-            current_pullback['h'] = df_dir.iloc[j-1]['h']
-          else:
-            current_pullback['l'] = df_dir.iloc[j-1]['l']
+        if is_opposite and current_pullback is None:
+          current_pullback = {"start": df_dir.iloc[j].name, "o": df_dir.iloc[j]['o'], "direction": direction}
+          j_start = j
 
   ##%%
     try:
@@ -232,21 +275,16 @@ for symbol in symbols:
 
       ind_day_ema20_plot = mpf.make_addplot(df_day['20EMA'], ax=ax2, width=0.6, color="#FF9900", linestyle='--')
 
-      extrema_aline= []
-      for extrema in extrema_ordered:
-        extrema_aline.append((extrema['ts'], extrema['value']))
+      df_ohcl_extrema = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l'])]
+      extrema_ohcl_aline = list(zip(df_ohcl_extrema.ts, df_ohcl_extrema.value))
+      extrema_aline = list(zip(df_extrema.ts, df_extrema.value))
 
       pb_alines= []
-      sc_alines= []
       for pullback in pullbacks:
-        if pullback['type'] == 'PB':
-          pb_alines.append([(pullback['start'], pullback['l']), (pullback['end'], pullback['l'])])
-          pb_alines.append([(pullback['start'], pullback['h']), (pullback['end'], pullback['h'])])
-        else:
-          sc_alines.append([(pullback['start'], pullback['l']), (pullback['end'], pullback['l'])])
-          sc_alines.append([(pullback['start'], pullback['h']), (pullback['end'], pullback['h'])])
+        pb_alines.append([(pullback['start'], pullback['l']), (pullback['end'], pullback['l'])])
+        pb_alines.append([(pullback['start'], pullback['h']), (pullback['end'], pullback['h'])])
 
-      alines=dict(alines=[extrema_aline, *pb_alines, *sc_alines], colors=['black', *['darkblue'] * len(pb_alines), *['darkred'] * len(sc_alines)], alpha=0.3, linewidths=[0.25], linestyle=['--', *['-'] * len(pb_alines)])
+      alines=dict(alines=[extrema_ohcl_aline, extrema_aline, *pb_alines], colors=['purple', 'black', *['darkblue'] * len(pb_alines)], alpha=0.3, linewidths=[0.25], linestyle=['--']*2+['-'] * len(pb_alines))
 
       mpf.plot(df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
                scale_width_adjustment=dict(candle=1.35), hlines=hlines, alines=alines, addplot=[ind_5m_ema20_plot, ind_5m_ema240_plot, ind_vwap3_plot])
@@ -261,8 +299,8 @@ for symbol in symbols:
       ax1.yaxis.set_major_locator(mticker.MaxNLocator(nbins=10))  # Increase number of ticks on y-axis
 
       # plt.show()
-      # %%
-      metadata = {"pullbacks": pullbacks, "extrema": extrema_ordered, "VWAP": df_5m['VWAP3']}
+      ## %%
+      metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3']}
       with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
         pickle.dump(metadata, f)
       plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
@@ -274,4 +312,3 @@ for symbol in symbols:
     except Exception as e:
       print(f'{symbol} error: {e}')
       continue
-

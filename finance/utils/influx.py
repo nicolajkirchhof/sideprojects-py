@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import influxdb as idb
 
 from finance.utils.exchanges import DE_EXCHANGE, US_EXCHANGE, GB_EXCHANGE, JP_EXCHANGE, HK_EXCHANGE, AU_EXCHANGE, \
@@ -106,3 +108,18 @@ def create_databases():
 
 def sec_type_to_database_name(sec_type):
   return SEC_TYPE_DB_MAPPING[sec_type]
+
+def get_5m_30m_day_date_range_with_indicators(start, end, symbol):
+  df_5m_two_weeks = get_candles_range_aggregate(start-timedelta(days=30), end, symbol, '5m')
+  df_day_two_weeks = df_5m_two_weeks.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
+  df_30m_two_weeks = df_5m_two_weeks.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
+  df_5m_two_weeks['20EMA'] = df_5m_two_weeks['c'].ewm(span=20, adjust=False).mean()
+  df_5m_two_weeks['240EMA'] = df_5m_two_weeks['c'].ewm(span=240, adjust=False).mean()
+  df_5m_two_weeks['VWAP3'] = (df_5m_two_weeks['c']+df_5m_two_weeks['h']+df_5m_two_weeks['l'])/3
+  df_30m_two_weeks['20EMA'] = df_30m_two_weeks['c'].ewm(span=20, adjust=False).mean()
+  df_30m_two_weeks['40EMA'] = df_30m_two_weeks['c'].ewm(span=40, adjust=False).mean()
+  df_day_two_weeks['20EMA'] = df_day_two_weeks['c'].ewm(span=20, adjust=False).mean()
+  df_5m_two_weeks.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
+  df_30m_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+  df_day_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+  return df_5m_two_weeks, df_30m_two_weeks, df_day_two_weeks

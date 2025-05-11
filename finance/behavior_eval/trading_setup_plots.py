@@ -29,7 +29,7 @@ mpl.use('QtAgg')
 #%%
 symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
 #symbol = symbols[5]
-for symbol in symbols[5:]:
+for symbol in symbols:
   ##%% Create a directory
   directory = f'N:/My Drive/Projects/Trading/Research/Plots/5m_30m_d_w/{symbol}'
   os.makedirs(directory, exist_ok=True)
@@ -51,27 +51,13 @@ for symbol in symbols[5:]:
   day_start = first_day + timedelta(days=1)
 
   ##%%
-  offset = timedelta(hours=0)
-  df_5m_two_weeks = utils.influx.get_candles_range_aggregate(day_start-timedelta(days=14), day_start+timedelta(days=1), symbol, '5m')
-  df_day_two_weeks = None
-  df_30m_two_weeks = None
+  df_5m_two_weeks, df_30m_two_weeks, df_day_two_weeks = utils.influx.get_5m_30m_day_date_range_with_indicators(day_start, day_start+timedelta(days=14), symbol)
   ##%%
   while day_start < last_day:
     ##%%
     if df_5m_two_weeks.index.max() < day_start + timedelta(days=5):
-      ##%%
-      df_5m_two_weeks = df_5m_two_weeks[df_5m_two_weeks.index > day_start - timedelta(days=14)].copy()
-      df_5m_two_weeks = pd.concat([df_5m_two_weeks, utils.influx.get_candles_range_aggregate(df_5m_two_weeks.index.max(), df_5m_two_weeks.index.max()+timedelta(days=14), symbol, '5m')])
-      df_day_two_weeks = df_5m_two_weeks.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
-      df_30m_two_weeks = df_5m_two_weeks.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
-      df_5m_two_weeks['20EMA'] = df_5m_two_weeks['c'].ewm(span=20, adjust=False).mean()
-      df_5m_two_weeks['240EMA'] = df_5m_two_weeks['c'].ewm(span=240, adjust=False).mean()
-      df_30m_two_weeks['20EMA'] = df_30m_two_weeks['c'].ewm(span=20, adjust=False).mean()
-      df_30m_two_weeks['40EMA'] = df_30m_two_weeks['c'].ewm(span=40, adjust=False).mean()
-      df_day_two_weeks['20EMA'] = df_day_two_weeks['c'].ewm(span=20, adjust=False).mean()
-      df_5m_two_weeks.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
-      df_30m_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
-      df_day_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+      df_5m_two_weeks, df_30m_two_weeks, df_day_two_weeks = utils.influx.get_5m_30m_day_date_range_with_indicators(day_start, day_start+timedelta(days=14), symbol)
+
 
     ##%%
     day_end = day_start + exchange['Close'] + timedelta(hours=1)
@@ -130,10 +116,11 @@ for symbol in symbols[5:]:
              f'PriorDay: H {pdh:.2f} C {pdc:.2f} L {pdl:.2f}  On: H {onh:.2f} L {onl:.2f} \n' +
              f'CurrentWeek: H {cwh:.2f} L {cwl:.2f}  PriorWeek: H {pwh:.2f} L {pwl:.2f}')
 
-      hlines=dict(hlines=indicator_hlines, colors=[*['#bf42f5']*5, *['#3179f5']*4], linewidths=[0.5, 0.75, 0.75, 0.5, 0.5], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
+      hlines=dict(hlines=indicator_hlines, colors=[*['#bf42f5']*5, *['#3179f5']*4], linewidths=[0.6]*3+[0.4]*6, linestyle=['--', *['-']*(len(indicator_hlines)-1)])
 
       ind_5m_ema20_plot = mpf.make_addplot(df_5m['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
       ind_5m_ema240_plot = mpf.make_addplot(df_5m['240EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
+      ind_vwap3_plot = mpf.make_addplot(df_5m['VWAP3'], ax=ax1, width=0.4, color='magenta')
 
       ind_30m_ema20_plot = mpf.make_addplot(df_30m['20EMA'], ax=ax3, width=0.6, color="#FF9900", linestyle='--')
       ind_30m_ema40_plot = mpf.make_addplot(df_30m['40EMA'], ax=ax3, width=0.6, color='#0099FF', linestyle='--')
@@ -141,7 +128,7 @@ for symbol in symbols[5:]:
       ind_day_ema20_plot = mpf.make_addplot(df_day['20EMA'], ax=ax2, width=0.6, color="#FF9900", linestyle='--')
 
       mpf.plot(df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
-               scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_5m_ema20_plot, ind_5m_ema240_plot])
+               scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_5m_ema20_plot, ind_5m_ema240_plot, ind_vwap3_plot])
       mpf.plot(df_day, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%m-%d', tight_layout=True,
                hlines=hlines, warn_too_much_data=700, addplot=[ind_day_ema20_plot])
       mpf.plot(df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,

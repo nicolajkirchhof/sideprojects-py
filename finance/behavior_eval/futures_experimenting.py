@@ -18,6 +18,7 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import mplfinance as mpf
 from matplotlib import gridspec
+from scipy.spatial import ConvexHull
 
 import finance.utils as utils
 
@@ -61,7 +62,7 @@ for symbol in symbols:
     if df_5m_two_weeks.index.max() < day_start + timedelta(days=5):
       df_5m_two_weeks, df_30m_two_weeks, df_day_two_weeks = utils.influx.get_5m_30m_day_date_range_with_indicators(day_start, day_start+timedelta(days=14), symbol)
 
-    ##%%
+    #%%
     day_end = day_start + exchange['Close'] + timedelta(hours=1)
 
     # get the following data for daily assignment
@@ -70,6 +71,124 @@ for symbol in symbols:
     df_5m = df_5m_two_weeks[(df_5m_two_weeks.index >= day_start+exchange['Open']-timedelta(hours=1, minutes=0)) & (df_5m_two_weeks.index <= day_end)].copy()
     df_30m = df_30m_two_weeks[(df_30m_two_weeks.index >= day_start+exchange['Open']-timedelta(hours=1, minutes=0)) & (df_30m_two_weeks.index <= day_end)].copy()
     df_day = df_day_two_weeks[(df_day_two_weeks.index >= day_start - timedelta(days=14)) & (df_day_two_weeks.index <= day_start + timedelta(days=14))]
+#%%
+
+def calculate_price_range_convex_hull(df):
+  """
+  Calculate convex hull for price range data from DataFrame
+
+  Args:
+      df: pandas DataFrame with datetime index and 'h'/'l' columns
+
+  Returns:
+      tuple: (hull_dates, hull_values) - Points that form the convex hull
+  """
+  # Convert dates to numerical values for calculation
+  dates_numeric = mdates.date2num(df.index)
+
+  # Create points array combining both high and low prices
+  points = np.column_stack((
+    np.concatenate([dates_numeric, dates_numeric]),
+    np.concatenate([df['h'].values, df['l'].values])
+  ))
+
+  # Calculate convex hull
+  hull = ConvexHull(points)
+
+  # Get the vertices in order to form a polygon
+  # Include the first vertex at the end to close the polygon
+  vertices = np.append(hull.vertices, hull.vertices[0])
+  hull_points = points[vertices]
+
+  # Convert numeric dates back to datetime
+  hull_dates = mdates.num2date(hull_points[:, 0])
+  hull_values = hull_points[:, 1]
+
+  return hull_dates, hull_values
+
+
+#%% Example usage:
+# Generate sample data
+# Calculate convex hull
+hull_dates, hull_values = calculate_price_range_convex_hull(df_5m)
+
+# Create plot
+fig, ax = plt.subplots(figsize=(12, 8))
+
+# Plot high and low values
+ax.plot(df_5m.index, df_5m['h'], 'g.', alpha=0.5, label='High')
+ax.plot(df_5m.index, df_5m['l'], 'r.', alpha=0.5, label='Low')
+
+# Plot convex hull
+ax.plot(hull_dates, hull_values, 'b-', linewidth=2, label='Convex hull')
+
+# Format plot
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+plt.xticks(rotation=45)
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.title('Price Range Convex Hull')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+
+plt.show()
+
+
+#%%
+"""
+Create a polygon connecting all lows and then all highs in sequence
+
+Args:
+    df: pandas DataFrame with datetime index and 'h'/'l' columns
+"""
+# Create plot
+fig, ax = plt.subplots(figsize=(12, 8))
+
+# Create the polygon vertices by going through lows first, then highs in reverse
+dates = np.concatenate([
+  df_5m.index,                  # forward through dates for lows
+  df_5m.index[::-1]            # backward through dates for highs
+])
+
+values = np.concatenate([
+  df_5m['l'].values,           # all lows in order
+  df_5m['h'].values[::-1]      # all highs in reverse order
+])
+
+# Plot the price range as a polygon
+ax.fill(dates, values, 'lightblue', alpha=0.3, label='Price Range Envelope')
+ax.plot(dates, values, 'b-', linewidth=1)
+
+# Plot the original high and low points
+ax.plot(df_5m.index, df_5m['h'], 'g.', alpha=0.5, markersize=2, label='High')
+ax.plot(df_5m.index, df_5m['l'], 'r.', alpha=0.5, markersize=2, label='Low')
+
+# Format plot
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+plt.xticks(rotation=45)
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.title('Price Range Envelope')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  #%%
 
     if df_5m is None or len(df_5m) < 30:
       day_start = day_start + timedelta(days=1)
@@ -93,10 +212,6 @@ for symbol in symbols:
     # extrema = {"ts": , "type": 'h' | 'l',  'dpdh': , 'dpdl' , 'dcwh' , 'dcwl' , 'dpwh' , 'dpwl' }
 
     ##%%
-    cdh = df_5m.h.max()
-    cdl = df_5m.l.min()
-    cdo = df_5m.o.iat[0]
-    cdc = df_5m.c.iat[-1]
     pdh = prior_day_candle.h.max()
     pdl = prior_day_candle.l.min()
     pdc = prior_day_candle.c.iat[-1]
@@ -217,7 +332,7 @@ for symbol in symbols:
       ax3 = fig.add_subplot(gs[1, 1])
 
       indicator_hlines = [pdc, pdh, pdl, onh, onl, cwh, cwl, pwh, pwl]
-      fig.suptitle(f'{symbol} {date_str} 5m O {cdo:.2f} H {cdh:.2f} C {cdc:.2f} L {cdl:.2f} \n' +
+      fig.suptitle(f'{symbol} {date_str} 5m O {df_5m.o.iat[0]:.2f} H {df_5m.h.iat[0]:.2f} C {df_5m.c.iat[0]:.2f} L {df_5m.l.iat[0]:.2f} \n' +
              f'PriorDay: H {pdh:.2f} C {pdc:.2f} L {pdl:.2f}  On: H {onh:.2f} L {onl:.2f} \n' +
              f'CurrentWeek: H {cwh:.2f} L {cwl:.2f}  PriorWeek: H {pwh:.2f} L {pwl:.2f}')
 
