@@ -11,24 +11,25 @@ def calculate_time_to_next_5th_minute():
 
 
 def update_timer():
-  """Update the countdown timer and dynamically change colors."""
-  global remaining_time_seconds
+  """Update the countdown timer and dynamically change font colors."""
+  global remaining_time_seconds, total_time_seconds
 
   # Calculate minutes and seconds
   minutes, seconds = divmod(remaining_time_seconds, 60)
   timer_label.config(text=f"{minutes:02}:{seconds:02}")
 
-  # Change text color based on time left
-  if remaining_time_seconds > 30:
-    timer_label.config(fg="#228B22")  # Muted Green
-  else:
-    timer_label.config(fg="#B22222")  # Muted Red
+  # Use red font color during the first 30 seconds
+  if remaining_time_seconds > (total_time_seconds - 30):
+    timer_label.config(fg="#B22222")  # Muted Red font for the last 30 seconds
+  else: #  remaining_time_seconds > 30:
+    timer_label.config(fg="#228B22")  # Muted Green font for normal time
 
-  # When the timer reaches zero, beep and reset
+  # Reset the timer when it reaches zero and beep
   if remaining_time_seconds <= 0:
     if sound_enabled:
       winsound.Beep(1000, 500)  # Beep sound (frequency: 1000Hz, duration: 500ms)
     remaining_time_seconds = calculate_time_to_next_5th_minute()  # Reset to next 5-min mark
+    total_time_seconds = remaining_time_seconds  # Update total time for the logic
   else:
     remaining_time_seconds -= 1  # Decrement the timer
 
@@ -49,11 +50,13 @@ def toggle_sound():
 
 # Initialize Timer
 remaining_time_seconds = calculate_time_to_next_5th_minute()  # Time left to the next 5-min mark
+total_time_seconds = remaining_time_seconds  # Store the initial time for determining stages of countdown
 sound_enabled = True  # Sound is enabled by default
 
 # Create GUI
 root = tk.Tk()
 root.title("Always Counting Timer")
+root.attributes("-topmost", True)  # Keep the window always on top
 
 # Create a Frame for Timer + Sound button
 main_frame = tk.Frame(root, bg="white", padx=10, pady=10)
