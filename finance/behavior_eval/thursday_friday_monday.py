@@ -32,7 +32,7 @@ mpl.use('QtAgg')
 # %%
 symbols = ['DAX', 'ESTX50', 'SPX', 'INDU', 'NDX']
 # Create a directory
-directory = f'N:/My Drive/Projects/Trading/Research/Strategies/thu_fri_mon'
+directory = f'N:/My Drive/Trading/Strategies/thu_fri_mon'
 os.makedirs(directory, exist_ok=True)
 
 weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']

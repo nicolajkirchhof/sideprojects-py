@@ -35,7 +35,7 @@ symbol = symbols[0]
 for symbol in symbols:
   #%%
   # Create a directory
-  directory = f'N:/My Drive/Projects/Trading/Research/Plots/swing/{symbol}_5m_9ema_ama_slope'
+  directory = f'N:/My Drive/Trading/Plots/swing/{symbol}_5m_9ema_ama_slope'
   os.makedirs(directory, exist_ok=True)
 
   # Create a directory

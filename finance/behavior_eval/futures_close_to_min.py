@@ -31,8 +31,8 @@ symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500
 symbol = symbols[0]
 for symbol in symbols:
   #%% Create a directory
-  directory_evals = f'N:/My Drive/Projects/Trading/Research/Strategies/close_to_min/{symbol}'
-  directory_plots = f'N:/My Drive/Projects/Trading/Research/Plots/close_to_min/{symbol}'
+  directory_evals = f'N:/My Drive/Trading/Strategies/close_to_min/{symbol}'
+  directory_plots = f'N:/My Drive/Trading/Plots/close_to_min/{symbol}'
   os.makedirs(directory_evals, exist_ok=True)
   os.makedirs(directory_plots, exist_ok=True)
 

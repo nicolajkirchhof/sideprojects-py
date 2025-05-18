@@ -29,9 +29,9 @@ mpl.use('QtAgg')
 #%%
 symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
 #symbol = symbols[0]
-for symbol in symbols:
+for symbol in symbols[-1:]:
   #%% Create a directory
-  directory = f'N:/My Drive/Projects/Trading/Research/Plots/5m_30m_d_w/{symbol}'
+  directory = f'N:/My Drive/Trading/Plots/5m_30m_d_w/{symbol}'
   os.makedirs(directory, exist_ok=True)
 
   # Create a directory
@@ -93,9 +93,9 @@ for symbol in symbols:
     cdl = df_5m[intraday_filter].l.min()
     cdo = df_5m[intraday_filter].o.iat[0]
     cdc = df_5m[intraday_filter].c.iloc[-1]
-    pdh = prior_day_candle.h.max()
-    pdl = prior_day_candle.l.min()
-    pdc = prior_day_candle.c.iat[-1]
+    pdh = prior_day_candle.h.max() if not prior_day_candle.empty else np.nan
+    pdl = prior_day_candle.l.min() if not prior_day_candle.empty else np.nan
+    pdc = prior_day_candle.c.iat[-1] if not prior_day_candle.empty else np.nan
     cwh = current_week_candle.h.max() if not current_week_candle.empty else np.nan
     cwl = current_week_candle.l.min() if not current_week_candle.empty else np.nan
     pwh = prior_week_candle.h.max()
@@ -143,7 +143,7 @@ for symbol in symbols:
     mpf.plot(df_day, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%m-%d', tight_layout=True,
              hlines=hlines_day, warn_too_much_data=700, addplot=[ind_day_ema20_plot])
     mpf.plot(df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
-             scale_width_adjustment=dict(candle=1.35), hlines=hlines, vlines=vlines, addplot=[ind_30m_ema20_plot, ind_30m_ema40_plot])
+             scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_30m_ema20_plot, ind_30m_ema40_plot])
 
 
     # Use MaxNLocator to increase the number of ticks

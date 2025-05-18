@@ -26,7 +26,7 @@ mpl.use('QtAgg')
 %autoreload 2
 
 # %%
-directory = f'N:/My Drive/Projects/Trading/Research/Strategies/future_following'
+directory = f'N:/My Drive/Trading/Strategies/future_following'
 os.makedirs(directory, exist_ok=True)
 # symbol = 'IBDE40'
 # symbols = [('IBDE40', pytz.timezone('Europe/Berlin')), ('IBGB100', pytz.timezone('Europe/London')),

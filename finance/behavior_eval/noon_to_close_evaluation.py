@@ -35,7 +35,7 @@ mpl.use('QtAgg')
 %autoreload 2
 
 # %%
-directory = f'N:/My Drive/Projects/Trading/Research/Strategies/noon_to_close'
+directory = f'N:/My Drive/Trading/Strategies/noon_to_close'
 os.makedirs(directory, exist_ok=True)
 symbols = ['DAX', 'ESTX50', 'SPX']
 symbol = symbols[0]

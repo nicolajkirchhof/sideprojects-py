@@ -37,8 +37,8 @@ symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500
 symbol = symbols[0]
 for symbol in symbols:
 #%% Create a directory
-directory_evals = f'N:/My Drive/Projects/Trading/Research/Strategies/swing_ohcl/{symbol}'
-directory_plots = f'N:/My Drive/Projects/Trading/Research/Plots/swing_ohcl/{symbol}'
+directory_evals = f'N:/My Drive/Trading/Strategies/swing_ohcl/{symbol}'
+directory_plots = f'N:/My Drive/Trading/Plots/swing_ohcl/{symbol}'
 
 files = glob.glob(f'{directory_evals}/*.pkl')
 #%%

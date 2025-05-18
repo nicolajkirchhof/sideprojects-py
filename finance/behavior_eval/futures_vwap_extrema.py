@@ -32,8 +32,8 @@ symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500
 symbol = symbols[0]
 for symbol in symbols:
   #%% Create a directory
-  directory_evals = f'N:/My Drive/Projects/Trading/Research/Strategies/swing_vwap/{symbol}'
-  directory_plots = f'N:/My Drive/Projects/Trading/Research/Plots/swing_vwap/{symbol}'
+  directory_evals = f'N:/My Drive/Trading/Strategies/swing_vwap/{symbol}'
+  directory_plots = f'N:/My Drive/Trading/Plots/swing_vwap/{symbol}'
   os.makedirs(directory_evals, exist_ok=True)
   os.makedirs(directory_plots, exist_ok=True)
 
@@ -65,6 +65,7 @@ for symbol in symbols:
     day_end = day_start + exchange['Close'] + timedelta(hours=1)
     day_open = day_start + exchange['Open']
     day_close = day_start + exchange['Close']
+
     # get the following data for daily assignment
     ##%%
 
@@ -72,11 +73,17 @@ for symbol in symbols:
     df_30m = df_30m_two_weeks[(df_30m_two_weeks.index >= day_start+exchange['Open']-timedelta(hours=1, minutes=0)) & (df_30m_two_weeks.index <= day_end)].copy()
     df_day = df_day_two_weeks[(df_day_two_weeks.index >= day_start - timedelta(days=21)) & (df_day_two_weeks.index <= day_start + timedelta(days=14))]
 
+    if day_open < df_5m.index.min():
+      day_open = df_5m.index.min()
+
+    if day_close > df_5m.index.max():
+      day_close = df_5m.index.max()
+
     if df_5m is None or len(df_5m) < 30:
       day_start = day_start + timedelta(days=1)
       print(f'{symbol} no data for {day_start.isoformat()}')
-      raise Exception('no data')
-      # continue
+      # raise Exception('no data')
+      continue
     last_saturday = utils.time.get_last_saturday(day_start)
     current_week_candle = df_5m_two_weeks[(df_5m_two_weeks.index >= last_saturday) & (df_5m_two_weeks.index <= prior_day + exchange['Close'])]
     prior_week_candle = df_5m_two_weeks[(df_5m_two_weeks.index >= last_saturday-timedelta(days=7)) & (df_5m_two_weeks.index <= last_saturday)]
@@ -152,53 +159,45 @@ for symbol in symbols:
       direction = 1 if end_extrema.type == 'h' or start_extrema.type == 'l'  else -1
       extrema_range_filter = (df_5m.index >= start_extrema['ts']) & (df_5m.index < end_extrema['ts'])
       df_dir = df_5m[extrema_range_filter]
+      if df_dir.empty:
+        continue
 
       last_pivot = df_dir.iloc[0]
       current_pivot = None
       extrema_candidate = None
 
-      print(f'Start extrema {start_extrema.ts}, End extrema {end_extrema.ts}, Direction {direction}, LastPivot {last_pivot.VWAP3}', )
+      # print(f'Start extrema {start_extrema.ts}, End extrema {end_extrema.ts}, Direction {direction}, LastPivot {last_pivot.VWAP3}', )
       ##%%
       for j in range(1, len(df_dir)):
       ##%%
-        print('ts ', df_dir.iloc[j].name)
+        # print('ts ', df_dir.iloc[j].name)
         is_pivot = df_dir.iloc[j]['VWAP3_is_top'] | df_dir.iloc[j]['VWAP3_is_bottom']
         if not is_pivot:
           # raise Exception('Not pivot')
           continue
-        # is_candidate = (df_dir.iloc[j]['VWAP3_is_top'] and direction < 0 and df_dir.iloc[j].h - last_pivot.l > pullback_threshold or
-        #                 df_dir.iloc[j]['VWAP3_is_bottom'] and direction > 0 and last_pivot.h - df_dir.iloc[j].l > pullback_threshold)
-        is_candidate = (df_dir.iloc[j]['VWAP3_is_top'] and direction < 0 and df_dir.iloc[j].VWAP3 - last_pivot.VWAP3 > pullback_threshold or
-                        df_dir.iloc[j]['VWAP3_is_bottom'] and direction > 0 and last_pivot.VWAP3 - df_dir.iloc[j].VWAP3 > pullback_threshold)
-        print('Is candidate:', is_candidate)
+        is_candidate = (((df_dir.iloc[j]['VWAP3_is_top'] and direction < 0) or (df_dir.iloc[j]['VWAP3_is_bottom'] and direction > 0)) and
+                        abs(df_dir.iloc[j].VWAP3 - last_pivot.VWAP3) > pullback_threshold)
+        # print('Is candidate:', is_candidate)
         if is_candidate:
           is_new = False
           if extrema_candidate is None:
             # Create pullback if last pivot distance is more than PULLBACK_THRESHOLD day range
-            # extrema_candidate = {"start": last_pivot.name, "o": last_pivot.l if direction < 0 else last_pivot.h, "type": 'PB_VWAP', "direction": direction}
             extrema_candidate = {"start": last_pivot.name, "o": last_pivot.VWAP3, "type": 'PB_VWAP', "direction": direction}
             is_new = True
 
-          # if is_new or (direction < 0 and extrema_candidate['c'] < df_dir.iloc[j].h) or (direction > 0 and extrema_candidate['c'] > df_dir.iloc[j].l):
           if is_new or (direction < 0 and extrema_candidate['c'] < df_dir.iloc[j].VWAP3) or (direction > 0 and extrema_candidate['c'] > df_dir.iloc[j].VWAP3):
             # Pullback is actually larger, update the range
-            print('Is higher or new candidate')
+            # print('Is higher or new candidate')
             extrema_candidate['end'] = df_dir.iloc[j].name
-            # extrema_candidate['c'] = df_dir.iloc[j]['h'] if direction < 0 else df_dir.iloc[j]['l']
             extrema_candidate['c'] = df_dir.iloc[j].VWAP3
 
         # Close pivot on lower pivot bottom / higher pivot top or when the next low / high has a distance of greater than the pullback threshold
-        # is_extrema_candidate_with_pullback_dist = (extrema_candidate is not None and
-        #                 ((direction < 0 and extrema_candidate['c'] - df_dir.iloc[j].l > pullback_threshold ) or
-        #                  ((direction > 0 and df_dir.iloc[j].h - extrema_candidate['c']  > pullback_threshold ))))
-        is_extrema_candidate_with_pullback_dist = (extrema_candidate is not None and
-                                                   ((direction < 0 and extrema_candidate['c'] - df_dir.iloc[j].VWAP3 > pullback_threshold ) or
-                                                    ((direction > 0 and df_dir.iloc[j].VWAP3 - extrema_candidate['c']  > pullback_threshold ))))
+        is_extrema_candidate_with_pullback_dist = (extrema_candidate is not None and abs(extrema_candidate['c'] - df_dir.iloc[j].VWAP3) > pullback_threshold)
 
-        print('Is pullback dist:', is_extrema_candidate_with_pullback_dist)
+        # print('Is pullback dist:', is_extrema_candidate_with_pullback_dist)
         is_pivot_move = (df_dir.iloc[j]['VWAP3_is_bottom'] and direction < 0 and (df_dir.iloc[j]['VWAP3'] < last_pivot['VWAP3'] or is_extrema_candidate_with_pullback_dist) or
                          df_dir.iloc[j]['VWAP3_is_top'] and direction > 0 and (df_dir.iloc[j]['VWAP3'] > last_pivot['VWAP3'] or is_extrema_candidate_with_pullback_dist))
-        print(f'Is pivot move:{is_pivot_move}, VWAP {df_dir.iloc[j].VWAP3}')
+        # print(f'Is pivot move:{is_pivot_move}, VWAP {df_dir.iloc[j].VWAP3}')
         if is_pivot_move:
           last_pivot = df_dir.iloc[j]
           if extrema_candidate is not None:
@@ -303,20 +302,20 @@ for symbol in symbols:
     mpf.plot(df_day, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%m-%d', tight_layout=True,
              hlines=hlines_day, warn_too_much_data=700, addplot=[ind_day_ema20_plot])
     mpf.plot(df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
-             scale_width_adjustment=dict(candle=1.35), hlines=hlines, vlines=vlines, addplot=[ind_30m_ema20_plot, ind_30m_ema40_plot])
+             scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_30m_ema20_plot, ind_30m_ema40_plot])
 
 
     # Use MaxNLocator to increase the number of ticks
     ax1.xaxis.set_major_locator(mticker.MaxNLocator(nbins=20))  # Increase number of ticks on x-axis
     ax1.yaxis.set_major_locator(mticker.MaxNLocator(nbins=10))  # Increase number of ticks on y-axis
 
-    plt.show()
+    # plt.show()
     ## %%
-    # metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3']}
-    # with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
-    #   pickle.dump(metadata, f)
-    # plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
-    # plt.close()
+    metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3']}
+    with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
+      pickle.dump(metadata, f)
+    plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
+    plt.close()
     print(f'{symbol} finished {date_str}')
     #%%
     prior_day = day_start
