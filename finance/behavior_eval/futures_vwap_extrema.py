@@ -82,8 +82,8 @@ for symbol in symbols:
     if df_5m is None or len(df_5m) < 30:
       day_start = day_start + timedelta(days=1)
       print(f'{symbol} no data for {day_start.isoformat()}')
-      # raise Exception('no data')
-      continue
+      raise Exception('no data')
+      # continue
     last_saturday = utils.time.get_last_saturday(day_start)
     current_week_candle = df_5m_two_weeks[(df_5m_two_weeks.index >= last_saturday) & (df_5m_two_weeks.index <= prior_day + exchange['Close'])]
     prior_week_candle = df_5m_two_weeks[(df_5m_two_weeks.index >= last_saturday-timedelta(days=7)) & (df_5m_two_weeks.index <= last_saturday)]
@@ -149,67 +149,71 @@ for symbol in symbols:
     ##%%
     extrema_vwap = []
     # PULLBACK_THRESHOLD_MULTIPLIER = 0.33
-    PULLBACK_THRESHOLD_MULTIPLIER = 0.2
-    pullback_threshold = PULLBACK_THRESHOLD_MULTIPLIER*(cdh - cdl)
+    # PULLBACK_THRESHOLD_MULTIPLIER = 0.2
     ##%%
-    for i in range(1, len(df_extrema)):
-      ##%%
-      start_extrema = df_extrema.iloc[i-1]
-      end_extrema = df_extrema.iloc[i]
-      direction = 1 if end_extrema.type == 'h' or start_extrema.type == 'l'  else -1
-      extrema_range_filter = (df_5m.index >= start_extrema['ts']) & (df_5m.index < end_extrema['ts'])
-      df_dir = df_5m[extrema_range_filter]
-      if df_dir.empty:
-        continue
-
-      last_pivot = df_dir.iloc[0]
-      current_pivot = None
-      extrema_candidate = None
-
-      # print(f'Start extrema {start_extrema.ts}, End extrema {end_extrema.ts}, Direction {direction}, LastPivot {last_pivot.VWAP3}', )
-      ##%%
-      for j in range(1, len(df_dir)):
-      ##%%
-        # print('ts ', df_dir.iloc[j].name)
-        is_pivot = df_dir.iloc[j]['VWAP3_is_top'] | df_dir.iloc[j]['VWAP3_is_bottom']
-        if not is_pivot:
-          # raise Exception('Not pivot')
+    for pullback_threshold_multiplier in [0.25, 0.3]:
+      pullback_threshold = pullback_threshold_multiplier*(cdh - cdl)
+      key = f'dev{pullback_threshold_multiplier*100:n}'
+      # print(key)
+      for i in range(1, len(df_extrema)):
+        ##%%
+        start_extrema = df_extrema.iloc[i-1]
+        end_extrema = df_extrema.iloc[i]
+        direction = 1 if end_extrema.type == 'h' or start_extrema.type == 'l'  else -1
+        extrema_range_filter = (df_5m.index >= start_extrema['ts']) & (df_5m.index < end_extrema['ts'])
+        df_dir = df_5m[extrema_range_filter]
+        if df_dir.empty:
           continue
-        is_candidate = (((df_dir.iloc[j]['VWAP3_is_top'] and direction < 0) or (df_dir.iloc[j]['VWAP3_is_bottom'] and direction > 0)) and
-                        abs(df_dir.iloc[j].VWAP3 - last_pivot.VWAP3) > pullback_threshold)
-        # print('Is candidate:', is_candidate)
-        if is_candidate:
-          is_new = False
-          if extrema_candidate is None:
-            # Create pullback if last pivot distance is more than PULLBACK_THRESHOLD day range
-            extrema_candidate = {"start": last_pivot.name, "o": last_pivot.VWAP3, "type": 'PB_VWAP', "direction": direction}
-            is_new = True
 
-          if is_new or (direction < 0 and extrema_candidate['c'] < df_dir.iloc[j].VWAP3) or (direction > 0 and extrema_candidate['c'] > df_dir.iloc[j].VWAP3):
-            # Pullback is actually larger, update the range
-            # print('Is higher or new candidate')
-            extrema_candidate['end'] = df_dir.iloc[j].name
-            extrema_candidate['c'] = df_dir.iloc[j].VWAP3
+        last_pivot = df_dir.iloc[0]
+        current_pivot = None
+        extrema_candidate = None
 
-        # Close pivot on lower pivot bottom / higher pivot top or when the next low / high has a distance of greater than the pullback threshold
-        is_extrema_candidate_with_pullback_dist = (extrema_candidate is not None and abs(extrema_candidate['c'] - df_dir.iloc[j].VWAP3) > pullback_threshold)
+        # print(f'Start extrema {start_extrema.ts}, End extrema {end_extrema.ts}, Direction {direction}, LastPivot {last_pivot.VWAP3}', )
+        ##%%
+        for j in range(1, len(df_dir)):
+        ##%%
+          # print('ts ', df_dir.iloc[j].name)
+          is_pivot = df_dir.iloc[j]['VWAP3_is_top'] | df_dir.iloc[j]['VWAP3_is_bottom']
+          if not is_pivot:
+            # raise Exception('Not pivot')
+            continue
+          is_candidate = (((df_dir.iloc[j]['VWAP3_is_top'] and direction < 0) or (df_dir.iloc[j]['VWAP3_is_bottom'] and direction > 0)) and
+                          abs(df_dir.iloc[j].VWAP3 - last_pivot.VWAP3) > pullback_threshold)
+          # print('Is candidate:', is_candidate)
+          if is_candidate:
+            is_new = False
+            if extrema_candidate is None:
+              # Create pullback if last pivot distance is more than PULLBACK_THRESHOLD day range
+              extrema_candidate = {"start": last_pivot.name, "o": last_pivot.VWAP3, "type": key, "direction": direction}
+              is_new = True
 
-        # print('Is pullback dist:', is_extrema_candidate_with_pullback_dist)
-        is_pivot_move = (df_dir.iloc[j]['VWAP3_is_bottom'] and direction < 0 and (df_dir.iloc[j]['VWAP3'] < last_pivot['VWAP3'] or is_extrema_candidate_with_pullback_dist) or
-                         df_dir.iloc[j]['VWAP3_is_top'] and direction > 0 and (df_dir.iloc[j]['VWAP3'] > last_pivot['VWAP3'] or is_extrema_candidate_with_pullback_dist))
-        # print(f'Is pivot move:{is_pivot_move}, VWAP {df_dir.iloc[j].VWAP3}')
-        if is_pivot_move:
-          last_pivot = df_dir.iloc[j]
-          if extrema_candidate is not None:
-            extrema_vwap.append(extrema_candidate)
-            extrema_candidate = None
+            if is_new or (direction < 0 and extrema_candidate['c'] < df_dir.iloc[j].VWAP3) or (direction > 0 and extrema_candidate['c'] > df_dir.iloc[j].VWAP3):
+              # Pullback is actually larger, update the range
+              # print('Is higher or new candidate')
+              extrema_candidate['end'] = df_dir.iloc[j].name
+              extrema_candidate['c'] = df_dir.iloc[j].VWAP3
 
-      if extrema_candidate is not None:
-        extrema_vwap.append(extrema_candidate)
+          # Close pivot on lower pivot bottom / higher pivot top or when the next low / high has a distance of greater than the pullback threshold
+          is_extrema_candidate_with_pullback_dist = (extrema_candidate is not None and abs(extrema_candidate['c'] - df_dir.iloc[j].VWAP3) > pullback_threshold)
+
+          # print('Is pullback dist:', is_extrema_candidate_with_pullback_dist)
+          is_pivot_move = (df_dir.iloc[j]['VWAP3_is_bottom'] and direction < 0 and (df_dir.iloc[j]['VWAP3'] < last_pivot['VWAP3'] or is_extrema_candidate_with_pullback_dist) or
+                           df_dir.iloc[j]['VWAP3_is_top'] and direction > 0 and (df_dir.iloc[j]['VWAP3'] > last_pivot['VWAP3'] or is_extrema_candidate_with_pullback_dist))
+          # print(f'Is pivot move:{is_pivot_move}, VWAP {df_dir.iloc[j].VWAP3}')
+          if is_pivot_move:
+            last_pivot = df_dir.iloc[j]
+            if extrema_candidate is not None:
+              # print(f'Append Extrema Candidate')
+              extrema_vwap.append(extrema_candidate)
+              extrema_candidate = None
+
+        if extrema_candidate is not None:
+          extrema_vwap.append(extrema_candidate)
     for extrema in extrema_vwap:
       # push start and end of extrema
-      extrema_start = {"ts": extrema['start'], "type": 'dev', 'value': extrema['o'],  **calculate_offssets(extrema['o'])}
-      extrema_end = {"ts": extrema['end'], "type": 'dev', 'value': extrema['c'],  **calculate_offssets(extrema['c'])}
+      extrema_start = {"ts": extrema['start'], "type":extrema['type'] ,'value': extrema['o'],  **calculate_offssets(extrema['o'])}
+      extrema_end = {"ts": extrema['end'], "type":extrema['type'], 'value': extrema['c'],  **calculate_offssets(extrema['c'])}
       df_extrema = pd.concat([df_extrema, pd.DataFrame([extrema_start, extrema_end])]).sort_values(by='ts')
       df_extrema.reset_index(drop=True, inplace=True)
 
@@ -222,7 +226,7 @@ for symbol in symbols:
     # pullback = {"start": , "end": , "duration": , "h": , "l": , "o": , "c": , "type": 'SC', "direction": 1 | -1"}"
     ##%%
     pullbacks = []
-    for i in range(1, len(df_extrema)):
+    for i in range(1, len(df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l', 'dev2'])])):
       start_extrema = df_extrema.iloc[i-1]
       end_extrema = df_extrema.iloc[i]
       direction = 1 if start_extrema.value < end_extrema.value else -1
@@ -252,6 +256,45 @@ for symbol in symbols:
           current_pullback = {"start": df_dir.iloc[j].name, "o": df_dir.iloc[j]['o'], "direction": direction}
           j_start = j
 
+      ##%%
+      def create_trend(i, type):
+        return {"start": df_5m.iloc[i].name, "end": df_5m.iloc[i].name, "o": df_5m.iloc[i][type], "c": df_5m.iloc[i][type], "bars": 1, "ema20_o": df_5m.iloc[i]["20EMA"]}
+
+      uptrends = []
+      current_uptrend = None
+      downtrends = []
+      current_downtrend = None
+      for i in range(len(df_5m)):
+        if current_uptrend is None:
+          current_uptrend = create_trend(i, 'l')
+        elif df_5m.iloc[i].l > current_uptrend['c']:
+          current_uptrend['end'] = df_5m.iloc[i].name
+          current_uptrend['c'] = df_5m.iloc[i].l
+          current_uptrend['ema20_c'] = df_5m.iloc[i]["20EMA"]
+          current_uptrend['bars'] += 1
+        else:
+          if current_uptrend['end'] != current_uptrend['start']:
+            uptrends.append(current_uptrend)
+          current_uptrend = create_trend(i, 'l')
+
+        if current_downtrend is None:
+          current_downtrend= create_trend(i, 'h')
+        elif df_5m.iloc[i].h < current_downtrend['c']:
+          current_downtrend['end'] = df_5m.iloc[i].name
+          current_downtrend['c'] = df_5m.iloc[i].h
+          current_downtrend['ema20_c'] = df_5m.iloc[i]["20EMA"]
+          current_downtrend['bars'] += 1
+        else:
+          if current_downtrend['end'] != current_downtrend['start']:
+            downtrends.append(current_downtrend)
+          current_downtrend= create_trend(i, 'h')
+
+      df_uptrends = pd.DataFrame(uptrends)
+      df_uptrends['trend_support'] = df_uptrends['ema20_o'] < df_uptrends['ema20_c']
+      df_downtrends = pd.DataFrame(downtrends)
+      df_downtrends['trend_support'] = df_downtrends['ema20_o'] > df_downtrends['ema20_c']
+
+
 ##%%
 # New setup
 # |-------------------------|
@@ -268,18 +311,18 @@ for symbol in symbols:
     ax2 = fig.add_subplot(gs[1, 0])
     ax3 = fig.add_subplot(gs[1, 1])
 
-    indicator_hlines = [cdl, cdh, cdo, cdc, pdc, pdh, pdl, onh, onl, cwh, cwl, pwh, pwl]
+    indicator_hlines = [cdl, cdh, cdc, pdc, pdh, pdl, onh, onl, cwh, cwl, pwh, pwl]
     fig.suptitle(f'{symbol} {date_str} T {pullback_threshold:.2f} O {cdo:.2f} H {cdh:.2f} C {cdc:.2f} L {cdl:.2f} \n' +
            f'PriorDay: H {pdh:.2f} C {pdc:.2f} L {pdl:.2f}  On: H {onh:.2f} L {onl:.2f} \n' +
            f'CurrentWeek: H {cwh:.2f} L {cwl:.2f}  PriorWeek: H {pwh:.2f} L {pwl:.2f}')
 
-    hlines=dict(hlines=indicator_hlines, colors= ['deeppink']*4+['#bf42f5']*5+['#3179f5']*4, linewidths=[0.4]*4+[0.6]*3+[0.4]*6, linestyle=['--']*5+['-']*(len(indicator_hlines)-1))
-    hlines_day=dict(hlines=indicator_hlines[4:], colors= ['#bf42f5']*5+['#3179f5']*4, linewidths=[0.6]*3+[0.4]*6, linestyle=['--']+['-']*(len(indicator_hlines)-1))
+    hlines=dict(hlines=indicator_hlines, colors= ['deeppink']*3+['#bf42f5']*5+['#3179f5']*4, linewidths=[0.4]*3+[0.6]*3+[0.4]*6, linestyle=['--']*4+['-']*(len(indicator_hlines)-1))
+    hlines_day=dict(hlines=indicator_hlines[3:], colors= ['#bf42f5']*5+['#3179f5']*4, linewidths=[0.6]*3+[0.4]*6, linestyle=['--']+['-']*(len(indicator_hlines)-1))
     vlines=dict(vlines=[day_open, day_close], colors= ['deeppink'], linewidths=[0.4], linestyle=['--'])
 
     ind_5m_ema20_plot = mpf.make_addplot(df_5m['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
     ind_5m_ema240_plot = mpf.make_addplot(df_5m['240EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
-    ind_vwap3_plot = mpf.make_addplot(df_5m['VWAP3'], ax=ax1, width=0.4, color='magenta')
+    ind_vwap3_plot = mpf.make_addplot(df_5m['VWAP3'], ax=ax1, width=2, color='turquoise')
 
     ind_30m_ema20_plot = mpf.make_addplot(df_30m['20EMA'], ax=ax3, width=0.6, color="#FF9900", linestyle='--')
     ind_30m_ema40_plot = mpf.make_addplot(df_30m['40EMA'], ax=ax3, width=0.6, color='#0099FF', linestyle='--')
@@ -288,14 +331,29 @@ for symbol in symbols:
 
     df_ohcl_extrema = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l'])]
     extrema_ohcl_aline = list(zip(df_ohcl_extrema.ts, df_ohcl_extrema.value))
-    extrema_aline = list(zip(df_extrema.ts, df_extrema.value))
+    df_extrema2 = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l', 'dev25'])]
+    extrema2_aline = list(zip(df_extrema2.ts, df_extrema2.value))
+    df_extrema3 = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l', 'dev30'])]
+    extrema3_aline = list(zip(df_extrema3.ts, df_extrema3.value))
+    # df_extrema4 = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l', 'dev4'])]
+    # extrema4_aline = list(zip(df_extrema4.ts, df_extrema4.value))
+
 
     pb_alines= []
     for pullback in pullbacks:
       pb_alines.append([(pullback['start'], pullback['l']), (pullback['end'], pullback['l'])])
       pb_alines.append([(pullback['start'], pullback['h']), (pullback['end'], pullback['h'])])
 
-    alines=dict(alines=[extrema_ohcl_aline, extrema_aline, *pb_alines], colors=['purple', 'black', *['darkblue'] * len(pb_alines)], alpha=0.3, linewidths=[0.25], linestyle=['--']*2+['-'] * len(pb_alines))
+    ut_alines = []
+    for idx, uptrend in df_uptrends[df_uptrends.bars > 2].iterrows():
+      ut_alines.append([(uptrend['start'], uptrend['o']), (uptrend['end'], uptrend['c'])])
+
+    dt_alines = []
+    for idx, downtrend in df_downtrends[df_downtrends.bars > 2].iterrows():
+      dt_alines.append([(downtrend['start'], downtrend['o']), (downtrend['end'], downtrend['c'])])
+
+    alines=dict(alines=[extrema_ohcl_aline, extrema2_aline, extrema3_aline,  *pb_alines, *ut_alines, *dt_alines],
+                colors=['purple', 'darkorange', 'cornflowerblue']+ ['darkblue'] * len(pb_alines) + ['forestgreen']*len(ut_alines)+['firebrick']*len(dt_alines), alpha=0.5, linewidths=[0.25], linestyle=['--']*4+['-'] * len(pb_alines))
 
     mpf.plot(df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
              scale_width_adjustment=dict(candle=1.35), hlines=hlines, alines=alines, vlines=vlines, addplot=[ind_5m_ema20_plot, ind_5m_ema240_plot, ind_vwap3_plot])
@@ -309,9 +367,9 @@ for symbol in symbols:
     ax1.xaxis.set_major_locator(mticker.MaxNLocator(nbins=20))  # Increase number of ticks on x-axis
     ax1.yaxis.set_major_locator(mticker.MaxNLocator(nbins=10))  # Increase number of ticks on y-axis
 
-    # plt.show()
-    ## %%
-    metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3']}
+    plt.show()
+    # %%
+    metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3'], "uptrends": df_uptrends, "downtrends": df_downtrends, "firstBars": df_5m[df_5m.index >= day_open][0:6]}
     with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
       pickle.dump(metadata, f)
     plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save

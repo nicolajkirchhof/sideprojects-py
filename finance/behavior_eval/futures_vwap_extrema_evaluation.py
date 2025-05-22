@@ -31,7 +31,13 @@ mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
-
+#%%
+# TODO:
+# - Determine time between Significant points
+# - How does it change in comparison to the last hour before the opening. Is that a good setup?
+# - Analyze the changes thoughout the day, how many percentages are made where
+#   - What might be triggers for a positive/negative rally into the close of the US indices?
+# -
 # %%
 symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
 symbol = symbols[0]
