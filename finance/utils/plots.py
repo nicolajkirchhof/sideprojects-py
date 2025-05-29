@@ -5,98 +5,58 @@ from datetime import timedelta, datetime
 import mplfinance as mpf
 import numpy as np
 import pandas as pd
+from matplotlib import gridspec
 
 from finance import utils
+from finance.utils.trading_day_data import TradingDayData
+import matplotlib.ticker as mticker
 
-def daily_change_plot(symbol, day):
-  # Create a directory
-  symbol_def = utils.influx.SYMBOLS[symbol]
-  exchange = symbol_def['EX']
 
-  offset = timedelta(hours=0)
-  #%% get prior day
-  prior_day_candle = None
-  prior_day = day
-  while prior_day_candle is None:
-    prior_day = prior_day - timedelta(days=1)
-    prior_day_candle = utils.influx.get_candles_range_aggregate(prior_day + exchange['Open'] + offset, prior_day + exchange['Close'] + offset, symbol)
-    print('prior_day', prior_day)
+def daily_change_plot(day_data: TradingDayData, alines=None, title_add=''):
+  # |-------------------------|
+  # |           5m            |
+  # | ------------------------|
+  # |   D   |       30m       |
+  # | ------------------------|
 
-  overnight_candle= utils.influx.get_candles_range_aggregate(day + offset, day + exchange['Open'] - timedelta(hours=1) + offset, symbol)
-  ##%%
-  day_end = day + exchange['Close'] + timedelta(hours=1) + offset
-  # get the following data for daily assignment
-  day_candles = utils.influx.get_candles_range_raw(day+exchange['Open']-timedelta(hours=1, minutes=0)+offset, day_end, symbol)
-  if day_candles is None or len(day_candles) < 100:
-    day = day + timedelta(days=1)
-    print(f'{symbol} no data for {day.isoformat()}')
-    raise Exception('no data')
+  fig = mpf.figure(style='yahoo', figsize=(16,9), tight_layout=True)
+  gs = gridspec.GridSpec(2, 2, height_ratios=[2, 1], width_ratios=[1, 2])
 
-  df_1m = day_candles
-  df_5m = df_1m.resample('5min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last'))
-  df_30m = df_1m.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last'))
+  date_str = day_data.day_start.strftime('%Y-%m-%d')
+  ax1 = fig.add_subplot(gs[0, :])
+  ax2 = fig.add_subplot(gs[1, 0])
+  ax3 = fig.add_subplot(gs[1, 1])
 
-  df_1m['9EMA'] = df_1m['c'].ewm(span=9, adjust=False).mean()
-  df_5m['9EMA'] = df_5m['c'].ewm(span=9, adjust=False).mean()
+  indicator_hlines = [day_data.cdl, day_data.cdh, day_data.cdc, day_data.pdc, day_data.pdh, day_data.pdl,
+                      day_data.onh, day_data.onl, day_data.cwh, day_data.cwl, day_data.pwh, day_data.pwl]
+  fig.suptitle(f'{day_data.symbol} {date_str} || O {day_data.cdo:.2f} H {day_data.cdh:.2f} C {day_data.cdc:.2f} L {day_data.cdl:.2f} || On: H {day_data.onh:.2f} L {day_data.onl:.2f} \n' +
+               f'PD: H {day_data.pdh:.2f} C {day_data.pdc:.2f} L {day_data.pdl:.2f} || ' +
+               f'CW: H {day_data.cwh:.2f} L {day_data.cwl:.2f} || PW: H {day_data.pwh:.2f} L {day_data.pwl:.2f} || {title_add}')
 
-  # Calculate the Adaptive Moving Average (AMA / KAMA)
-  df_5m['AMA'] = utils.indicators.adaptive_moving_average(df_5m['c'], period=10, fast=2, slow=30)
+  hlines=dict(hlines=indicator_hlines, colors= ['deeppink']*3+['#bf42f5']*5+['#3179f5']*4, linewidths=[0.4]*3+[0.6]*3+[0.4]*6, linestyle=['--']*4+['-']*(len(indicator_hlines)-1))
+  hlines_day=dict(hlines=indicator_hlines[3:], colors= ['#bf42f5']*5+['#3179f5']*4, linewidths=[0.6]*3+[0.4]*6, linestyle=['--']+['-']*(len(indicator_hlines)-1))
+  vlines=dict(vlines=[day_data.day_open, day_data.day_close], colors= ['deeppink'], linewidths=[0.4], linestyle=['--'])
 
-  ##%%
-  try:
-    ## %%
-    fig = mpf.figure(style='yahoo', figsize=(16,9), tight_layout=True)
+  ind_5m_ema20_plot = mpf.make_addplot(day_data.df_5m['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
+  ind_5m_ema240_plot = mpf.make_addplot(day_data.df_5m['240EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
+  ind_vwap3_plot = mpf.make_addplot(day_data.df_5m['VWAP3'], ax=ax1, width=2, color='turquoise')
 
-    date_str = day.strftime('%Y-%m-%d')
-    ax1 = fig.add_subplot(3,1,1)
-    ax2 = fig.add_subplot(3,1,2)
-    ax3 = fig.add_subplot(3,1,3)
+  ind_30m_ema20_plot = mpf.make_addplot(day_data.df_30m['20EMA'], ax=ax3, width=0.6, color="#FF9900", linestyle='--')
+  ind_30m_ema40_plot = mpf.make_addplot(day_data.df_30m['40EMA'], ax=ax3, width=0.6, color='#0099FF', linestyle='--')
 
-    overnight_h = overnight_candle.h.iat[0] if overnight_candle is not None else np.nan
-    overnight_l = overnight_candle.l.iat[0] if overnight_candle is not None else np.nan
+  ind_day_ema20_plot = mpf.make_addplot(day_data.df_day['20EMA'], ax=ax2, width=0.6, color="#FF9900", linestyle='--')
 
-    indicator_hlines = [prior_day_candle.c.iat[0], prior_day_candle.h.iat[0], prior_day_candle.l.iat[0], overnight_h, overnight_l]
-    fig.suptitle(f'{symbol} {date_str} 1m/5m/30m PriorDay: H {prior_day_candle.h.iat[0]:.2f}  C {prior_day_candle.c.iat[0]:.2f} L {prior_day_candle.l.iat[0]:.2f} On: H {overnight_h:.2f} L {overnight_l:.2f}')
+  mpf.plot(day_data.df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
+           scale_width_adjustment=dict(candle=1.35), hlines=hlines, alines=alines, vlines=vlines, addplot=[ind_5m_ema20_plot, ind_5m_ema240_plot, ind_vwap3_plot])
+  mpf.plot(day_data.df_day, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%m-%d', tight_layout=True,
+           hlines=hlines_day, warn_too_much_data=700, addplot=[ind_day_ema20_plot])
+  mpf.plot(day_data.df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
+           scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_30m_ema20_plot, ind_30m_ema40_plot])
 
-    hlines=dict(hlines=indicator_hlines, colors=['#bf42f5'], linewidths=[0.5, 1, 1, 0.5, 0.5], linestyle=['--', *['-']*(len(indicator_hlines)-1)])
 
-    ema_plot = mpf.make_addplot(df_5m['9EMA'], ax=ax2, width=0.4, color="turquoise")
-    ama_plot = mpf.make_addplot(df_5m['AMA'], ax=ax2, width=0.4, color='gold')
-
-    mpf.plot(df_1m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%H:%M', tight_layout=True, hlines=hlines, warn_too_much_data=700)
-    mpf.plot(df_5m, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ama_plot, ema_plot])
-    mpf.plot(df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True, scale_width_adjustment=dict(candle=1.35), hlines=hlines)
-
-    ticks = pd.date_range(df_1m.index.min().ceil('30min'),df_1m.index.max()+timedelta(minutes=1),freq='30min')
-    ticklabels = [ tick.time().strftime('%H:%M') for tick in ticks ]
-    loc_1m = [df_1m.index.get_loc(tick) for tick in ticks[:-1]]
-    last_tick_1m = 2* loc_1m[-1] - loc_1m[-2]
-    loc_1m.append(last_tick_1m)
-    ax1.set_xticks(loc_1m)
-    ax1.set_xticklabels(ticklabels)
-    ax1.set_xlim(-2.5, last_tick_1m + 2.5)
-
-    ticklabels = [ (tick+timedelta(minutes=2.5)).strftime('%H:%M') for tick in ticks ]
-    loc_5m = [df_5m.index.get_loc(tick) for tick in ticks[:-1]]
-    last_tick_5m = 2*loc_5m[-1] - loc_5m[-2]
-    loc_5m.append(last_tick_5m)
-    ax2.set_xticks(loc_5m)
-    ax2.set_xticklabels(ticklabels)
-    ax2.set_xlim(-1, last_tick_5m )
-
-    ticklabels = [ (tick+timedelta(minutes=15)).time().strftime('%H:%M') for tick in ticks ]
-    loc_30m = [df_30m.index.get_loc(tick) for tick in ticks[:-1]]
-    last_tick_30m = 2*loc_30m[-1] - loc_30m[-2]
-    loc_30m.append(last_tick_30m)
-    ax3.set_xticks(loc_30m)
-    ax3.set_xticklabels(ticklabels)
-    ax3.set_xlim(-0.583, last_tick_30m - 0.45)
-
-    return fig
-
-  except Exception as e:
-    print(f'{symbol} error: {e}')
-    return None
+  # Use MaxNLocator to increase the number of ticks
+  ax1.xaxis.set_major_locator(mticker.MaxNLocator(nbins=20))  # Increase number of ticks on x-axis
+  ax1.yaxis.set_major_locator(mticker.MaxNLocator(nbins=10))  # Increase number of ticks on y-axis
 
 def last_date_from_files(directory):
   files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]

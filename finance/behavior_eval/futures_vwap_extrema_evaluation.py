@@ -38,6 +38,10 @@ mpl.use('QtAgg')
 # - Analyze the changes thoughout the day, how many percentages are made where
 #   - What might be triggers for a positive/negative rally into the close of the US indices?
 # -
+# Trends & Patterns
+# - Follow-Through on strong trend without pullback vs 50% PB vs 100% PB on the same day
+
+
 # %%
 symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
 symbol = symbols[0]
@@ -67,26 +71,77 @@ for symbol in symbols:
       results.append(data)
 
   #%%
+  def add_time_date(df, index_name = 'ts'):
+    df.set_index(index_name, inplace=True)
+    df['date'] = df.index.date
+    df['time'] = df.index.time
+    return df
+#%%
   # Evaluate the time of the extrema
   extrema = [data['extrema'] for data in results]
-  df_extrema = pd.concat(extrema)
-  df_extrema.set_index('ts', inplace=True)
+  df_uptrends = add_time_date(pd.concat([data['uptrends'] for data in results]), 'start')
+  df_uptrends['mid'] = (df_uptrends.o + df_uptrends.c)/2
+  df_uptrends['type'] =  pd.cut(df_uptrends['bars'], bins=[-np.inf, 3, 5, np.inf], labels=['x<3', '3<x<5', 'x>5' ])
 
-  df_extrema['time'] = df_extrema.index.time
-  df_extrema['date'] = df_extrema.index.date
+  df_downtrends = add_time_date(pd.concat([data['downtrends'] for data in results]), 'start')
+  df_downtrends['type'] =  pd.cut(df_downtrends['bars'], bins=[-np.inf, 3, 5, np.inf], labels=['x<3', '3<x<5', 'x>5' ])
+  df_downtrends['mid'] = (df_downtrends.o + df_downtrends.c)/2
+  df_extrema = pd.concat(extrema)
+  df_extrema = add_time_date(df_extrema, 'ts')
+  # df_extrema.set_index('ts', inplace=True)
+
+  # df_extrema['time'] = df_extrema.index.time
+  # df_extrema['date'] = df_extrema.index.date
 
   df_extrema_lhd = df_extrema[~df_extrema.type.isin(['o', 'c'])].copy()
 
   df_extrema_lh = df_extrema[df_extrema.type.isin(['l', 'h'])].copy()
   df_extrema_lh['is_first_of_day'] = df_extrema_lh.groupby('date')['time'].transform('first') == df_extrema_lh['time']
 
-  df_extrema_d = df_extrema[df_extrema.type.isin(['dev'])].copy()
+  df_extrema_d_25 = df_extrema[df_extrema.type.isin(['dev25'])].copy()
+  df_extrema_d_30 = df_extrema[df_extrema.type.isin(['dev30'])].copy()
+
+  #%% Calculate uptrends / downtrends with one pullback that is not more than three bars and 50%
+  def trends_with_pb(df, is_larger = True):
+    df_pb = df.iloc[[0]].copy()
+    last_combined_index = df_pb.index[0]
+    for i in range(1, len(df)):
+      if (df.iloc[i].name - df_pb.loc[last_combined_index].end <= datetime.timedelta(minutes=15) and
+           ((is_larger and df.iloc[i].o > df_pb.loc[last_combined_index].mid) or
+            (not is_larger and df.iloc[i].o < df_pb.loc[last_combined_index].mid))):
+        df_pb.loc[last_combined_index, 'end'] = df.iloc[i].end
+        df_pb.loc[last_combined_index, 'c'] = df.iloc[i].c
+        df_pb.loc[last_combined_index, 'bars'] += df.iloc[i].bars
+        df_pb.loc[last_combined_index, 'ema20_c'] = df.iloc[i].ema20_c
+      else:
+        df_pb= pd.concat([df_pb, df.iloc[[i]].copy()])
+        last_combined_index = df_pb.index[-1]
+    return df_pb
+#%%
+  df_uptrends_pb = trends_with_pb(df_uptrends, is_larger=True)
+  df_uptrends_pb['type'] =  pd.cut(df_uptrends_pb['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
+  df_uptrends_pb['trend_support'] = df_uptrends_pb['ema20_o'] < df_uptrends_pb['ema20_c']
+  df_downtrends_pb = trends_with_pb(df_downtrends, is_larger=True)
+  df_downtrends_pb['type'] =  pd.cut(df_downtrends_pb['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
+  df_downtrends_pb['trend_support'] = df_downtrends_pb['ema20_o'] > df_downtrends_pb['ema20_c']
+# df_uptrends_pb = df_uptrends.iloc[[0]].copy()
+#   last_combined_index = df_uptrends_pb.index[0]
+#   for i in range(1, len(df_uptrends)):
+#     if df_uptrends.iloc[i].name - df_uptrends_pb.loc[last_combined_index].end <= datetime.timedelta(minutes=15) and df_uptrends.iloc[i].o > df_uptrends_pb.loc[last_combined_index].mid:
+#       df_uptrends_pb.loc[last_combined_index, 'end'] = df_uptrends.iloc[i].end
+#       df_uptrends_pb.loc[last_combined_index, 'c'] = df_uptrends.iloc[i].c
+#       df_uptrends_pb.loc[last_combined_index, 'bars'] += df_uptrends.iloc[i].bars
+#       df_uptrends_pb.loc[last_combined_index, 'ema20_c'] = df_uptrends.iloc[i].ema20_c
+#     else:
+#       df_uptrends_pb= pd.concat([df_uptrends_pb, df_uptrends.iloc[[i]].copy()])
+#       last_combined_index = df_uptrends_pb.index[-1]
+
 
   #%%
   df = df_extrema_lhd
   def plot_type_percentages(df, event = ''):
     # Calculate percentages for each type independently
-    type_counts = df.groupby(['time', 'type']).size().unstack(fill_value=0)
+    type_counts = df.groupby(['time', 'type'], observed=True).size().unstack(fill_value=0)
     type_percentages = type_counts.div(type_counts.sum(), axis=1) * 100
 
     # Calculate percentages for each type independently
@@ -107,7 +162,7 @@ for symbol in symbols:
 
     # Plot 1: Individual type percentages
     type_percentages.plot(kind='bar', ax=ax1, width=0.8)
-    ax1.set_title(f'{symbol} Distribution of {event} Events by Type\n(Each type adds to 100%)')
+    ax1.set_title(f'{symbol} Distribution of {len(df)} {event} Events by Type\n(Each type adds to 100%)')
     ax1.set_xlabel('')
     ax1.set_ylabel('Percentage of Type Events')
     ax1.legend(title='Type')
@@ -119,7 +174,7 @@ for symbol in symbols:
 
     # Plot 2: Cumulative percentages
     cumulative_percentages.plot(kind='bar', ax=ax2, width=0.8)
-    ax2.set_title(f'{symbol} Cumulative Distribution of {event} Events by Type\n(Each type reaches 100%)')
+    ax2.set_title(f'{symbol} Cumulative Distribution of {len(df)} {event} Events by Type\n(Each type reaches 100%)')
     ax2.set_xlabel('Time')
     ax2.set_ylabel('Cumulative Percentage of Type Events')
     ax2.legend(title='Type')
@@ -144,12 +199,50 @@ for symbol in symbols:
   plot_type_percentages(df_extrema_lh[~df_extrema_lh.is_first_of_day], 'Second of Day')
   plt.savefig(f'{directory_plots}/{symbol}_SecondOfDay.png', bbox_inches='tight')  # High-quality save
   plt.close()
-  plot_type_percentages(df_extrema_d, 'Deviation')
-  plt.savefig(f'{directory_plots}/{symbol}_Deviations.png', bbox_inches='tight')  # High-quality save
+  plot_type_percentages(df_extrema_d_25, 'Deviation 25%')
+  plt.savefig(f'{directory_plots}/{symbol}_Deviations_25.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+  plot_type_percentages(df_extrema_d_30, 'Deviation 30%')
+  plt.savefig(f'{directory_plots}/{symbol}_Deviations_30.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_downtrends, 'Downtrends')
+  plt.savefig(f'{directory_plots}/{symbol}_Downtrends.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_downtrends[~df_downtrends.trend_support], 'Downtrends With Trend')
+  plt.savefig(f'{directory_plots}/{symbol}_DowntrendsWithTrend.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_downtrends[~df_downtrends.trend_support], 'Downtrends Against Trend')
+  plt.savefig(f'{directory_plots}/{symbol}_DowntrendsAgainstTrend.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_downtrends_pb, 'Downtrends Pullback')
+  plt.savefig(f'{directory_plots}/{symbol}_Downtrends_Pullback.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_downtrends_pb, 'Uptrends Pullback')
+  plt.savefig(f'{directory_plots}/{symbol}_Uptrends_Pullback.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_uptrends, 'Uptrends')
+  plt.savefig(f'{directory_plots}/{symbol}_Uptrends.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_uptrends[~df_uptrends.trend_support], 'Uptrends With Trend')
+  plt.savefig(f'{directory_plots}/{symbol}_UptrendsWithTrend.png', bbox_inches='tight')  # High-quality save
+  plt.close()
+
+  plot_type_percentages(df_uptrends[~df_uptrends.trend_support], 'Uptrends Against Trend')
+  plt.savefig(f'{directory_plots}/{symbol}_UptrendsAgainstTrend.png', bbox_inches='tight')  # High-quality save
   plt.close()
 
 
-  #%%
+#%%
+  # plt.show()
+
+#%%
   all_vwap_pct = {}
   for day_type in ['up', 'neutral', 'down']:
     # all_vwap_pct[day_type] = pd.concat([result['VWAP_PCT'] for result in results if result['day_type'] == day_type])
