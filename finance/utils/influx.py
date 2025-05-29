@@ -114,10 +114,9 @@ def get_5m_30m_day_date_range_with_indicators(start, end, symbol):
   df_day_two_weeks = df_5m_two_weeks.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
   df_30m_two_weeks = df_5m_two_weeks.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
   df_5m_two_weeks['20EMA'] = df_5m_two_weeks['c'].ewm(span=20, adjust=False).mean()
-  df_5m_two_weeks['240EMA'] = df_5m_two_weeks['c'].ewm(span=240, adjust=False).mean()
+  df_5m_two_weeks['200EMA'] = df_5m_two_weeks['c'].ewm(span=240, adjust=False).mean()
   df_5m_two_weeks['VWAP3'] = (df_5m_two_weeks['c']+df_5m_two_weeks['h']+df_5m_two_weeks['l'])/3
   df_30m_two_weeks['20EMA'] = df_30m_two_weeks['c'].ewm(span=20, adjust=False).mean()
-  df_30m_two_weeks['40EMA'] = df_30m_two_weeks['c'].ewm(span=40, adjust=False).mean()
   df_day_two_weeks['20EMA'] = df_day_two_weeks['c'].ewm(span=20, adjust=False).mean()
   df_5m_two_weeks.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
   df_30m_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)

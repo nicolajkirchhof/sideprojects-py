@@ -271,6 +271,10 @@ for symbol in symbols:
     day_data.df_5m['is_high_lh'] = day_data.df_5m.lh/2>mean_atr_lh
     day_data.df_5m['is_high_oc'] = day_data.df_5m.oc/2>mean_atr_oc
 
+    ts_oii = day_data.df_5m[day_data.df_5m.is_oii].index.tolist()
+    ts_is_high_lh = day_data.df_5m[day_data.df_5m.is_high_lh].index.tolist()
+    ts_is_high_oc = day_data.df_5m[day_data.df_5m.is_high_oc].index.tolist()
+
 
     #%%
     df_ohcl_extrema = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l'])]
@@ -281,6 +285,8 @@ for symbol in symbols:
     extrema3_aline = list(zip(df_extrema3.ts, df_extrema3.value))
     # df_extrema4 = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l', 'dev4'])]
     # extrema4_aline = list(zip(df_extrema4.ts, df_extrema4.value))
+
+    vlines = dict(vlines=ts_oii+ts_is_high_lh+ts_is_high_oc, colors= ['indigo']*len(ts_oii)+['darkviolet']*len(ts_is_high_lh)+['violet']*len(ts_is_high_oc), linewidths=[0.4], linestyle=['--'])
 
     pb_alines= []
     for pullback in pullbacks:
@@ -298,7 +304,7 @@ for symbol in symbols:
     alines=dict(alines=[extrema_ohcl_aline, extrema2_aline, extrema3_aline,  *pb_alines, *ut_alines, *dt_alines],
                 colors=['purple', 'darkorange', 'cornflowerblue']+ ['darkblue'] * len(pb_alines) + ['forestgreen']*len(ut_alines)+['firebrick']*len(dt_alines), alpha=0.5, linewidths=[0.25], linestyle=['--']*4+['-'] * len(pb_alines))
 
-    utils.plots.daily_change_plot(day_data, alines, f'T {pullback_threshold:.2f}')
+    utils.plots.daily_change_plot(day_data, alines, f'T {pullback_threshold:.2f}', vlines)
 
     plt.show()
     # %%

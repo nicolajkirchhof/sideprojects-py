@@ -12,7 +12,7 @@ from finance.utils.trading_day_data import TradingDayData
 import matplotlib.ticker as mticker
 
 
-def daily_change_plot(day_data: TradingDayData, alines=None, title_add=''):
+def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', my_vlines=dict(vlines=[], colors=[])):
   # |-------------------------|
   # |           5m            |
   # | ------------------------|
@@ -35,14 +35,13 @@ def daily_change_plot(day_data: TradingDayData, alines=None, title_add=''):
 
   hlines=dict(hlines=indicator_hlines, colors= ['deeppink']*3+['#bf42f5']*5+['#3179f5']*4, linewidths=[0.4]*3+[0.6]*3+[0.4]*6, linestyle=['--']*4+['-']*(len(indicator_hlines)-1))
   hlines_day=dict(hlines=indicator_hlines[3:], colors= ['#bf42f5']*5+['#3179f5']*4, linewidths=[0.6]*3+[0.4]*6, linestyle=['--']+['-']*(len(indicator_hlines)-1))
-  vlines=dict(vlines=[day_data.day_open, day_data.day_close], colors= ['deeppink'], linewidths=[0.4], linestyle=['--'])
+  vlines=dict(vlines=[day_data.day_open, day_data.day_close]+my_vlines['vlines'], colors= ['deeppink']*2+my_vlines['colors'], linewidths=[0.4], linestyle=['--'])
 
   ind_5m_ema20_plot = mpf.make_addplot(day_data.df_5m['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
-  ind_5m_ema240_plot = mpf.make_addplot(day_data.df_5m['240EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
+  ind_5m_ema240_plot = mpf.make_addplot(day_data.df_5m['200EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
   ind_vwap3_plot = mpf.make_addplot(day_data.df_5m['VWAP3'], ax=ax1, width=2, color='turquoise')
 
   ind_30m_ema20_plot = mpf.make_addplot(day_data.df_30m['20EMA'], ax=ax3, width=0.6, color="#FF9900", linestyle='--')
-  ind_30m_ema40_plot = mpf.make_addplot(day_data.df_30m['40EMA'], ax=ax3, width=0.6, color='#0099FF', linestyle='--')
 
   ind_day_ema20_plot = mpf.make_addplot(day_data.df_day['20EMA'], ax=ax2, width=0.6, color="#FF9900", linestyle='--')
 
@@ -51,7 +50,7 @@ def daily_change_plot(day_data: TradingDayData, alines=None, title_add=''):
   mpf.plot(day_data.df_day, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%m-%d', tight_layout=True,
            hlines=hlines_day, warn_too_much_data=700, addplot=[ind_day_ema20_plot])
   mpf.plot(day_data.df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
-           scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_30m_ema20_plot, ind_30m_ema40_plot])
+           scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_30m_ema20_plot])
 
 
   # Use MaxNLocator to increase the number of ticks
