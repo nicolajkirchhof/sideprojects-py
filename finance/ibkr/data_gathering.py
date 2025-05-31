@@ -44,6 +44,9 @@ index_cfd_asia = ['IBHK50', 'IBJP225', 'IBAU200']
 index_cfds = [ib.CFD(symbol=symbol, exchange='SMART') for symbol in [*index_cfd_euro, *index_cfd_us, *index_cfd_asia]]
 ## %%
 
+commodity_cfds = [ib.Commodity("XAUUSD", exchange='SMART'), ib.Commodity("USGOLD", exchange='IBMETAL')]
+## %%
+
 forex = [ib.Forex(symbol=sym, exchange='IDEALPRO', currency=cur) for sym, cur in
          [('EUR', 'USD'), ('EUR', 'GBP'), ('EUR', 'CHF'), ('GBP', 'USD'), ('AUD', 'USD'), ('USD', 'CAD'),
           ('USD', 'JPY'), ('CHF', 'USD')]]
@@ -64,8 +67,7 @@ futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 # us_etf_symbols = ['SPY', 'QQQ', 'GLD', 'SLV', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLE', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP', 'SMH']
 # us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
-# contracts = [*futures, *indices]
-contracts = [ *indices, *index_cfds, *forex, *futures,]
+contracts = [*commodity_cfds, *indices, *index_cfds, *forex, *futures,]
 
 for contract in contracts:
   ib_con.qualifyContracts(contract)
@@ -76,7 +78,7 @@ for contract in contracts:
 ## %%
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
                            'OPTION_IMPLIED_VOLATILITY']
-types_of_data = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY','OPTION_IMPLIED_VOLATILITY'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT']}
+types_of_data = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY','OPTION_IMPLIED_VOLATILITY'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT'], 'CMDTY': ['MIDPOINT']}
 rth = False
 ##%%
 duration = '10 D'
@@ -90,7 +92,7 @@ endDateTime = datetime.now()
 
 
 def contract_to_fieldname(contract):
-  if contract.secType == 'IND' or contract.secType == 'CFD' or contract.secType == 'STK':
+  if contract.secType == 'IND' or contract.secType == 'CFD' or contract.secType == 'STK' or contract.secType == 'CMDTY':
     return contract.symbol
   if 'FUT' in contract.secType:
     return f'F{contract.symbol}'

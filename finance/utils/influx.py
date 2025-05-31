@@ -13,7 +13,7 @@ DB_FUTURE = 'future'
 MPF_COLUMN_MAPPING = ['o', 'h', 'l', 'c', 'v']
 
 SEC_TYPE_DB_MAPPING = {
-  'IND': DB_INDEX, 'CFD': DB_CFD, 'CONTFUT': DB_FUTURE, 'FUT': DB_FUTURE, 'CASH': DB_FOREX, 'STK': DB_ETF,
+  'IND': DB_INDEX, 'CFD': DB_CFD, 'CONTFUT': DB_FUTURE, 'FUT': DB_FUTURE, 'CASH': DB_FOREX, 'STK': DB_ETF, 'CMDTY':DB_CFD
 }
 
 SYMBOLS = {'IBDE40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
@@ -109,16 +109,22 @@ def create_databases():
 def sec_type_to_database_name(sec_type):
   return SEC_TYPE_DB_MAPPING[sec_type]
 
-def get_5m_30m_day_date_range_with_indicators(start, end, symbol):
-  df_5m_two_weeks = get_candles_range_aggregate(start-timedelta(days=30), end, symbol, '5m')
-  df_day_two_weeks = df_5m_two_weeks.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
-  df_30m_two_weeks = df_5m_two_weeks.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
-  df_5m_two_weeks['20EMA'] = df_5m_two_weeks['c'].ewm(span=20, adjust=False).mean()
-  df_5m_two_weeks['200EMA'] = df_5m_two_weeks['c'].ewm(span=240, adjust=False).mean()
-  df_5m_two_weeks['VWAP3'] = (df_5m_two_weeks['c']+df_5m_two_weeks['h']+df_5m_two_weeks['l'])/3
-  df_30m_two_weeks['20EMA'] = df_30m_two_weeks['c'].ewm(span=20, adjust=False).mean()
-  df_day_two_weeks['20EMA'] = df_day_two_weeks['c'].ewm(span=20, adjust=False).mean()
-  df_5m_two_weeks.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
-  df_30m_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
-  df_day_two_weeks.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
-  return df_5m_two_weeks, df_30m_two_weeks, df_day_two_weeks
+def get_5m_30m_day_date_range_with_indicators(start, end, symbol, cache_offset = timedelta(days=30)):
+  df_5m = get_candles_range_aggregate(start-cache_offset, end, symbol, '5m')
+  df_day = df_5m.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
+  df_30m = df_5m.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
+  df_5m['20EMA'] = df_5m['c'].ewm(span=20, adjust=False).mean()
+  df_5m['200EMA'] = df_5m['c'].ewm(span=200, adjust=False).mean()
+  df_5m['VWAP3'] = (df_5m['c']+df_5m['h']+df_5m['l'])/3
+  df_30m['20EMA'] = df_30m['c'].ewm(span=20, adjust=False).mean()
+  df_day['20EMA'] = df_day['c'].ewm(span=20, adjust=False).mean()
+  df_5m['lh'] = (df_5m.h - df_5m.l)
+  df_30m['lh'] = (df_30m.h - df_30m.l)
+  df_day['lh'] = (df_day.h - df_day.l)
+  df_5m['oc'] = (df_5m.c - df_5m.o)
+  df_30m['oc'] = (df_30m.c - df_30m.o)
+  df_day['oc'] = (df_day.c - df_day.o)
+  df_5m.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
+  df_30m.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+  df_day.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+  return df_5m, df_30m, df_day

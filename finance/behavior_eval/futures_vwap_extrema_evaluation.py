@@ -101,29 +101,51 @@ for symbol in symbols:
   df_extrema_d_25 = df_extrema[df_extrema.type.isin(['dev25'])].copy()
   df_extrema_d_30 = df_extrema[df_extrema.type.isin(['dev30'])].copy()
 
-  #%% Calculate uptrends / downtrends with one pullback that is not more than three bars and 50%
-  def trends_with_pb(df, is_larger = True):
-    df_pb = df.iloc[[0]].copy()
-    last_combined_index = df_pb.index[0]
-    for i in range(1, len(df)):
-      if (df.iloc[i].name - df_pb.loc[last_combined_index].end <= datetime.timedelta(minutes=15) and
-           ((is_larger and df.iloc[i].o > df_pb.loc[last_combined_index].mid) or
-            (not is_larger and df.iloc[i].o < df_pb.loc[last_combined_index].mid))):
-        df_pb.loc[last_combined_index, 'end'] = df.iloc[i].end
-        df_pb.loc[last_combined_index, 'c'] = df.iloc[i].c
-        df_pb.loc[last_combined_index, 'bars'] += df.iloc[i].bars
-        df_pb.loc[last_combined_index, 'ema20_c'] = df.iloc[i].ema20_c
+  #%% Calculate channels
+  def channels(df, is_larger = True, pb_offset = 0.5):
+    channels = []
+    channel = None
+    for i in range(0, len(df)):
+      if channel is not None and (df.iloc[i].name.date() == channel['end'].date() and
+           ((is_larger and df.iloc[i].o > channel['SL']) or
+            (not is_larger and df.iloc[i].o < channel['SL']))):
+        is_range_extended = is_larger and df.iloc[i].c > channel['c'] or not is_larger and df.iloc[i].c < channel['c']
+        channel['end'] = df.iloc[i].end
+        channel['c'] = df.iloc[i].c if is_range_extended else channel['c']
+        channel['bars'] += df.iloc[i].bars
+        channel['ema20_c'] = df.iloc[i].ema20_c
+        channel['legs'] += 1
+        channel['hlegs'] += 1 if is_range_extended else 0
+        channel['SL'] = channel['o'] + (channel['c'] - channel['o'])*pb_offset
       else:
-        df_pb= pd.concat([df_pb, df.iloc[[i]].copy()])
-        last_combined_index = df_pb.index[-1]
-    return df_pb
+        if channel is not None:
+          channels.append(channel)
+        channel = df.iloc[i].to_dict()
+        channel['legs'] = 1
+        channel['hlegs'] = 1
+        channel['SL'] = channel['o'] + (channel['c'] - channel['o'])*pb_offset
+
+    if channel is not None:
+      channels.append(channel)
+    df_channels = pd.DataFrame(channels)
+    # df_channels.set_index('start', inplace=True)
+    return df_channels
 #%%
-  df_uptrends_pb = trends_with_pb(df_uptrends, is_larger=True)
-  df_uptrends_pb['type'] =  pd.cut(df_uptrends_pb['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
-  df_uptrends_pb['trend_support'] = df_uptrends_pb['ema20_o'] < df_uptrends_pb['ema20_c']
-  df_downtrends_pb = trends_with_pb(df_downtrends, is_larger=True)
-  df_downtrends_pb['type'] =  pd.cut(df_downtrends_pb['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
-  df_downtrends_pb['trend_support'] = df_downtrends_pb['ema20_o'] > df_downtrends_pb['ema20_c']
+  dfs_bull_channels = []
+  dfs_bear_channels = []
+  for i in range(11):
+    dfs_bull_channels.append({str(i): channels(df_uptrends, is_larger=True, pb_offset=i/10)})
+    dfs_bear_channels.append({str(i): channels(df_downtrends, is_larger=False, pb_offset=i/10)})
+
+
+#%%
+
+
+  # df_uptrends_pb_50['type'] =  pd.cut(df_uptrends_pb_50['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
+  # df_uptrends_pb_50['trend_support'] = df_uptrends_pb_50['ema20_o'] < df_uptrends_pb_50['ema20_c']
+  # df_downtrends_pb_50 = channels(df_downtrends, is_larger=False)
+  # df_downtrends_pb_50['type'] =  pd.cut(df_downtrends_pb_50['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
+  # df_downtrends_pb_50['trend_support'] = df_downtrends_pb_50['ema20_o'] > df_downtrends_pb_50['ema20_c']
 # df_uptrends_pb = df_uptrends.iloc[[0]].copy()
 #   last_combined_index = df_uptrends_pb.index[0]
 #   for i in range(1, len(df_uptrends)):

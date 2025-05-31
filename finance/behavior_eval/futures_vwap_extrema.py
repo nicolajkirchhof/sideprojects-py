@@ -16,7 +16,6 @@ import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import mplfinance as mpf
-from matplotlib import gridspec
 
 import finance.utils as utils
 
@@ -29,7 +28,7 @@ mpl.use('QtAgg')
 #%%
 symbols = ['IBDE40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
 symbol = symbols[0]
-for symbol in symbols:
+for symbol in symbols[3:]:
   #%% Create a directory
   directory_evals = f'N:/My Drive/Trading/Strategies/swing_vwap/{symbol}'
   directory_plots = f'N:/My Drive/Trading/Plots/swing_vwap/{symbol}'
@@ -50,10 +49,17 @@ for symbol in symbols:
   prior_day = first_day
   day_start = first_day + timedelta(days=1)
 
+  day_data = utils.trading_day_data.TradingDayData(symbol)
   #%%
   while day_start < last_day:
     #%%
-    day_data = utils.trading_day_data.TradingDayData(day_start, symbol)
+    day_data.update(day_start, prior_day)
+
+    if not day_data.has_sufficient_data():
+      print(f'Skipping day {day_start.date()} because of insufficient data')
+      day_start = day_start + timedelta(days=1)
+      continue
+      # raise(Exception('Insufficient data'))
 
     # Extrema algorithm
     # 1. Start with the o, h, c, l of the current day
@@ -249,14 +255,11 @@ for symbol in symbols:
       df_uptrends['trend_support'] = df_uptrends['ema20_o'] < df_uptrends['ema20_c']
       df_downtrends = pd.DataFrame(downtrends)
       df_downtrends['trend_support'] = df_downtrends['ema20_o'] > df_downtrends['ema20_c']
-#%% Candle pattern algorithms
+##%% Candle pattern algorithms
     # - Oii & iii pattern recognition for L-H and O-C
     # - Doji recognition
     # - High candle range change recognition for L-H and O-C
-    day_data.df_5m['lh'] = (day_data.df_5m.h - day_data.df_5m.l)
     day_data.df_5m.loc[day_data.df_5m['lh'] == 0, 'lh'] = 0.001
-
-    day_data.df_5m['oc'] = (day_data.df_5m.c - day_data.df_5m.o)
     day_data.df_5m.loc[day_data.df_5m['oc'] == 0, 'oc'] = 0.001
     day_data.df_5m['is_doji'] = day_data.df_5m.lh/2>day_data.df_5m.oc.abs()
     mean_atr_lh = day_data.df_5m.lh.mean()
@@ -276,7 +279,7 @@ for symbol in symbols:
     ts_is_high_oc = day_data.df_5m[day_data.df_5m.is_high_oc].index.tolist()
 
 
-    #%%
+    ##%%
     df_ohcl_extrema = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l'])]
     extrema_ohcl_aline = list(zip(df_ohcl_extrema.ts, df_ohcl_extrema.value))
     df_extrema2 = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l', 'dev25'])]
@@ -286,11 +289,12 @@ for symbol in symbols:
     # df_extrema4 = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l', 'dev4'])]
     # extrema4_aline = list(zip(df_extrema4.ts, df_extrema4.value))
 
-    vlines = dict(vlines=ts_oii+ts_is_high_lh+ts_is_high_oc, colors= ['indigo']*len(ts_oii)+['darkviolet']*len(ts_is_high_lh)+['violet']*len(ts_is_high_oc), linewidths=[0.4], linestyle=['--'])
+    vlines = dict(vlines=ts_is_high_lh+ts_is_high_oc, colors= ['darkviolet']*len(ts_is_high_lh)+['violet']*len(ts_is_high_oc),
+                  linewidths=[0.4], linestyle=['--'])
 
     pb_alines= []
     for pullback in pullbacks:
-      pb_alines.append([(pullback['start'], pullback['l']), (pullback['end'], pullback['l'])])
+      # pb_alines.append([(pullback['start'], pullback['l']), (pullback['end'], pullback['l'])])
       pb_alines.append([(pullback['start'], pullback['h']), (pullback['end'], pullback['h'])])
 
     ut_alines = []
@@ -301,16 +305,26 @@ for symbol in symbols:
     for idx, downtrend in df_downtrends[df_downtrends.bars > 2].iterrows():
       dt_alines.append([(downtrend['start'], downtrend['o']), (downtrend['end'], downtrend['c'])])
 
-    alines=dict(alines=[extrema_ohcl_aline, extrema2_aline, extrema3_aline,  *pb_alines, *ut_alines, *dt_alines],
-                colors=['purple', 'darkorange', 'cornflowerblue']+ ['darkblue'] * len(pb_alines) + ['forestgreen']*len(ut_alines)+['firebrick']*len(dt_alines), alpha=0.5, linewidths=[0.25], linestyle=['--']*4+['-'] * len(pb_alines))
+    oii_alines = []
+    for ts in ts_oii:
+      oii_start = day_data.df_5m[day_data.df_5m.index < ts].iloc[-2]
+      oii_alines.append([(oii_start.name, oii_start.l), (ts, oii_start.l)])
+      oii_alines.append([(oii_start.name, oii_start.h), (ts, oii_start.h)])
+
+    alines=dict(alines=[extrema_ohcl_aline, extrema2_aline, extrema3_aline,  *ut_alines, *dt_alines, *oii_alines],
+                colors=['purple', 'darkorange', 'cornflowerblue']+
+                       ['mediumblue']*len(ut_alines)+['mediumblue']*len(dt_alines) + ['deeppink']*len(oii_alines),
+                alpha=0.8, linewidths=[0.6],
+                linestyle=['--']*4+['-'] * len(ut_alines+dt_alines+oii_alines))
 
     utils.plots.daily_change_plot(day_data, alines, f'T {pullback_threshold:.2f}', vlines)
 
-    plt.show()
+    # plt.show()
     # %%
     date_str = day_data.day_start.strftime('%Y-%m-%d')
     metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": day_data.df_5m['VWAP3'], "uptrends": df_uptrends,
-                "downtrends": df_downtrends, "firstBars": day_data.df_5m[day_data.df_5m.index >= day_data.day_open][0:6]}
+                "downtrends": df_downtrends, "firstBars": day_data.df_5m[day_data.df_5m.index >= day_data.day_open][0:6],
+                "ts_oii": ts_oii, "ts_is_high_lh": ts_is_high_lh, "ts_is_high_oc": ts_is_high_oc}
     with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
       pickle.dump(metadata, f)
     plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save

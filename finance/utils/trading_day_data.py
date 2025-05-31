@@ -1,12 +1,13 @@
 import string
 from datetime import datetime, timedelta
 import numpy as np
+import pandas as pd
 
 from finance import utils
 
 
 class TradingDayData:
-  def __init__(self, day_start: datetime, symbol: string):
+  def __init__(self, symbol: string, min_future_data = timedelta(days=7), min_future_cache = None):
     """
     Initialize trading day data with start time and exchange settings
 
@@ -17,22 +18,35 @@ class TradingDayData:
     symbol: string
         The sybol to analyze
     """
+    self.min_future_data = min_future_data
+    self.min_future_cache = min_future_cache if min_future_cache is not None else min_future_data * 5
     self.symbol = symbol
-    self.day_start = day_start
     self.exchange = utils.influx.SYMBOLS[symbol]['EX']
+    self.df_5m_cache = pd.DataFrame()
+    self.df_day_cache = pd.DataFrame()
+    self.df_30m_cache = pd.DataFrame()
+    self.day_start = None
+    self.day_end = None
+    self.day_open = None
+    self.day_close = None
+    self.prior_day = None
+    self.last_saturday = None
 
+  def update(self, day_start, prior_day=None) -> None:
     # Calculate time boundaries
+    self.day_start = day_start
     self.day_end = day_start + self.exchange['Close'] + timedelta(hours=1)
     self.day_open = day_start + self.exchange['Open']
     self.day_close = day_start + self.exchange['Close']
-    self.prior_day = day_start - timedelta(days=1)
+    self.prior_day = prior_day if prior_day is not None else day_start - timedelta(days=1)
     self.last_saturday = self._get_last_saturday()
 
     # Store DataFrames
     self._process_dataframes()
 
     # Calculate candle data
-    self._calculate_candle_data()
+    if self.has_sufficient_data():
+      self._calculate_candle_data()
 
   def _get_last_saturday(self) -> datetime:
     """Get the last Saturday before day_start"""
@@ -43,23 +57,25 @@ class TradingDayData:
 
   def _process_dataframes(self) -> None:
     """Process and filter DataFrames for different time periods"""
-    df_5m_two_weeks, df_30m_two_weeks, df_day_two_weeks = utils.influx.get_5m_30m_day_date_range_with_indicators(self.day_start, self.day_start+timedelta(days=14), self.symbol)
     # Filter 5-minute data
-    self.df_5m = df_5m_two_weeks[
-      (df_5m_two_weeks.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
-      (df_5m_two_weeks.index <= self.day_end)
+    if self.df_day_cache.empty or self.df_day_cache.iloc[-1].name < self.day_start + self.min_future_data:
+      self.df_5m_cache, self.df_30m_cache, self.df_day_cache = utils.influx.get_5m_30m_day_date_range_with_indicators(
+        self.day_start, self.day_start+self.min_future_cache, self.symbol)
+    self.df_5m = self.df_5m_cache[
+      (self.df_5m_cache.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
+      (self.df_5m_cache.index <= self.day_end)
       ].copy()
 
     # Filter 30-minute data
-    self.df_30m = df_30m_two_weeks[
-      (df_30m_two_weeks.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
-      (df_30m_two_weeks.index <= self.day_end)
+    self.df_30m = self.df_30m_cache[
+      (self.df_30m_cache.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
+      (self.df_30m_cache.index <= self.day_end)
       ].copy()
 
     # Filter daily data
-    self.df_day = df_day_two_weeks[
-      (df_day_two_weeks.index >= self.day_start - timedelta(days=21)) &
-      (df_day_two_weeks.index <= self.day_start + timedelta(days=14))
+    self.df_day = self.df_day_cache[
+      (self.df_day_cache.index >= self.day_start - timedelta(days=21)) &
+      (self.df_day_cache.index <= self.day_start + timedelta(days=7))
       ]
 
     # Adjust day_open and day_close based on available data
@@ -69,24 +85,24 @@ class TradingDayData:
       self.day_close = self.df_5m.index.max()
 
     # Calculate period-specific candles
-    self.current_week_candle = df_5m_two_weeks[
-      (df_5m_two_weeks.index >= self.last_saturday) &
-      (df_5m_two_weeks.index <= self.prior_day + self.exchange['Close'])
+    self.current_week_candle = self.df_5m_cache[
+      (self.df_5m_cache.index >= self.last_saturday) &
+      (self.df_5m_cache.index <= self.prior_day + self.exchange['Close'])
       ]
 
-    self.prior_week_candle = df_5m_two_weeks[
-      (df_5m_two_weeks.index >= self.last_saturday - timedelta(days=7)) &
-      (df_5m_two_weeks.index <= self.last_saturday)
+    self.prior_week_candle = self.df_5m_cache[
+      (self.df_5m_cache.index >= self.last_saturday - timedelta(days=7)) &
+      (self.df_5m_cache.index <= self.last_saturday)
       ]
 
-    self.prior_day_candle = df_5m_two_weeks[
-      (df_5m_two_weeks.index >= self.prior_day + self.exchange['Open']) &
-      (df_5m_two_weeks.index <= self.prior_day + self.exchange['Close'])
+    self.prior_day_candle = self.df_5m_cache[
+      (self.df_5m_cache.index >= self.prior_day + self.exchange['Open']) &
+      (self.df_5m_cache.index <= self.prior_day + self.exchange['Close'])
       ]
 
-    self.overnight_candle = df_5m_two_weeks[
-      (df_5m_two_weeks.index >= self.day_start) &
-      (df_5m_two_weeks.index <= self.day_start + self.exchange['Open'] - timedelta(hours=1))
+    self.overnight_candle = self.df_5m_cache[
+      (self.df_5m_cache.index >= self.day_start) &
+      (self.df_5m_cache.index <= self.day_start + self.exchange['Open'] - timedelta(hours=1))
       ]
 
   def _calculate_candle_data(self) -> None:
