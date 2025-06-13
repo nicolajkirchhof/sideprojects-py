@@ -38,7 +38,8 @@ SYMBOLS = {'IBDE40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'SPX': {'EX': US_EXCHANGE, 'DB': DB_INDEX},
            'RUT': {'EX': US_EXCHANGE, 'DB': DB_INDEX},
            'INDU': {'EX': US_EXCHANGE, 'DB': DB_INDEX},
-           'EURUSD': {'EX': US_NY_EXCHANGE, 'DB': DB_FOREX}
+           'EURUSD': {'EX': US_NY_EXCHANGE, 'DB': DB_FOREX},
+           'USGOLD': {'EX': US_EXCHANGE, 'DB': DB_CFD}
            }
 
 
@@ -110,21 +111,5 @@ def sec_type_to_database_name(sec_type):
   return SEC_TYPE_DB_MAPPING[sec_type]
 
 def get_5m_30m_day_date_range_with_indicators(start, end, symbol, cache_offset = timedelta(days=30)):
-  df_5m = get_candles_range_aggregate(start-cache_offset, end, symbol, '5m')
-  df_day = df_5m.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
-  df_30m = df_5m.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
-  df_5m['20EMA'] = df_5m['c'].ewm(span=20, adjust=False).mean()
-  df_5m['200EMA'] = df_5m['c'].ewm(span=200, adjust=False).mean()
-  df_5m['VWAP3'] = (df_5m['c']+df_5m['h']+df_5m['l'])/3
-  df_30m['20EMA'] = df_30m['c'].ewm(span=20, adjust=False).mean()
-  df_day['20EMA'] = df_day['c'].ewm(span=20, adjust=False).mean()
-  df_5m['lh'] = (df_5m.h - df_5m.l)
-  df_30m['lh'] = (df_30m.h - df_30m.l)
-  df_day['lh'] = (df_day.h - df_day.l)
-  df_5m['oc'] = (df_5m.c - df_5m.o)
-  df_30m['oc'] = (df_30m.c - df_30m.o)
-  df_day['oc'] = (df_day.c - df_day.o)
-  df_5m.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
-  df_30m.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
-  df_day.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+
   return df_5m, df_30m, df_day

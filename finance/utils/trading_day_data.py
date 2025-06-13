@@ -59,17 +59,45 @@ class TradingDayData:
     """Process and filter DataFrames for different time periods"""
     # Filter 5-minute data
     if self.df_day_cache.empty or self.df_day_cache.iloc[-1].name < self.day_start + self.min_future_data:
-      self.df_5m_cache, self.df_30m_cache, self.df_day_cache = utils.influx.get_5m_30m_day_date_range_with_indicators(
-        self.day_start, self.day_start+self.min_future_cache, self.symbol)
+      self.df_5m_cache = utils.influx.get_candles_range_aggregate(self.day_start - timedelta(days=30), self.day_start+self.min_future_cache, self.symbol, '5m')
+      self.df_5m_cache['VWAP3'] = (self.df_5m_cache['c']+self.df_5m_cache['h']+self.df_5m_cache['l'])/3
+      self.df_5m_cache['20EMA'] = self.df_5m_cache['VWAP3'].ewm(span=20, adjust=False).mean()
+      self.df_5m_cache['200EMA'] = self.df_5m_cache['VWAP3'].ewm(span=200, adjust=False).mean()
+      self.df_5m_cache['lh'] = (self.df_5m_cache.h - self.df_5m_cache.l)
+      self.df_5m_cache['oc'] = (self.df_5m_cache.c - self.df_5m_cache.o)
+      self.df_5m_cache.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
+
+      self.df_30m_cache = self.df_5m_cache.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
+      self.df_30m_cache['VWAP3'] = (self.df_30m_cache['c']+self.df_30m_cache['h']+self.df_30m_cache['l'])/3
+      self.df_30m_cache['lh'] = (self.df_30m_cache.h - self.df_30m_cache.l)
+      self.df_30m_cache['20EMA'] = self.df_30m_cache['VWAP3'].ewm(span=20, adjust=False).mean()
+      self.df_30m_cache['oc'] = (self.df_30m_cache.c - self.df_30m_cache.o)
+      self.df_30m_cache.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+
+      df_day_all = self.df_5m_cache[(self.df_5m_cache.index.time >= (self.day_start + self.exchange['Open']).time()) & (self.df_5m_cache.index.time <= (self.day_start + self.exchange['Close']).time())].copy()
+      self.df_day_cache = df_day_all.resample('D').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
+      self.df_day_cache['VWAP3'] = (self.df_day_cache['c']+self.df_day_cache['h']+self.df_day_cache['l'])/3
+      self.df_day_cache['20EMA'] = self.df_day_cache['VWAP3'].ewm(span=20, adjust=False).mean()
+      self.df_day_cache['lh'] = (self.df_day_cache.h - self.df_day_cache.l)
+      self.df_day_cache['oc'] = (self.df_day_cache.c - self.df_day_cache.o)
+      self.df_day_cache.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
     self.df_5m = self.df_5m_cache[
       (self.df_5m_cache.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
       (self.df_5m_cache.index <= self.day_end)
+      ].copy()
+    self.df_5m_ad = self.df_5m_cache[
+      (self.df_5m_cache.index >= self.day_start) &
+      (self.df_5m_cache.index <= self.day_start + timedelta(days=1))
       ].copy()
 
     # Filter 30-minute data
     self.df_30m = self.df_30m_cache[
       (self.df_30m_cache.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
       (self.df_30m_cache.index <= self.day_end)
+      ].copy()
+    self.df_30m_ad = self.df_30m_cache[
+      (self.df_30m_cache.index >= self.day_start) &
+      (self.df_30m_cache.index <= self.day_start + timedelta(days=1))
       ].copy()
 
     # Filter daily data
