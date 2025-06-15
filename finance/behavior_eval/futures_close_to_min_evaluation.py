@@ -1,5 +1,5 @@
 # %%
-import datetime
+from datetime import time
 import glob
 
 import dateutil
@@ -58,8 +58,20 @@ df_all = pd.concat(results)
 
 #%%
 
-df_all.groupby(['time']).agg({'dist': ['sum', 'mean', 'median', 'count']})
-
-
+df_all.groupby(['time']).agg({'dist': ['mean', 'median', lambda x: x.quantile(0.75), lambda x: x.quantile(0.25) ]}).plot(kind='bar')
 
 plt.show()
+
+#%%
+df_all.groupby(['minT']).agg({'dist': ['mean', 'median', lambda x: x.quantile(0.75), lambda x: x.quantile(0.25) ]}).plot(kind='bar')
+
+plt.show()
+
+#%%
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(24, 14), tight_layout=True)
+df_all[df_all.minT == time(13, 0)].groupby(['time']).agg(
+  {'dist': ['mean', 'median', lambda x: x.quantile(0.75), lambda x: x.quantile(0.25) ]}).plot(kind='bar', ax=ax1)
+
+df_all[df_all.minT == time(13, 0)].groupby(['time']).agg({'dist': ['count']}).plot(kind='bar', ax=ax2)
+plt.show()
+

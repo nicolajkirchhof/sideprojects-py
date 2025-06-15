@@ -15,7 +15,6 @@ import mplfinance as mpf
 from matplotlib.pyplot import tight_layout
 
 from finance import utils
-import pytz
 
 pd.options.plotting.backend = "matplotlib"
 pd.set_option("display.max_columns", None)  # None means "no limit"
@@ -45,9 +44,9 @@ for symbol in symbols:
   symbol_def = utils.influx.SYMBOLS[symbol]
   tz = symbol_def['EX']['TZ']
 
-  first_day = tz.localize(dateutil.parser.parse('2016-01-01T00:00:00'))
-  # last_day = tz.localize(dateutil.parser.parse('2016-03-19T00:00:00'))
-  last_day = tz.localize(dateutil.parser.parse('2025-04-09T00:00:00'))
+  first_day = dateutil.parser.parse('2016-01-01T00:00:00').replace(tzinfo=tz)
+  # last_day = dateutil.parser.parse('2016-03-19T00:00:00').replace(tzinfo=tz)
+  last_day = dateutil.parser.parse('2025-04-09T00:00:00').replace(tzinfo=tz)
   df = utils.influx.get_candles_range_aggregate(first_day, last_day, symbol, '1d')
   df['weekday'] = df.index.day_name()
   df['year'] = df.index.year

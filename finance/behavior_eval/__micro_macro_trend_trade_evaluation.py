@@ -46,11 +46,11 @@ for symbol in symbols:
 
   dfs_ref_range = []
   dfs_closing = []
-  first_day = tz.localize(dateutil.parser.parse('2022-01-03T00:00:00'))
+  first_day = dateutil.parser.parse('2022-01-03T00:00:00').replace(tzinfo=tz)
 
   # first_day_from_file = utils.plots.last_date_from_files(directory)
   # if first_day_from_file is not None:
-  #   first_day = tz.localize(first_day_from_file)
+  #   first_day = first_day_from_file.replace(tzinfo=tz)
 
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)

@@ -41,8 +41,8 @@ for symbol in symbols[1:]:
 
   dfs_ref_range = []
   dfs_closing = []
-  first_day = tz.localize(dateutil.parser.parse('2023-01-02T00:00:00'))
-  last_day = tz.localize(dateutil.parser.parse('2025-03-06T00:00:00'))
+  first_day = dateutil.parser.parse('2023-01-02T00:00:00').replace(tzinfo=tz)
+  last_day = dateutil.parser.parse('2025-03-06T00:00:00').replace(tzinfo=tz)
   day_start = first_day
   prior_close = None
   df_raw = None

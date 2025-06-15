@@ -45,8 +45,8 @@ symbol_def = utils.influx.SYMBOLS[symbol]
 tz = symbol_def['EX']['TZ']
 
 #%%
-first_day = tz.localize(dateutil.parser.parse('2022-01-01T00:00:00'))
-last_day = tz.localize(dateutil.parser.parse('2025-03-19T00:00:00'))
+first_day = dateutil.parser.parse('2022-01-01T00:00:00').replace(tzinfo=tz)
+last_day = dateutil.parser.parse('2025-03-19T00:00:00').replace(tzinfo=tz)
 df = utils.influx.get_candles_range_aggregate(first_day, last_day, symbol, '30m')
 
 # Group data by the date part of the index

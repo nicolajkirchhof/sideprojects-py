@@ -1,5 +1,6 @@
 #%%
 import datetime
+from zoneinfo import ZoneInfo
 
 import dateutil
 import numpy as np
@@ -16,7 +17,6 @@ import matplotlib.ticker as mticker
 
 from finance.utils.pct import percentage_change
 import finplot as fplt
-import pytz
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, mean_squared_error, r2_score
@@ -46,9 +46,9 @@ futures_names = [x[0] for x in futures.raw['series'][0]['values']]
 print('Futures: ', futures_names)
 #%%
 symbol = 'FDAX'
-tz = pytz.timezone('Europe/Berlin')
+tz = ZoneInfo('Europe/Berlin')
 # symbol = 'SPX'
-# tz = pytz.timezone('EST')
+# tz = ZoneInfo('EST')
 
 indicator_range_start = datetime.timedelta(hours=9, minutes=30)
 indicator_range_end = datetime.timedelta(hours=10, minutes=30)
@@ -62,10 +62,10 @@ def get_candles_range(start, end, symbol, group_by_time=None):
 
 dfs_ref_range = []
 dfs_closing = []
-first_day = tz.localize(dateutil.parser.parse('2020-01-01T00:00:00'))
-last_day = tz.localize(dateutil.parser.parse('2025-02-07T00:00:00'))
+first_day = dateutil.parser.parse('2020-01-01T00:00:00').replace(tzinfo=tz)
+last_day = dateutil.parser.parse('2025-02-07T00:00:00').replace(tzinfo=tz)
 while first_day < last_day:
-  # day_end = dateutil.parser.parse('2025-02-01T00:00:00').replace(tzinfo=pytz.timezone('Europe/Berlin'))
+  # day_end = dateutil.parser.parse('2025-02-01T00:00:00').replace(tzinfo=ZoneInfo('Europe/Berlin'))
   day_end = first_day + datetime.timedelta(days=1)
   # get the following data for daily assignment
   # overnight range 0-7:00

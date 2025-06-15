@@ -39,9 +39,9 @@ for symbol in symbols:
   symbol_def = utils.influx.SYMBOLS[symbol]
   tz = symbol_def['EX']['TZ']
 
-  first_day = tz.localize(dateutil.parser.parse('2022-01-02T00:00:00'))
-  first_day = tz.localize(dateutil.parser.parse('2024-01-01T00:00:00'))
-  last_day = tz.localize(dateutil.parser.parse('2025-03-20T00:00:00'))
+  first_day = dateutil.parser.parse('2022-01-02T00:00:00').replace(tzinfo=tz)
+  first_day = dateutil.parser.parse('2024-01-01T00:00:00').replace(tzinfo=tz)
+  last_day = dateutil.parser.parse('2025-03-20T00:00:00').replace(tzinfo=tz)
   day_start = first_day
   prior_close = None
   dfs = []

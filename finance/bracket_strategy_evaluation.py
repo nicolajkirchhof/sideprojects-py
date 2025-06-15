@@ -70,8 +70,8 @@ def get_candles_range(start, end, symbol, group_by_time=None):
   return base_query + f' group by time({group_by_time})'
 
 #%%
-first_day = tz.localize(dateutil.parser.parse('2023-01-01T00:00:00'))
-last_day = tz.localize(dateutil.parser.parse('2025-02-07T00:00:00'))
+first_day = dateutil.parser.parse('2023-01-01T00:00:00').replace(tzinfo=tz)
+last_day = dateutil.parser.parse('2025-02-07T00:00:00').replace(tzinfo=tz)
 
 df_day = index_client_df.query(get_candles_range(first_day, last_day, symbol, '1d'))
 df_day_clean = df_day[symbol].tz_convert(tz).dropna()
@@ -106,7 +106,7 @@ first_date = dateutil.parser.parse(first_date_str)
 last_date = dateutil.parser.parse(last_date_str)
 num_days = (last_date - first_date).days
 
-# last_day = tz.localize(dateutil.parser.parse('2025-02-07T00:00:00'))
+# last_day = dateutil.parser.parse('2025-02-07T00:00:00').replace(tzinfo=tz)
 # while first_day < last_day:
 while True:
   selected_day_dist = random.randint(0, num_days)

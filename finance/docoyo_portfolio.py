@@ -27,7 +27,7 @@ for etf_symbol in df_etfs['symbol']:
   filename = f'finance/y_finance_data/{etf_symbol}.csv'
   if os.path.isfile(filename):
     etf_data[etf_symbol] = pd.read_csv(filename)
-    etf_data[etf_symbol]['Date'] =  pd.to_datetime(etf_data[etf_symbol]['Date'], utc=True).dt.tz_localize(None)
+    etf_data[etf_symbol]['Date'] =  pd.to_datetime(etf_data[etf_symbol]['Date'], utc=True).dt.None.replace(tzinfo=tz)
     # etf_data[etf_symbol] = etf_data[etf_symbol].set_index('Date').groupby(pd.Grouper(freq='7D', origin='start_day')).mean()
     etf_data[etf_symbol] = etf_data[etf_symbol].set_index('Date').groupby(pd.Grouper(freq='7D', origin='epoch')).mean().reset_index()
     continue

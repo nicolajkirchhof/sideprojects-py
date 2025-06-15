@@ -43,12 +43,14 @@ mpl.use('QtAgg')
 
 
 # %%
-symbols = ['IBDE40', 'IBES35', 'IBFR40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225']
+symbols = ['IBDE40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225', 'USGOLD' ]
 symbol = symbols[0]
-for symbol in symbols:
+for symbol in symbols[4:]:
   #%% Create a directory
-  directory_evals = f'N:/My Drive/Trading/Strategies/swing_vwap/{symbol}'
-  directory_plots = f'N:/My Drive/Trading/Plots/swing_vwap/{symbol}_eval'
+  ad = True
+  ad_str = '_ad' if ad else ''
+  directory_evals = f'N:/My Drive/Trading/Strategies/swing_vwap{ad_str}/{symbol}'
+  directory_plots = f'N:/My Drive/Trading/Plots/swing_vwap{ad_str}/{symbol}_eval'
   os.makedirs(directory_plots, exist_ok=True)
 
   files = glob.glob(f'{directory_evals}/*.pkl')
@@ -63,11 +65,12 @@ for symbol in symbols:
       data['VWAP_PCT'] = data['VWAP'].apply(lambda x: utils.pct.percentage_change(x, data['VWAP'].iat[0]))
       data['VWAP_PCT'].index = data['VWAP_PCT'].index.time
       day_change = data['VWAP_PCT'].iat[-1]
-      prior_day_change = np.NaN if i < 1 else utils.pct.percentage_change(results[i-1]['VWAP'].iat[-1], data['VWAP'].iat[-1])
+      prior_day_change = np.nan if i < 1 else utils.pct.percentage_change(results[i-1]['VWAP'].iat[-1], data['VWAP'].iat[-1])
       data['day_type'] = 'neutral' if abs(day_change) < 0.5 else 'up' if day_change > 0 else 'down'
       data['prior_day_change'] = prior_day_change
       data['day_type_prior'] = 'neutral' if abs(prior_day_change) < 0.5 else 'up' if prior_day_change > 0 else 'down'
       data['day_change'] = prior_day_change
+      data['first_bars'] = data['firstBars']
       results.append(data)
 
   #%%
@@ -76,6 +79,8 @@ for symbol in symbols:
     df['date'] = df.index.date
     df['time'] = df.index.time
     return df
+
+
 #%%
   # Evaluate the time of the extrema
   extrema = [data['extrema'] for data in results]
@@ -100,6 +105,44 @@ for symbol in symbols:
 
   df_extrema_d_25 = df_extrema[df_extrema.type.isin(['dev25'])].copy()
   df_extrema_d_30 = df_extrema[df_extrema.type.isin(['dev30'])].copy()
+
+#%%
+  # Evaluate the percentage points from the first bar following the first trend in contrast to the first bar
+  df_first_bars = pd.concat([result['first_bars'].iloc[[0]].copy() for result in results])
+  df_next_extrema = pd.concat([df_extrema_lhd[df_extrema_lhd.index > row[0]].iloc[[0]] for row in df_first_bars.iterrows()])
+
+  df_first_bar_stats = pd.DataFrame([{
+                          "date": first_bar[0],
+                          "weekday": first_bar[0].weekday(),
+                          "weekday_name": first_bar[0].strftime('%a'),
+                          "pct_first_oc": utils.pct.percentage_change(first_bar[1].o, first_bar[1].c),
+                         "pct_first_lh": utils.pct.percentage_change(first_bar[1].l, first_bar[1].h),
+                         "in_trend": first_bar[1].o < first_bar[1].c < next_extrema[1].value or first_bar[1].o > first_bar[1].c < next_extrema[1].value,
+                         "first_bar_positive":first_bar[1].o < first_bar[1].c,
+                         "pct_move": utils.pct.percentage_change(first_bar[1].c, next_extrema[1].value),
+                          "length_move": next_extrema[0] - first_bar[0]
+                         } for first_bar, next_extrema in zip(df_first_bars.iterrows(), df_next_extrema.iterrows())])
+#%%
+  # Create figure with two subplots
+  fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(24, 14), tight_layout=True)
+
+  df_first_bar_stats.groupby(['first_bar_positive', 'in_trend']).agg({'pct_move': [
+    'mean',
+    ('percentile_25', lambda x: np.percentile(x, 25)),
+    ('percentile_75', lambda x: np.percentile(x, 75)),
+  ]}).plot(kind='bar', ax = ax1)
+  ax1.set_title(f'{symbol} First Positive and following trend pct\n(Mean, 25th Percentile, 75th Percentile)')
+
+  df_first_bar_stats.groupby(['first_bar_positive', 'in_trend']).agg({'pct_move': [ 'count' ]}).plot(kind='bar', ax = ax2)
+  ax2.set_title(f'{symbol} First Positive and following trend number of occurrences')
+
+  for ax in [ax1, ax2]:
+    for container in ax.containers:
+      ax.bar_label(container, fmt='%.2f', padding=3)
+
+  # plt.show()
+  plt.savefig(f'{directory_plots}/{symbol}_FirstBarAndTrend.png', bbox_inches='tight')  # High-quality save
+  plt.close()
 
   #%% Calculate channels
   def channels(df, is_larger = True, pb_offset = 0.5):
@@ -221,9 +264,9 @@ for symbol in symbols:
   plot_type_percentages(df_extrema_lh[~df_extrema_lh.is_first_of_day], 'Second of Day')
   plt.savefig(f'{directory_plots}/{symbol}_SecondOfDay.png', bbox_inches='tight')  # High-quality save
   plt.close()
-  plot_type_percentages(df_extrema_d_25, 'Deviation 25%')
-  plt.savefig(f'{directory_plots}/{symbol}_Deviations_25.png', bbox_inches='tight')  # High-quality save
-  plt.close()
+  # plot_type_percentages(df_extrema_d_25, 'Deviation 25%')
+  # plt.savefig(f'{directory_plots}/{symbol}_Deviations_25.png', bbox_inches='tight')  # High-quality save
+  # plt.close()
   plot_type_percentages(df_extrema_d_30, 'Deviation 30%')
   plt.savefig(f'{directory_plots}/{symbol}_Deviations_30.png', bbox_inches='tight')  # High-quality save
   plt.close()
@@ -240,13 +283,13 @@ for symbol in symbols:
   plt.savefig(f'{directory_plots}/{symbol}_DowntrendsAgainstTrend.png', bbox_inches='tight')  # High-quality save
   plt.close()
 
-  plot_type_percentages(df_downtrends_pb, 'Downtrends Pullback')
-  plt.savefig(f'{directory_plots}/{symbol}_Downtrends_Pullback.png', bbox_inches='tight')  # High-quality save
-  plt.close()
-
-  plot_type_percentages(df_downtrends_pb, 'Uptrends Pullback')
-  plt.savefig(f'{directory_plots}/{symbol}_Uptrends_Pullback.png', bbox_inches='tight')  # High-quality save
-  plt.close()
+  # plot_type_percentages(df_downtrends_pb, 'Downtrends Pullback')
+  # plt.savefig(f'{directory_plots}/{symbol}_Downtrends_Pullback.png', bbox_inches='tight')  # High-quality save
+  # plt.close()
+  #
+  # plot_type_percentages(df_downtrends_pb, 'Uptrends Pullback')
+  # plt.savefig(f'{directory_plots}/{symbol}_Uptrends_Pullback.png', bbox_inches='tight')  # High-quality save
+  # plt.close()
 
   plot_type_percentages(df_uptrends, 'Uptrends')
   plt.savefig(f'{directory_plots}/{symbol}_Uptrends.png', bbox_inches='tight')  # High-quality save

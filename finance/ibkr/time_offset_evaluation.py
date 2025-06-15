@@ -1,4 +1,5 @@
 from datetime import timedelta, datetime
+from zoneinfo import ZoneInfo
 
 from dateutil import parser
 import numpy as np
@@ -16,7 +17,6 @@ import matplotlib.ticker as mticker
 import mplfinance as mpf
 
 import finplot as fplt
-import pytz
 
 import finance.utils as utils
 from finance.utils.influx import DB_CFD, DB_INDEX, DB_FOREX
@@ -31,21 +31,21 @@ mpl.use('QtAgg')
 influx_client_df, influx_client = utils.influx.get_influx_clients()
 
 
-de_exchange = {'TZ':pytz.timezone('Europe/Berlin'), 'Open': timedelta(hours=9), 'Close': timedelta(hours=17, minutes=30), 'PostClose': timedelta(hours=22), 'PreOpen': timedelta(hours=8)}
-gb_exchange = {'TZ':pytz.timezone('Europe/London'), 'Open': timedelta(hours=8), 'Close': timedelta(hours=16, minutes=30), 'PostClose': timedelta(hours=17), 'PreOpen': timedelta(hours=4, minutes=30)}
-us_exchange = {'TZ':pytz.timezone('America/Chicago'), 'Open': timedelta(hours=8), 'Close': timedelta(hours=16, minutes=30), 'PostClose': timedelta(hours=17), 'PreOpen': timedelta(hours=4, minutes=30)}
-jp_exchange = {'TZ':pytz.timezone('Asia/Tokyo'), 'Open': timedelta(hours=8, minutes=45), 'Close': timedelta(hours=15, minutes=45), 'PostClose': timedelta(hours=30), 'PreOpen': timedelta(hours=8, minutes=45)}
-hk_exchange = {'TZ':pytz.timezone('Asia/Hong_Kong'), 'Open': timedelta(hours=9, minutes=30), 'Close': timedelta(hours=16, minutes=0), 'PostClose': timedelta(hours=26), 'PreOpen': timedelta(hours=9, minutes=30)}
-au_exchange = {'TZ':pytz.timezone('Australia/Sydney'), 'Open': timedelta(hours=10, minutes=0), 'Close': timedelta(hours=16, minutes=0), 'PostClose': timedelta(hours=19), 'PreOpen': timedelta(hours=7, minutes=0)}
+de_exchange = {'TZ':ZoneInfo('Europe/Berlin'), 'Open': timedelta(hours=9), 'Close': timedelta(hours=17, minutes=30), 'PostClose': timedelta(hours=22), 'PreOpen': timedelta(hours=8)}
+gb_exchange = {'TZ':ZoneInfo('Europe/London'), 'Open': timedelta(hours=8), 'Close': timedelta(hours=16, minutes=30), 'PostClose': timedelta(hours=17), 'PreOpen': timedelta(hours=4, minutes=30)}
+us_exchange = {'TZ':ZoneInfo('America/Chicago'), 'Open': timedelta(hours=8), 'Close': timedelta(hours=16, minutes=30), 'PostClose': timedelta(hours=17), 'PreOpen': timedelta(hours=4, minutes=30)}
+jp_exchange = {'TZ':ZoneInfo('Asia/Tokyo'), 'Open': timedelta(hours=8, minutes=45), 'Close': timedelta(hours=15, minutes=45), 'PostClose': timedelta(hours=30), 'PreOpen': timedelta(hours=8, minutes=45)}
+hk_exchange = {'TZ':ZoneInfo('Asia/Hong_Kong'), 'Open': timedelta(hours=9, minutes=30), 'Close': timedelta(hours=16, minutes=0), 'PostClose': timedelta(hours=26), 'PreOpen': timedelta(hours=9, minutes=30)}
+au_exchange = {'TZ':ZoneInfo('Australia/Sydney'), 'Open': timedelta(hours=10, minutes=0), 'Close': timedelta(hours=16, minutes=0), 'PostClose': timedelta(hours=19), 'PreOpen': timedelta(hours=7, minutes=0)}
 exchanges = {'DE': de_exchange, 'GB': gb_exchange, 'US': us_exchange, 'JP': jp_exchange, 'HK': hk_exchange}
 
 exchange_mapping = {'IBDE40': 'DE', 'IBNL25':'DE', 'IBCH20': 'DE', 'IBES35':'DE', 'IBEU50':'DE', 'IBFR40':'DE',
                     'IBGB100':'GB', 'IBUS30':'US', 'IBUS500':'US', 'IBUST100':'US', 'IBJP225': 'JP', 'IBHK50': 'HK',
                     'IBAU200': 'AU'}
 #%%
-tz = pytz.utc
+tz = ZoneInfo('UTC')
 # Create a directory
-# tz = pytz.timezone('EST')
+# tz = ZoneInfo('EST')
 symbol = 'EURGBP'
 # db = DB_CFD
 # db = DB_INDEX
@@ -54,10 +54,10 @@ db = DB_FOREX
 dfs_ref_range = []
 dfs_closing = []
 
-test_day_feb = tz.localize(parser.parse('2024-02-01T00:00:00'))
-test_day_aug = tz.localize(parser.parse('2024-05-08T00:00:00'))
-test_day_oct = tz.localize(parser.parse('2024-10-08T00:00:00'))
-test_day_nov = tz.localize(parser.parse('2024-11-08T00:00:00'))
+test_day_feb = parser.parse('2024-02-01T00:00:00').replace(tzinfo=tz)
+test_day_aug = parser.parse('2024-05-08T00:00:00').replace(tzinfo=tz)
+test_day_oct = parser.parse('2024-10-08T00:00:00').replace(tzinfo=tz)
+test_day_nov = parser.parse('2024-11-08T00:00:00').replace(tzinfo=tz)
 ##%%
 
 df_feb = influx_client_df.query(utils.influx.get_candles_range_aggregate_query(test_day_feb, test_day_feb+timedelta(days=1), symbol, '1h'), database=db)[symbol]
@@ -67,13 +67,13 @@ df_aug = influx_client_df.query(utils.influx.get_candles_range_aggregate_query(t
 
 #%%
 plt.close()
-# tz = pytz.timezone('Asia/Tokyo')
-# tz = pytz.timezone('Asia/Hong_Kong')
-# tz = pytz.timezone('Australia/Sydney')
-# tz = pytz.timezone('Europe/Berlin')
-# tz = pytz.timezone('Europe/London')
-# tz = pytz.timezone('America/Chicago')
-tz = pytz.timezone('America/New_York')
+# tz = ZoneInfo('Asia/Tokyo')
+# tz = ZoneInfo('Asia/Hong_Kong')
+# tz = ZoneInfo('Australia/Sydney')
+# tz = ZoneInfo('Europe/Berlin')
+# tz = ZoneInfo('Europe/London')
+# tz = ZoneInfo('America/Chicago')
+tz = ZoneInfo('America/New_York')
 # df = df_feb
 # df = df_aug
 # df = df_feb.tz_convert(tz)

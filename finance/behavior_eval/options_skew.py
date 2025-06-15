@@ -35,7 +35,7 @@ mpl.use('QtAgg')
 # %%
 selected_columns = ['Date','Symbol','Expiry','Right','Strike','Pos','P/L','Last','Price','Mult']
 df_ref = pd.read_csv('finance/_data/Options Strategies - NoonIronButterfly.csv', parse_dates=['Date'], usecols=selected_columns)
-df_ref['Date'] = df_ref['Date'].dt.tz_localize(pytz.timezone('Europe/Berlin'))
+df_ref['Date'] = df_ref['Date'].dt.pytz.timezone('Europe/Berlin').replace(tzinfo=tz)
 df_ref.set_index('Date', inplace=True)
 
 #%%

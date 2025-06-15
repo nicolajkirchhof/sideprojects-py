@@ -1,11 +1,11 @@
 # %%
 # from __future__ import (absolute_import, division, print_function, unicode_literals)
-import pytz
+from zoneinfo import ZoneInfo
+
 from dateutil import parser
 # from ib_async import ib
 import ib_async as ib
 # util.startLoop()  # uncomment this line when in a notebook
-
 
 import pandas as pd
 
@@ -101,7 +101,7 @@ for future in futures:
       c_last = influx_client_df.query(f'select last("c") from {contract_to_fieldname(contract)}',
                                      database=database_lookup[contract.secType])
       if c_last:
-        current_date = pytz.utc.localize(pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime())
+        current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime().replace(tzinfo=ZoneInfo('UTC'))
       else:
         current_date = startDateTime
       while current_date < endDateTime:
