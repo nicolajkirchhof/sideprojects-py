@@ -16,6 +16,8 @@ import matplotlib.ticker as mticker
 import mplfinance as mpf
 import pickle
 import numpy as np
+import humanize
+
 
 from matplotlib.pyplot import tight_layout
 
@@ -45,12 +47,12 @@ mpl.use('QtAgg')
 # %%
 symbols = ['IBDE40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225', 'USGOLD' ]
 symbol = symbols[0]
-for symbol in symbols[4:]:
+for symbol in symbols:
   #%% Create a directory
   ad = True
   ad_str = '_ad' if ad else ''
   directory_evals = f'N:/My Drive/Trading/Strategies/swing_vwap{ad_str}/{symbol}'
-  directory_plots = f'N:/My Drive/Trading/Plots/swing_vwap{ad_str}/{symbol}_eval'
+  directory_plots: str = f'N:/My Drive/Trading/Plots/swing_vwap{ad_str}/{symbol}_eval'
   os.makedirs(directory_plots, exist_ok=True)
 
   files = glob.glob(f'{directory_evals}/*.pkl')
@@ -71,6 +73,7 @@ for symbol in symbols[4:]:
       data['day_type_prior'] = 'neutral' if abs(prior_day_change) < 0.5 else 'up' if prior_day_change > 0 else 'down'
       data['day_change'] = prior_day_change
       data['first_bars'] = data['firstBars']
+      data['df_bracket_moves']['gap'] = 0 if np.isnan(prior_day_change) else prior_day_change
       results.append(data)
 
   #%%
@@ -103,47 +106,135 @@ for symbol in symbols[4:]:
   df_extrema_lh = df_extrema[df_extrema.type.isin(['l', 'h'])].copy()
   df_extrema_lh['is_first_of_day'] = df_extrema_lh.groupby('date')['time'].transform('first') == df_extrema_lh['time']
 
-  df_extrema_d_25 = df_extrema[df_extrema.type.isin(['dev25'])].copy()
   df_extrema_d_30 = df_extrema[df_extrema.type.isin(['dev30'])].copy()
 
 #%%
-  # Evaluate the percentage points from the first bar following the first trend in contrast to the first bar
-  df_first_bars = pd.concat([result['first_bars'].iloc[[0]].copy() for result in results])
-  df_next_extrema = pd.concat([df_extrema_lhd[df_extrema_lhd.index > row[0]].iloc[[0]] for row in df_first_bars.iterrows()])
+  df_candle_moves = pd.concat([data['df_bracket_moves'] for data in results])
+  df_candle_moves.set_index('ts', inplace=True)
+  df_candle_moves['time'] = df_candle_moves.index.time
 
-  df_first_bar_stats = pd.DataFrame([{
-                          "date": first_bar[0],
-                          "weekday": first_bar[0].weekday(),
-                          "weekday_name": first_bar[0].strftime('%a'),
-                          "pct_first_oc": utils.pct.percentage_change(first_bar[1].o, first_bar[1].c),
-                         "pct_first_lh": utils.pct.percentage_change(first_bar[1].l, first_bar[1].h),
-                         "in_trend": first_bar[1].o < first_bar[1].c < next_extrema[1].value or first_bar[1].o > first_bar[1].c < next_extrema[1].value,
-                         "first_bar_positive":first_bar[1].o < first_bar[1].c,
-                         "pct_move": utils.pct.percentage_change(first_bar[1].c, next_extrema[1].value),
-                          "length_move": next_extrema[0] - first_bar[0]
-                         } for first_bar, next_extrema in zip(df_first_bars.iterrows(), df_next_extrema.iterrows())])
 #%%
-  # Create figure with two subplots
-  fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(24, 14), tight_layout=True)
+  def format_axes(ax):
+    for row in ax:
+      for a in row:
+        labels = [label.get_text().replace('True', 'T').replace('False', 'F') for label in a.get_xticklabels()]
+        a.set_xticklabels(labels, rotation=0)
+        a.legend(
+          loc='lower center',
+          bbox_to_anchor=(0.5, 0.0),
+          ncol=3,  # Number of columns
+          columnspacing=1.0,  # Space between columns
+          frameon=True,  # Show frame
+        )
 
-  df_first_bar_stats.groupby(['first_bar_positive', 'in_trend']).agg({'pct_move': [
-    'mean',
-    ('percentile_25', lambda x: np.percentile(x, 25)),
-    ('percentile_75', lambda x: np.percentile(x, 75)),
-  ]}).plot(kind='bar', ax = ax1)
-  ax1.set_title(f'{symbol} First Positive and following trend pct\n(Mean, 25th Percentile, 75th Percentile)')
+        for container in a.containers:
+          a.bar_label(container, fmt='%.2f', padding=3)
 
-  df_first_bar_stats.groupby(['first_bar_positive', 'in_trend']).agg({'pct_move': [ 'count' ]}).plot(kind='bar', ax = ax2)
-  ax2.set_title(f'{symbol} First Positive and following trend number of occurrences')
+#%%
+  time = df_candle_moves.time.unique()[0]
+  candle_move_stats = []
+  for time in df_candle_moves.time.unique():
+    #%%
+    df_candle = df_candle_moves[df_candle_moves.index.time == time]
+    df_candle.to_csv(f'{directory_plots}/{symbol}_{time.strftime("%H_%M")}_data.csv')
 
-  for ax in [ax1, ax2]:
-    for container in ax.containers:
-      ax.bar_label(container, fmt='%.2f', padding=3)
+    fig, ax  = plt.subplots(2, 3, figsize=(19, 11))
+
+    stats =[ 'mean', ('percentile_25', lambda x: np.nanpercentile(x, 25)), ('percentile_75', lambda x: np.nanpercentile(x, 75)) ]
+    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': stats}).plot(kind='bar', ax = ax[0, 0])
+    ax[0,0].set_title(f'Pts move stats')
+    fig.suptitle(f'{symbol} {time}')
+
+    all_count = len(df_candle)
+    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': [ 'count', ]}).plot(kind='bar', ax = ax[0, 1])
+    ax[0,1].set_title(f'Counts')
+    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': [ ('pts', lambda x: len(x)*100/all_count), ]}).plot(kind='bar', ax = ax[1, 1])
+    ax[1,1].set_title(f'Counts PCT')
+    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': [ ('abs_sum', lambda x: np.sum(np.abs(x))) ],
+                                         'candle_atr_pts': [ ('abs_sum', lambda x: np.sum(np.abs(x))) ]
+                                         }).plot(kind='bar', ax = ax[1, 0])
+
+    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'sl_pts_offset': stats}).plot(kind='bar', ax = ax[0, 2])
+    ax[0,2].set_title(f'SL pts offset stats')
+    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'candle_atr_pts': stats}).plot(kind='bar', ax = ax[1, 2])
+    ax[1,2].set_title(f'SL pts offset stats')
+
+    format_axes(ax)
+
+    sl_holds_moves_pts = df_candle[df_candle.sl_holds].pts_move.sum()
+    sl_holds_count_pct = len(df_candle[df_candle.sl_holds])*100/all_count
+    sl_not_holds_count_pct = len(df_candle[~df_candle.sl_holds])*100/all_count
+    sl_not_holds_candle_atr_pts = df_candle[~df_candle.sl_holds].candle_atr_pts.abs().sum()
+    candle_trend_or_counter_sl_prob = (df_candle.in_trend.sum() + df_candle[~df_candle.in_trend].sl_holds.sum())*100/all_count
+    candle_trend_or_counter_sl_move = df_candle[df_candle.in_trend].pts_move.abs().sum() + df_candle[~df_candle.in_trend & df_candle.sl_holds].pts_move.abs().sum()
+    candle_trend_or_counter_sl_drawdowns = df_candle[df_candle.in_trend & ~df_candle.sl_holds].candle_atr_pts.sum()
+    sl_in_trend_no_hold = df_candle[~df_candle.sl_holds & df_candle.in_trend].sl_pts_offset.describe()
+    atr_in_trend_no_hold = df_candle[~df_candle.sl_holds & df_candle.in_trend].candle_atr_pts.describe()
+
+    candle_move_stats.append({ "time": time, "sl_holds_moves_pts": sl_holds_moves_pts, "sl_holds_count_pct":sl_holds_count_pct,
+                    "sl_not_holds_candle_atr_pts": sl_not_holds_candle_atr_pts,
+                    "candle_trend_or_counter_sl_prob":candle_trend_or_counter_sl_prob,
+                    "candle_trend_or_counter_sl_move": candle_trend_or_counter_sl_move,
+                    "candle_trend_or_counter_sl_drawdowns": candle_trend_or_counter_sl_drawdowns,
+                    "sl_in_trend_no_hold_25": sl_in_trend_no_hold['25%'],
+                    "sl_in_trend_no_hold_50": sl_in_trend_no_hold['mean'],
+                    "sl_in_trend_no_hold_75": sl_in_trend_no_hold['75%'],
+                    "atr_in_trend_no_hold_25": atr_in_trend_no_hold['25%'],
+                    "atr_in_trend_no_hold_50": atr_in_trend_no_hold['mean'],
+                    "atr_in_trend_no_hold_75": atr_in_trend_no_hold['75%'] })
+
+    label = f'''
+      SL holds moves {sl_holds_moves_pts:.2f}pts ({sl_holds_count_pct:.1f}%) vs SL {sl_not_holds_candle_atr_pts:.2f}pts ({sl_not_holds_count_pct:.1f}%)
+      Candle in Trend or counter SL moves {candle_trend_or_counter_sl_move:.2f}pts ({candle_trend_or_counter_sl_prob:.2f}% prob) SL drawdown {candle_trend_or_counter_sl_drawdowns:.2f}pts
+      SL in trend no hold {sl_in_trend_no_hold['25%']:.0f} - {sl_in_trend_no_hold['mean']:.0f} - {sl_in_trend_no_hold['75%']:.0f} atr {atr_in_trend_no_hold['25%']:.0f} - {atr_in_trend_no_hold['mean']:.0f} - {atr_in_trend_no_hold['75%']:.0f} pts
+    '''
+    fig.text(0.5, 0.005, label, ha='center', va='bottom', fontsize=10)
+    plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.125, hspace=0.15)
+    # plt.show()
+
+    plt.savefig(f'{directory_plots}/{symbol}_{time.strftime("%H_%M")}_BracketMove.png', bbox_inches='tight')  # High-quality save
+    plt.close()
+    print(f"Done with {time}")
+ #%%
+  def format_axes_2(ax, fct):
+    for i,a in enumerate(ax):
+      labels = [label.get_text().replace('True', 'T').replace('False', 'F') for label in a.get_xticklabels()]
+      a.set_xticklabels(labels, rotation=90)
+      a.legend(
+        loc='lower center',
+        bbox_to_anchor=(0.5, 0.0),
+        ncol=3,  # Number of columns
+        columnspacing=1.0,  # Space between columns
+        frameon=True,  # Show frame
+      )
+      # Add styled grid
+      a.grid(True, linestyle='--', color='gray', alpha=0.7, linewidth=0.5)
+      for container in a.containers:
+          a.bar_label(container, fmt=fct[i], padding=3, rotation=90)
+  #%%
+  df_candle_move_stats = pd.DataFrame(candle_move_stats)
+  df_candle_move_stats.set_index('time', inplace=True)
+  df_candle_move_stats.sort_index(inplace=True)
+  fig, ax  = plt.subplots(2, 1, figsize=(38, 11), tight_layout=True)
+  df_candle_move_stats.plot(kind='bar', y=['sl_holds_moves_pts', 'sl_not_holds_candle_atr_pts'], ax=ax[0])
+  df_candle_move_stats.plot(kind='bar', y=['sl_holds_count_pct'], ax=ax[1])
+  format_axes_2(ax, [lambda x: humanize.naturalsize(x).replace('B', ''), '%.1f'])
 
   # plt.show()
-  plt.savefig(f'{directory_plots}/{symbol}_FirstBarAndTrend.png', bbox_inches='tight')  # High-quality save
+  plt.savefig(f'{directory_plots}/{symbol}_SlHoldsMove.png', bbox_inches='tight')  # High-quality save
   plt.close()
+  #%%
 
+  fig, ax  = plt.subplots(4, 1, figsize=(38, 22), tight_layout=True)
+  df_candle_move_stats.plot(kind='bar', y=['candle_trend_or_counter_sl_move', 'candle_trend_or_counter_sl_drawdowns'], ax=ax[0])
+  df_candle_move_stats.plot(kind='bar', y=['candle_trend_or_counter_sl_prob'], ax=ax[1])
+  df_candle_move_stats.plot(kind='bar', y=['sl_in_trend_no_hold_25', 'sl_in_trend_no_hold_50', 'sl_in_trend_no_hold_75'], ax=ax[2])
+  df_candle_move_stats.plot(kind='bar', y=['atr_in_trend_no_hold_25', 'atr_in_trend_no_hold_50', 'atr_in_trend_no_hold_75'], ax=ax[3])
+
+  format_axes_2(ax, [lambda x: humanize.naturalsize(x).replace('B', ''), '%.0f', '', ''])
+  # plt.show()
+  plt.savefig(f'{directory_plots}/{symbol}_CandleTrendOrCounterSl.png', bbox_inches='tight')  # High-quality save
+  plt.close()
   #%% Calculate channels
   def channels(df, is_larger = True, pb_offset = 0.5):
     channels = []
@@ -180,28 +271,6 @@ for symbol in symbols[4:]:
     dfs_bull_channels.append({str(i): channels(df_uptrends, is_larger=True, pb_offset=i/10)})
     dfs_bear_channels.append({str(i): channels(df_downtrends, is_larger=False, pb_offset=i/10)})
 
-
-#%%
-
-
-  # df_uptrends_pb_50['type'] =  pd.cut(df_uptrends_pb_50['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
-  # df_uptrends_pb_50['trend_support'] = df_uptrends_pb_50['ema20_o'] < df_uptrends_pb_50['ema20_c']
-  # df_downtrends_pb_50 = channels(df_downtrends, is_larger=False)
-  # df_downtrends_pb_50['type'] =  pd.cut(df_downtrends_pb_50['bars'], bins=[-np.inf, 3, 10, 20, np.inf], labels=['x<3', '3<x<10', '10<x20', 'x>20' ])
-  # df_downtrends_pb_50['trend_support'] = df_downtrends_pb_50['ema20_o'] > df_downtrends_pb_50['ema20_c']
-# df_uptrends_pb = df_uptrends.iloc[[0]].copy()
-#   last_combined_index = df_uptrends_pb.index[0]
-#   for i in range(1, len(df_uptrends)):
-#     if df_uptrends.iloc[i].name - df_uptrends_pb.loc[last_combined_index].end <= datetime.timedelta(minutes=15) and df_uptrends.iloc[i].o > df_uptrends_pb.loc[last_combined_index].mid:
-#       df_uptrends_pb.loc[last_combined_index, 'end'] = df_uptrends.iloc[i].end
-#       df_uptrends_pb.loc[last_combined_index, 'c'] = df_uptrends.iloc[i].c
-#       df_uptrends_pb.loc[last_combined_index, 'bars'] += df_uptrends.iloc[i].bars
-#       df_uptrends_pb.loc[last_combined_index, 'ema20_c'] = df_uptrends.iloc[i].ema20_c
-#     else:
-#       df_uptrends_pb= pd.concat([df_uptrends_pb, df_uptrends.iloc[[i]].copy()])
-#       last_combined_index = df_uptrends_pb.index[-1]
-
-
   #%%
   df = df_extrema_lhd
   def plot_type_percentages(df, event = ''):
@@ -223,7 +292,7 @@ for symbol in symbols[4:]:
     cumulative_percentages['all'] = all_cumulative_percentages
 
     # Create figure with two subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(24, 14))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(38, 11))
 
     # Plot 1: Individual type percentages
     type_percentages.plot(kind='bar', ax=ax1, width=0.8)
@@ -245,13 +314,22 @@ for symbol in symbols[4:]:
     ax2.legend(title='Type')
     ax2.grid(True, axis='y', linestyle='--', alpha=0.3)
 
+    for a in [ax1, ax2]:
+      labels = [label.get_text().replace('True', 'T').replace('False', 'F') for label in a.get_xticklabels()]
+      a.set_xticklabels(labels, rotation=90)
+
+      # Add styled grid
+      a.grid(True, linestyle='--', color='gray', alpha=0.7, linewidth=0.5)
+      for container in a.containers:
+        a.bar_label(container, fmt='%.2f', padding=3, rotation=90)
+
     # Add percentage labels on the bars
     # for container in ax2.containers:
     #   ax2.bar_label(container, fmt='%.1f%%', padding=3)
 
     # Rotate x-axis labels
-    ax1.tick_params(axis='x', rotation=45)
-    ax2.tick_params(axis='x', rotation=45)
+    ax1.tick_params(axis='x', rotation=90)
+    ax2.tick_params(axis='x', rotation=90)
 
     # Adjust layout to prevent overlap
     plt.tight_layout()
@@ -261,12 +339,11 @@ for symbol in symbols[4:]:
   plot_type_percentages(df_extrema_lh[df_extrema_lh.is_first_of_day], 'First of Day')
   plt.savefig(f'{directory_plots}/{symbol}_FirstOfDay.png', bbox_inches='tight')  # High-quality save
   plt.close()
+
   plot_type_percentages(df_extrema_lh[~df_extrema_lh.is_first_of_day], 'Second of Day')
   plt.savefig(f'{directory_plots}/{symbol}_SecondOfDay.png', bbox_inches='tight')  # High-quality save
   plt.close()
-  # plot_type_percentages(df_extrema_d_25, 'Deviation 25%')
-  # plt.savefig(f'{directory_plots}/{symbol}_Deviations_25.png', bbox_inches='tight')  # High-quality save
-  # plt.close()
+
   plot_type_percentages(df_extrema_d_30, 'Deviation 30%')
   plt.savefig(f'{directory_plots}/{symbol}_Deviations_30.png', bbox_inches='tight')  # High-quality save
   plt.close()
@@ -282,14 +359,6 @@ for symbol in symbols[4:]:
   plot_type_percentages(df_downtrends[~df_downtrends.trend_support], 'Downtrends Against Trend')
   plt.savefig(f'{directory_plots}/{symbol}_DowntrendsAgainstTrend.png', bbox_inches='tight')  # High-quality save
   plt.close()
-
-  # plot_type_percentages(df_downtrends_pb, 'Downtrends Pullback')
-  # plt.savefig(f'{directory_plots}/{symbol}_Downtrends_Pullback.png', bbox_inches='tight')  # High-quality save
-  # plt.close()
-  #
-  # plot_type_percentages(df_downtrends_pb, 'Uptrends Pullback')
-  # plt.savefig(f'{directory_plots}/{symbol}_Uptrends_Pullback.png', bbox_inches='tight')  # High-quality save
-  # plt.close()
 
   plot_type_percentages(df_uptrends, 'Uptrends')
   plt.savefig(f'{directory_plots}/{symbol}_Uptrends.png', bbox_inches='tight')  # High-quality save
