@@ -12,10 +12,8 @@ mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-## %%
 utils.influx.create_databases()
 influx_client_df, influx_client = utils.influx.get_influx_clients()
-##%%
 ib.util.startLoop()
 ib_con = ib.IB()
 tws_real_port = 7497
@@ -25,7 +23,6 @@ api_paper_port = 4002
 # ib_con.connect('127.0.0.1', api_paper_port, clientId=3, readonly=True)
 ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
-## %%
 
 ## %%
 eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50']]
@@ -36,22 +33,19 @@ fr_index = ib.Index('CAC40', 'MONEP', 'EUR')
 jp_index = ib.Index('N225', 'OSE.JPN', 'JPY')
 hk_index = ib.Index('HSI', 'HKFE', 'HKD')
 indices = [*eu_indices, *us_indices, jp_index, fr_index, hk_index]
-## %%
+
 index_cfd_euro = ['IBGB100', 'IBEU50', 'IBDE40', 'IBFR40', 'IBES35', 'IBNL25', 'IBCH20']
 index_cfd_us = ['IBUS500', 'IBUS30', 'IBUST100']
 index_cfd_asia = ['IBHK50', 'IBJP225', 'IBAU200']
 
 index_cfds = [ib.CFD(symbol=symbol, exchange='SMART') for symbol in [*index_cfd_euro, *index_cfd_us, *index_cfd_asia]]
-## %%
 
 commodity_cfds = [ib.Commodity("XAUUSD", exchange='SMART'), ib.Commodity("USGOLD", exchange='IBMETAL')]
-## %%
 
 forex = [ib.Forex(symbol=sym, exchange='IDEALPRO', currency=cur) for sym, cur in
          [('EUR', 'USD'), ('EUR', 'GBP'), ('EUR', 'CHF'), ('GBP', 'USD'), ('AUD', 'USD'), ('USD', 'CAD'),
           ('USD', 'JPY'), ('CHF', 'USD')]]
 
-## %%
 eu_futures = [ib.ContFuture(symbol=x, multiplier='1', exchange='EUREX',currency='EUR') for x in ['DAX', 'ESTX50']]
 us_futures =[*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange='CME',currency='USD') for x in [('MES', '5'), ('MNQ', '2'), ('RTY', '50')]],
              ib.ContFuture(symbol='MYM', multiplier='0.5', exchange='CBOT',currency='USD'),
@@ -62,13 +56,15 @@ swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',c
 # # contracts = indices
 futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 
-##%%
-##%% To be evaluated ['QQQ']
-# us_etf_symbols = ['SPY', 'QQQ', 'GLD', 'SLV', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLE', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP', 'SMH']
-# us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
+## %%
+# To be evaluated ['QQQ']
+# us_etf_symbols = ['QQQ']
+us_etf_symbols = [ 'EEM', 'EWZ', 'FXI', 'GDX', 'GLD', 'HYG', 'IEFA', 'IWM', 'LQD', 'QQQ', 'SLV', 'SMH', 'SMH', 'SPY',
+  'TLT', 'TQQQ', 'UNG', 'USO', 'XLB', 'XLC', 'XLE', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLP', 'XLRE', 'XLU', 'XLV',
+  'XLY', 'XOP']
+us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
-contracts = [*commodity_cfds, *indices, *index_cfds, *forex, *futures,]
-
+contracts = [*us_etfs, *commodity_cfds, *indices, *index_cfds, *forex, *futures,]
 for contract in contracts:
   ib_con.qualifyContracts(contract)
   details = ib_con.reqContractDetails(contract)
@@ -78,7 +74,8 @@ for contract in contracts:
 ## %%
 available_types_of_data = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
                            'OPTION_IMPLIED_VOLATILITY']
-types_of_data = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY','OPTION_IMPLIED_VOLATILITY'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'], 'STK': ['TRADES'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT'], 'CMDTY': ['MIDPOINT']}
+types_of_data = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY','OPTION_IMPLIED_VOLATILITY'], 'CFD': ['MIDPOINT'], 'FUT': ['TRADES'],
+                 'STK': ['TRADES', 'HISTORICAL_VOLATILITY','OPTION_IMPLIED_VOLATILITY'], 'CONTFUT': ['TRADES'], 'CASH': ['MIDPOINT'], 'CMDTY': ['MIDPOINT']}
 rth = False
 ##%%
 duration = '10 D'
@@ -105,8 +102,6 @@ field_name_lu = {
   'HISTORICAL_VOLATILITY': {'open': 'hvo', 'high': 'hvh', 'low': 'hvl', 'close': 'hvc', 'volume': 'hvv', 'average': 'hva', 'barCount': 'hvbc'},
   'OPTION_IMPLIED_VOLATILITY': {'open': 'ivo', 'high': 'ivh', 'low': 'ivl', 'close': 'ivc', 'volume': 'ivv', 'average': 'iva', 'barCount': 'ivbc'},
 }
-## %%
-
 
 # for stock_name in stock_names:
 current_date = startDateTime

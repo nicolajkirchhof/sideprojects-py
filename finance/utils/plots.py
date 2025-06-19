@@ -22,7 +22,7 @@ def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', atr_v
   df_5m = day_data.df_5m_ad if ad else day_data.df_5m
   df_30m = day_data.df_30m_ad if ad else day_data.df_30m
 
-  fig = mpf.figure(style='yahoo', figsize=(19,12), tight_layout=True)
+  fig = mpf.figure(style='yahoo', figsize=(19,11), tight_layout=True)
   gs = gridspec.GridSpec(3, 2, height_ratios=[2, 0.25, 1], width_ratios=[1, 2])
 
   date_str = day_data.day_start.strftime('%a, %Y-%m-%d')

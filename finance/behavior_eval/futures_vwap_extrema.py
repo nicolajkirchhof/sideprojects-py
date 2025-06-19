@@ -107,10 +107,10 @@ for symbol in symbols:
       pts_move = abs(candle['VWAP3'] - next_extrema.value)
       candles_move = df_5m[(df_5m.index > candle.name) & (df_5m.index < next_extrema.ts)]
       sl_value = candles_move.l.min() if move_sentiment > 0 else candles_move.h.max()
-      sl_pts_offset = abs(candle.h - sl_value) if move_sentiment > 0 else abs(candle.l - sl_value)
+      sl_pts_offset = candle.l - sl_value if move_sentiment > 0 else  sl_value - candle.h
       sl_holds = sl_value >= candle.l - 1 if move_sentiment > 0 else sl_value <= candle.h + 1
       bracket_moves.append({"ts": candle.name, "candle_sentiment": candle_sentiment, "candle_atr_pts": candle_atr_pts,
-                            "in_trend": in_trend, "pts_move": pts_move, "sl_pts_offset": sl_pts_offset, "sl_holds": sl_holds})
+                            "in_trend": in_trend, "pts_move": pts_move, "sl_value": sl_value, "sl_pts_offset": sl_pts_offset, "sl_holds": sl_holds})
 
     df_bracket_moves = pd.DataFrame(bracket_moves)
 

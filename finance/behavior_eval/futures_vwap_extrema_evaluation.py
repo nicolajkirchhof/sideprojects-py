@@ -17,6 +17,7 @@ import mplfinance as mpf
 import pickle
 import numpy as np
 import humanize
+import glob
 
 
 from matplotlib.pyplot import tight_layout
@@ -161,6 +162,16 @@ for symbol in symbols:
 
     format_axes(ax)
 
+    sl_holds_25_tight = df_candle[df_candle.sl_holds & (df_candle.sl_pts_offset > 0.25*df_candle.candle_atr_pts)]
+    sl_holds_25_tight_pts_against = df_candle[~df_candle.index.isin(sl_holds_25_tight.index)].pts_move.sum()
+    sl_holds_25_tight_pts = sl_holds_25_tight.pts_move.sum()
+    sl_holds_25_tight_pct = len(sl_holds_25_tight)*100/all_count
+
+    sl_holds_25_loose = df_candle[df_candle.sl_holds | (df_candle.sl_pts_offset < 0.25*df_candle.candle_atr_pts)]
+    sl_holds_25_loose_pts_against = df_candle[~df_candle.index.isin(sl_holds_25_loose.index)].pts_move.sum()
+    sl_holds_25_loose_pts = sl_holds_25_loose.pts_move.sum()
+    sl_holds_25_loose_pct = len(sl_holds_25_loose)*100/all_count
+
     sl_holds_moves_pts = df_candle[df_candle.sl_holds].pts_move.sum()
     sl_holds_count_pct = len(df_candle[df_candle.sl_holds])*100/all_count
     sl_not_holds_count_pct = len(df_candle[~df_candle.sl_holds])*100/all_count
@@ -190,10 +201,10 @@ for symbol in symbols:
     '''
     fig.text(0.5, 0.005, label, ha='center', va='bottom', fontsize=10)
     plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.125, hspace=0.15)
-    # plt.show()
-
-    plt.savefig(f'{directory_plots}/{symbol}_{time.strftime("%H_%M")}_BracketMove.png', bbox_inches='tight')  # High-quality save
-    plt.close()
+    plt.show()
+    #
+    # plt.savefig(f'{directory_plots}/{symbol}_{time.strftime("%H_%M")}_BracketMove.png', bbox_inches='tight')  # High-quality save
+    # plt.close()
     print(f"Done with {time}")
  #%%
   def format_axes_2(ax, fct):

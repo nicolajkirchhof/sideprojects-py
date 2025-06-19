@@ -8,12 +8,12 @@ from finance.utils.exchanges import DE_EXCHANGE, US_EXCHANGE, GB_EXCHANGE, JP_EX
 DB_INDEX = 'index'
 DB_CFD = 'cfd'
 DB_FOREX = 'forex'
-DB_ETF = 'etf'
+DB_STK = 'stk'
 DB_FUTURE = 'future'
 MPF_COLUMN_MAPPING = ['o', 'h', 'l', 'c', 'v']
 
 SEC_TYPE_DB_MAPPING = {
-  'IND': DB_INDEX, 'CFD': DB_CFD, 'CONTFUT': DB_FUTURE, 'FUT': DB_FUTURE, 'CASH': DB_FOREX, 'STK': DB_ETF, 'CMDTY':DB_CFD
+  'IND': DB_INDEX, 'CFD': DB_CFD, 'CONTFUT': DB_FUTURE, 'FUT': DB_FUTURE, 'CASH': DB_FOREX, 'STK': DB_STK, 'CMDTY':DB_CFD
 }
 
 SYMBOLS = {'IBDE40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
@@ -50,14 +50,14 @@ def get_influx_clients():
   indices = influx_client.query('show measurements', database=DB_INDEX)
   cfds = influx_client.query('show measurements', database=DB_CFD)
   forex = influx_client.query('show measurements', database=DB_FOREX)
-  etf = influx_client.query('show measurements', database=DB_ETF)
+  stk = influx_client.query('show measurements', database=DB_STK)
   futures = influx_client.query('show measurements', database=DB_FUTURE)
 
   get_values = lambda x: [y[0] for y in x.raw['series'][0]['values']]
   print('Indices: ', get_values(indices))
   print('Cfds: ', get_values(cfds))
   print('Forex: ', get_values(forex))
-  print('Etfs: ', get_values(etf))
+  print('Stoks: ', get_values(stk))
   print('Futures: ', get_values(futures))
   return influx_client_df, influx_client
 
@@ -102,7 +102,7 @@ def create_databases():
   influx_client = idb.InfluxDBClient()
   influx_client.create_database(DB_INDEX)
   influx_client.create_database(DB_FOREX)
-  influx_client.create_database(DB_ETF)
+  influx_client.create_database(DB_STK)
   influx_client.create_database(DB_FUTURE)
   influx_client.create_database(DB_CFD)
 
