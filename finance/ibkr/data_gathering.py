@@ -59,7 +59,7 @@ futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 ## %%
 # To be evaluated ['QQQ']
 # us_etf_symbols = ['QQQ']
-us_etf_symbols = [ 'EEM', 'EWZ', 'FXI', 'GDX', 'GLD', 'HYG', 'IEFA', 'IWM', 'LQD', 'QQQ', 'SLV', 'SMH', 'SMH', 'SPY',
+us_etf_symbols = [ 'EEM', 'EWZ', 'FXI', 'GDX', 'GLD', 'HYG', 'IEFA', 'IWM', 'LQD', 'QQQ', 'SLV', 'SMH', 'SPY',
   'TLT', 'TQQQ', 'UNG', 'USO', 'XLB', 'XLC', 'XLE', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLP', 'XLRE', 'XLU', 'XLV',
   'XLY', 'XOP']
 us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]

@@ -75,6 +75,7 @@ for symbol in symbols:
       data['day_change'] = prior_day_change
       data['first_bars'] = data['firstBars']
       data['df_bracket_moves']['gap'] = 0 if np.isnan(prior_day_change) else prior_day_change
+      data['df_bracket_moves_after_next']['gap'] = 0 if np.isnan(prior_day_change) else prior_day_change
       results.append(data)
 
   #%%
@@ -110,9 +111,23 @@ for symbol in symbols:
   df_extrema_d_30 = df_extrema[df_extrema.type.isin(['dev30'])].copy()
 
 #%%
-  df_candle_moves = pd.concat([data['df_bracket_moves'] for data in results])
-  df_candle_moves.set_index('ts', inplace=True)
-  df_candle_moves['time'] = df_candle_moves.index.time
+  def process_bracket_moves(df_moves):
+    df_moves.set_index('ts', inplace=True)
+    df_moves['time'] = df_moves.index.time
+    df_moves['sl_atr_pct_offset'] = df_moves.sl_pts_offset*100/df_moves.candle_atr_pts
+    df_moves['trend_sentiment'] = (df_moves.candle_sentiment * df_moves.in_trend.astype(int).replace(0, -1))
+    df_moves['bracket_sl_pts_offset'] = df_moves.sl_pts_offset + (df_moves.sl_value - df_moves.bracket_sl_value)*df_moves.trend_sentiment
+    df_moves['bracket_sl_atr_pct_offset'] = df_moves.bracket_sl_pts_offset*100/df_moves.candle_atr_pts
+    df_moves['sl_holds_calc'] =  df_moves.sl_pts_offset < 0
+    df_moves['in_trend'] = df_moves.in_trend.astype(bool)
+    df_moves['bracket_entry_in_trend'] = df_moves.bracket_trigger == df_moves.trend_sentiment
+    return df_moves
+
+
+  df_candle_moves = process_bracket_moves(pd.concat([data['df_bracket_moves'] for data in results]))
+  df_candle_moves_after_next = process_bracket_moves(pd.concat([data['df_bracket_moves_after_next'] for data in results]))
+
+
 
 #%%
   def format_axes(ax):
@@ -120,47 +135,133 @@ for symbol in symbols:
       for a in row:
         labels = [label.get_text().replace('True', 'T').replace('False', 'F') for label in a.get_xticklabels()]
         a.set_xticklabels(labels, rotation=0)
-        a.legend(
-          loc='lower center',
-          bbox_to_anchor=(0.5, 0.0),
-          ncol=3,  # Number of columns
-          columnspacing=1.0,  # Space between columns
-          frameon=True,  # Show frame
-        )
 
         for container in a.containers:
-          a.bar_label(container, fmt='%.2f', padding=3)
+          a.bar_label(container, fmt='%.2f', label_type='edge', padding=-10)
+
 
 #%%
   time = df_candle_moves.time.unique()[0]
   candle_move_stats = []
+  stats =[('percentile_25', lambda x: np.nanpercentile(x, 25)), ('percentile_50', lambda x: np.nanpercentile(x, 50)), ('percentile_75', lambda x: np.nanpercentile(x, 75)) ]
+  stats_stacked =[('percentile_25', lambda x: np.nanpercentile(x, 25)), ('percentile_50', lambda x: np.nanpercentile(x, 50) - np.nanpercentile(x, 25)), ('percentile_75', lambda x: np.nanpercentile(x, 75) - np.nanpercentile(x, 50)) ]
+  stats_labels=['25%', '50%', '75%']
+
+  def plot_stats_row(df_candle, ax, type):
+    # 1st evaluation: Probability of Candle to be in trend, overall points & SL
+    df_candle.groupby(['in_trend', 'trend_sentiment']).agg({'pts_move': stats}).plot(kind='bar', ax = ax[0], colormap='Set3')
+    ax[0].set_title(f'{type} Gains')
+    ax[0].legend(labels=stats_labels)
+
+    ax[1].set_title(f'{type} SL pts')
+    df_candle.groupby(['in_trend', 'trend_sentiment']).agg({'sl_pts_offset': stats}).plot(kind='bar', ax = ax[1],colormap='Set3')
+    ax[1].legend(labels=stats_labels)
+
+    ax[2].set_title(f'{type} SL pct of atr')
+    df_candle.groupby(['in_trend', 'trend_sentiment']).agg({'sl_atr_pct_offset': stats}).plot(kind='bar', ax = ax[2], colormap='Set3')
+    ax[2].legend(labels=stats_labels)
+
+
+    ax[3].set_title(f'{type} Candle Atr')
+    df_candle.groupby(['in_trend', 'trend_sentiment']).agg({'candle_atr_pts': stats}).plot(kind='bar', ax = ax[3], colormap='Set3')
+    ax[3].legend(labels=stats_labels)
+
+
+
+  #%%
   for time in df_candle_moves.time.unique():
     #%%
     df_candle = df_candle_moves[df_candle_moves.index.time == time]
+    df_candle_after_next = df_candle_moves_after_next[df_candle_moves_after_next.index.time == time]
     df_candle.to_csv(f'{directory_plots}/{symbol}_{time.strftime("%H_%M")}_data.csv')
-
-    fig, ax  = plt.subplots(2, 3, figsize=(19, 11))
-
-    stats =[ 'mean', ('percentile_25', lambda x: np.nanpercentile(x, 25)), ('percentile_75', lambda x: np.nanpercentile(x, 75)) ]
-    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': stats}).plot(kind='bar', ax = ax[0, 0])
-    ax[0,0].set_title(f'Pts move stats')
-    fig.suptitle(f'{symbol} {time}')
+    # df_candle_after_next.to_csv(f'{directory_plots}/{symbol}_{time.strftime("%H_%M")}_data_after_next.csv')
 
     all_count = len(df_candle)
-    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': [ 'count', ]}).plot(kind='bar', ax = ax[0, 1])
-    ax[0,1].set_title(f'Counts')
-    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': [ ('pts', lambda x: len(x)*100/all_count), ]}).plot(kind='bar', ax = ax[1, 1])
-    ax[1,1].set_title(f'Counts PCT')
+    all_count_after_next = len(df_candle_after_next)
+
+    fig, ax  = plt.subplots(2, 4, figsize=(19, 11), tight_layout=True)
+    fig.suptitle(f'''
+{symbol} {time} Stats
+In Trend {df_candle.in_trend.sum()*100/all_count:.1f}%, Counter {(~df_candle.in_trend).sum()*100/all_count:.1f}%
+In Next Trend {df_candle_after_next.in_trend.sum()*100/all_count_after_next:.1f}%, Counter {(~df_candle_after_next.in_trend).sum()*100/all_count_after_next:.1f}%
+''')
+
+    plot_stats_row(df_candle, ax[0], 'Bull/Bear Next')
+    plot_stats_row(df_candle_after_next, ax[1], 'Bull/Bear After Next')
+
+    #
+    format_axes(ax)
+    plt.show()
+    #%% Evaluate candle move where SL holds
+    # 1st strategy: Bracket the Candle with SL on the opposite side
+    fig, ax  = plt.subplots(1, 4, figsize=(19, 11))
+    success_rate = df_candle.bracket_entry_in_trend.sum()*100/all_count
+    success_rate_next_trend = df_candle_after_next.bracket_entry_in_trend.sum()*100/all_count
+    fig.suptitle(f'''
+{symbol} {time} Bracket Moves
+Success {success_rate:.1f}%, Failure {100 - success_rate:.1f}%
+Success Next Trend {success_rate:.1f}%, Failure {100 - success_rate:.1f}%
+''')
+    type = 'Bracket'
+    # plot_stats_row(df_bracket_moves_in_trend, ax[0], 'All')
+    df_candle[df_candle.bracket_entry_in_trend].groupby(['trend_sentiment']).agg({'pts_move': stats}).plot(kind='bar',  ax = ax[0], colormap='Set3')
+    ax[0].set_title(f'{type} Gains per Trade in Trend')
+    ax[0].legend(labels=stats_labels)
+
+    df_candle[df_candle.bracket_entry_in_trend].groupby(['trend_sentiment']).agg({'bracket_sl_pts_offset': stats}).plot(kind='bar',  ax = ax[1], colormap='Set3')
+    ax[1].set_title(f'{type} Necessary SL in Trend')
+    ax[1].legend(labels=stats_labels)
+
+    df_candle[df_candle.bracket_entry_in_trend].groupby(['trend_sentiment']).agg({'bracket_sl_atr_pct_offset': stats}).plot(kind='bar',  ax = ax[2], colormap='Set3')
+    ax[2].set_title(f'{type} Necessary SL PCT of ATR in Trend')
+    ax[2].legend(labels=stats_labels)
+
+    # df_candle[~df_candle.bracket_entry_in_trend].groupby(['trend_sentiment']).agg({'candle_atr_pts': stats}).plot(kind='bar',  ax = ax[3], colormap='Set3')
+    # ax[3].set_title(f'{type} Loss counter Trade')
+    # ax[3].legend(labels=stats_labels)
+
+    df_candle[~df_candle.bracket_entry_in_trend].groupby(['trend_sentiment']).agg({'bracket_sl_pts_offset': stats}).plot(kind='bar',  ax = ax[3], colormap='Set3')
+    ax[3].set_title(f'{type} Counter Trend in Profit')
+    ax[3].legend(labels=stats_labels)
+
+    format_axes([ax])
+    plt.show()
+
+
+    # Total gains vs losses when you use a SL of -75, -50, -25%
+
+    #%%
+
+  df_candle.groupby(['in_trend']).agg({'pts_move': stats}).plot(kind='bar', ax = ax[0, 0])
+    ax[0,0].set_title(f'Pts move stats')
+    set_legend(ax[0,0], stats_labels)
+
+  #%%
+
+    df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': [ ('pts', lambda x: len(x)*100/all_count), ]}).plot(kind='bar', ax = ax[0, 1])
+    ax[0,1].set_title(f'Counts PCT')
+    set_legend(ax[0,1], ['Count %'])
+
     df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'pts_move': [ ('abs_sum', lambda x: np.sum(np.abs(x))) ],
                                          'candle_atr_pts': [ ('abs_sum', lambda x: np.sum(np.abs(x))) ]
                                          }).plot(kind='bar', ax = ax[1, 0])
 
     df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'sl_pts_offset': stats}).plot(kind='bar', ax = ax[0, 2])
     ax[0,2].set_title(f'SL pts offset stats')
+    ax[0,2].legend(
+      loc='lower left',
+      bbox_to_anchor=(0.0, 0.0),
+      ncol=1,  # Number of columns
+      frameon=True,  # Show frame
+      labels=stats_labels
+    )
+
     df_candle.groupby(['candle_sentiment', 'in_trend', 'sl_holds']).agg({'candle_atr_pts': stats}).plot(kind='bar', ax = ax[1, 2])
     ax[1,2].set_title(f'SL pts offset stats')
+    set_legend(ax[1,2], stats_labels)
 
     format_axes(ax)
+
 
     sl_holds_25_tight = df_candle[df_candle.sl_holds & (df_candle.sl_pts_offset > 0.25*df_candle.candle_atr_pts)]
     sl_holds_25_tight_pts_against = df_candle[~df_candle.index.isin(sl_holds_25_tight.index)].pts_move.sum()

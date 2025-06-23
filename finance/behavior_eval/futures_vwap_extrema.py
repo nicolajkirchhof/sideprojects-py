@@ -31,7 +31,7 @@ symbols = ['IBDE40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP
 symbol = symbols[0]
 IS_PLOT_ACTIVE=False
 
-for symbol in symbols:
+for symbol in symbols[0:1]:
   #%% Create a directory
   ad = True
   ad_str = '_ad' if ad else ''
@@ -46,7 +46,7 @@ for symbol in symbols:
 
   dfs_ref_range = []
   dfs_closing = []
-  first_day = dateutil.parser.parse('2020-01-02T00:00:00').replace(tzinfo=tz)
+  first_day = dateutil.parser.parse('2020-01-03T00:00:00').replace(tzinfo=tz)
   # first_day = dateutil.parser.parse('2025-03-06T00:00:00').replace(tzinfo=tz)
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
@@ -54,7 +54,7 @@ for symbol in symbols:
   prior_day = first_day
   day_start = first_day + timedelta(days=1)
 
-  day_data = utils.trading_day_data.TradingDayData(symbol)
+  day_data = utils.trading_day_data.TradingDayData(symbol, min_future_cache=timedelta(days=365))
   #%%
   while day_start < last_day:
     #%%
@@ -95,24 +95,58 @@ for symbol in symbols:
     ts_is_high_oc = df_5m[df_5m.is_high_oc].index.tolist()
 
     #%%
-    bracket_moves = []
-    for i in range(len(df_5m)-10):
+    def cancel_moves_stats(candle, next_extrema):
       #%%
-      candle = df_5m.iloc[i]
       candle_sentiment = 1 if candle.c - candle.o >= 0 else -1
       candle_atr_pts = candle.h - candle.l
-      next_extrema = df_extrema[df_extrema.ts > candle.name].iloc[0]
       move_sentiment = 1 if next_extrema.value - candle['VWAP3'] >=0 else -1
       in_trend = candle_sentiment == move_sentiment
       pts_move = abs(candle['VWAP3'] - next_extrema.value)
-      candles_move = df_5m[(df_5m.index > candle.name) & (df_5m.index < next_extrema.ts)]
+      candles_move = df_5m[(df_5m.index > candle.name) & (df_5m.index <= next_extrema.ts)]
+      bull_trigger = candles_move[candles_move.h > candle.h]
+      bear_trigger = candles_move[candles_move.l < candle.l]
+
+      if bull_trigger.empty and bear_trigger.empty:
+        bracket_trigger = 0
+      elif bull_trigger.empty and not bear_trigger.empty:
+        bracket_trigger = -1
+      elif not bull_trigger.empty and bear_trigger.empty:
+        bracket_trigger = 1
+      elif not bull_trigger.empty and not bear_trigger.empty and bull_trigger.index[0] > bear_trigger.index[0]:
+        bracket_trigger = -1
+      elif not bull_trigger.empty and not bear_trigger.empty and bull_trigger.index[0] < bear_trigger.index[0]:
+        bracket_trigger = 1
+      else: # same candle so you have to assume you trigger in the wrong direction
+        bracket_trigger = move_sentiment * -1
+
+      bracket_candle_move = candles_move[candles_move.index >= bull_trigger.index[0]] if bracket_trigger > 0 else candles_move[candles_move.index >= bear_trigger.index[0]]  if bracket_trigger < 0 else None
+      bracket_sl_value = np.nan if bracket_candle_move is None else bracket_candle_move.l.min() if move_sentiment > 0 else bracket_candle_move.h.max()
+
       sl_value = candles_move.l.min() if move_sentiment > 0 else candles_move.h.max()
       sl_pts_offset = candle.l - sl_value if move_sentiment > 0 else  sl_value - candle.h
-      sl_holds = sl_value >= candle.l - 1 if move_sentiment > 0 else sl_value <= candle.h + 1
-      bracket_moves.append({"ts": candle.name, "candle_sentiment": candle_sentiment, "candle_atr_pts": candle_atr_pts,
-                            "in_trend": in_trend, "pts_move": pts_move, "sl_value": sl_value, "sl_pts_offset": sl_pts_offset, "sl_holds": sl_holds})
+      result = {"ts": candle.name, "candle_sentiment": candle_sentiment, "candle_atr_pts": candle_atr_pts,
+              "in_trend": in_trend,  "pts_move": pts_move, "sl_value": sl_value, "sl_pts_offset": sl_pts_offset,
+              "bracket_trigger": bracket_trigger, "bracket_sl_value": bracket_sl_value}
+      #%%
+      return result
+    #%%
+    bracket_moves = []
+    bracket_moves_after_next = []
+    for i in range(len(df_5m)-10):
+      #%%
+      candle = df_5m.iloc[i]
+      next_extremas = df_extrema[df_extrema.ts > candle.name]
+      next_extrema = next_extremas.iloc[0]
+      bracket_moves.append(cancel_moves_stats(candle, next_extrema))
+
+      candle = df_5m.iloc[i]
+      after_next_extrema = next_extremas.iloc[1] if len(next_extremas) > 1 else None
+      if after_next_extrema is not None:
+        bracket_moves_after_next.append(cancel_moves_stats(candle, after_next_extrema))
+
 
     df_bracket_moves = pd.DataFrame(bracket_moves)
+    df_bracket_moves_after_next = pd.DataFrame(bracket_moves_after_next)
 
     #%%
     df_ohcl_extrema = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l'])]
@@ -164,7 +198,7 @@ for symbol in symbols:
     metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3'], "uptrends": df_uptrends,
                 "downtrends": df_downtrends, "firstBars": df_5m[df_5m.index >= day_data.day_open][0:6],
                 "ts_oii": ts_oii, "ts_is_high_lh": ts_is_high_lh, "ts_is_high_oc": ts_is_high_oc,
-                "df_bracket_moves": df_bracket_moves}
+                "df_bracket_moves": df_bracket_moves, "df_bracket_moves_after_next": df_bracket_moves_after_next}
     with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
       pickle.dump(metadata, f)
 
