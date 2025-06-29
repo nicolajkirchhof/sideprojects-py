@@ -39,7 +39,7 @@ def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', atr_v
 
   hlines=dict(hlines=indicator_hlines, colors= ['deeppink']+['#bf42f5']*5+['#3179f5']*4, linewidths=[0.4]*1+[0.6]*3+[0.4]*6, linestyle=['--']*2+['-']*(len(indicator_hlines)-1))
   hlines_day=dict(hlines=indicator_hlines[1:], colors= ['#bf42f5']*5+['#3179f5']*4, linewidths=[0.6]*3+[0.4]*6, linestyle=['--']+['-']*(len(indicator_hlines)-1))
-  vlines=dict(vlines=[day_data.day_open, day_data.day_close], colors= ['deeppink']*2, linewidths=[0.4], linestyle=['--'])
+  vlines=dict(vlines=[day_data.day_open, day_data.day_close], alpha=[0.2], colors= ['deeppink']*2, linewidths=[1], linestyle=['--'])
 
   ind_5m_ema20_plot = mpf.make_addplot(df_5m['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
   ind_5m_ema240_plot = mpf.make_addplot(df_5m['200EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')

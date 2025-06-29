@@ -29,9 +29,9 @@ mpl.use('QtAgg')
 #%%
 symbols = ['IBDE40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225', 'USGOLD' ]
 symbol = symbols[0]
-IS_PLOT_ACTIVE=False
+IS_PLOT_ACTIVE=True
 
-for symbol in symbols[0:1]:
+for symbol in symbols:
   #%% Create a directory
   ad = True
   ad_str = '_ad' if ad else ''
@@ -46,7 +46,7 @@ for symbol in symbols[0:1]:
 
   dfs_ref_range = []
   dfs_closing = []
-  first_day = dateutil.parser.parse('2020-01-03T00:00:00').replace(tzinfo=tz)
+  first_day = dateutil.parser.parse('2020-01-02T00:00:00').replace(tzinfo=tz)
   # first_day = dateutil.parser.parse('2025-03-06T00:00:00').replace(tzinfo=tz)
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
@@ -96,7 +96,7 @@ for symbol in symbols[0:1]:
 
     #%%
     def cancel_moves_stats(candle, next_extrema):
-      #%%
+      ##%%
       candle_sentiment = 1 if candle.c - candle.o >= 0 else -1
       candle_atr_pts = candle.h - candle.l
       move_sentiment = 1 if next_extrema.value - candle['VWAP3'] >=0 else -1
@@ -127,13 +127,13 @@ for symbol in symbols[0:1]:
       result = {"ts": candle.name, "candle_sentiment": candle_sentiment, "candle_atr_pts": candle_atr_pts,
               "in_trend": in_trend,  "pts_move": pts_move, "sl_value": sl_value, "sl_pts_offset": sl_pts_offset,
               "bracket_trigger": bracket_trigger, "bracket_sl_value": bracket_sl_value}
-      #%%
+      ##%%
       return result
-    #%%
+    ##%%
     bracket_moves = []
     bracket_moves_after_next = []
     for i in range(len(df_5m)-10):
-      #%%
+      ##%%
       candle = df_5m.iloc[i]
       next_extremas = df_extrema[df_extrema.ts > candle.name]
       next_extrema = next_extremas.iloc[0]
@@ -195,12 +195,12 @@ for symbol in symbols[0:1]:
       plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
       plt.close()
     # %%
-    metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3'], "uptrends": df_uptrends,
-                "downtrends": df_downtrends, "firstBars": df_5m[df_5m.index >= day_data.day_open][0:6],
-                "ts_oii": ts_oii, "ts_is_high_lh": ts_is_high_lh, "ts_is_high_oc": ts_is_high_oc,
-                "df_bracket_moves": df_bracket_moves, "df_bracket_moves_after_next": df_bracket_moves_after_next}
-    with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
-      pickle.dump(metadata, f)
+    # metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3'], "uptrends": df_uptrends,
+    #             "downtrends": df_downtrends, "firstBars": df_5m[df_5m.index >= day_data.day_open][0:6],
+    #             "ts_oii": ts_oii, "ts_is_high_lh": ts_is_high_lh, "ts_is_high_oc": ts_is_high_oc,
+    #             "df_bracket_moves": df_bracket_moves, "df_bracket_moves_after_next": df_bracket_moves_after_next}
+    # with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
+    #   pickle.dump(metadata, f)
 
     print(f'{symbol} finished {date_str}')
     #%%

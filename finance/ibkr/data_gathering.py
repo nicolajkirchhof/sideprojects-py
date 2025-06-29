@@ -24,7 +24,7 @@ api_paper_port = 4002
 ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
 
-## %%
+#%%
 eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50']]
 us_indices = [ib.Index('SPX', 'CBOE', 'USD'), ib.Index('NDX', 'NASDAQ', 'USD'),
               ib.Index('RUT', 'RUSSELL', 'USD'), ib.Index('INDU', 'CME', 'USD')]
