@@ -1,0 +1,33 @@
+# Python package requirements for sideprojects-py
+# Core data science packages
+numpy
+pandas
+scipy
+scikit-learn
+
+# Visualization
+matplotlib
+mplfinance
+finplot
+
+# Finance-specific
+yfinance
+backtesting
+backtrader
+ib_async
+blackscholes
+
+# Data storage and processing
+influxdb
+
+# Utilities
+python-dateutil
+pytz
+
+# Development and interactive computing
+ipython
+spyder
+
+# GUI
+qt
+pyqt
