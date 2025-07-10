@@ -57,11 +57,10 @@ swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',c
 futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 
 ## %%
-# To be evaluated ['QQQ']
-# us_etf_symbols = ['QQQ']
-us_etf_symbols = [ 'EEM', 'EWZ', 'FXI', 'GDX', 'GLD', 'HYG', 'IEFA', 'IWM', 'LQD', 'QQQ', 'SLV', 'SMH', 'SPY',
-  'TLT', 'TQQQ', 'UNG', 'USO', 'XLB', 'XLC', 'XLE', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLP', 'XLRE', 'XLU', 'XLV',
-  'XLY', 'XOP']
+us_etf_symbols = [
+  # 'EEM', 'EWZ', 'FXI', 'GDX', 'GLD', 'HYG', 'IEFA', 'IWM', 'LQD', 'QQQ', 'SLV', 'SMH', 'SPY', 'TLT', 'TQQQ',
+  # 'UNG', 'USO', 'XLB', 'XLC', 'XLE',  'XLF',
+  'XLI', 'XLK', 'XLP', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP']
 us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
 contracts = [*us_etfs, *commodity_cfds, *indices, *index_cfds, *forex, *futures,]
@@ -102,7 +101,7 @@ field_name_lu = {
   'HISTORICAL_VOLATILITY': {'open': 'hvo', 'high': 'hvh', 'low': 'hvl', 'close': 'hvc', 'volume': 'hvv', 'average': 'hva', 'barCount': 'hvbc'},
   'OPTION_IMPLIED_VOLATILITY': {'open': 'ivo', 'high': 'ivh', 'low': 'ivl', 'close': 'ivc', 'volume': 'ivv', 'average': 'iva', 'barCount': 'ivbc'},
 }
-
+#%%
 # for stock_name in stock_names:
 current_date = startDateTime
 for contract in contracts:

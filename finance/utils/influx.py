@@ -45,8 +45,8 @@ SYMBOLS = {'IBDE40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
 
 
 def get_influx_clients():
-  influx_client_df = idb.DataFrameClient()
-  influx_client = idb.InfluxDBClient()
+  influx_client_df = idb.DataFrameClient(timeout=120)
+  influx_client = idb.InfluxDBClient(timeout=120)
 
   indices = influx_client.query('show measurements', database=DB_INDEX)
   cfds = influx_client.query('show measurements', database=DB_CFD)
