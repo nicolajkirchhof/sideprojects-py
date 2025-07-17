@@ -47,9 +47,11 @@ forex = [ib.Forex(symbol=sym, exchange='IDEALPRO', currency=cur) for sym, cur in
           ('USD', 'JPY'), ('CHF', 'USD')]]
 
 eu_futures = [ib.ContFuture(symbol=x, multiplier='1', exchange='EUREX',currency='EUR') for x in ['DAX', 'ESTX50']]
-us_futures =[*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange='CME',currency='USD') for x in [('MES', '5'), ('MNQ', '2'), ('RTY', '50')]],
-             ib.ContFuture(symbol='MYM', multiplier='0.5', exchange='CBOT',currency='USD'),
-            ib.ContFuture(symbol='VXM', multiplier='100', exchange='CFE',currency='USD')]
+us_futures =[*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange=x[2], currency='USD') for x in
+               [('MES', '5', 'CME'), ('MNQ', '2', 'CME'), ('RTY', '50', 'CME'), ('MYM', '0.5', 'CBOT'),
+                ('VXM', '100', 'CFE'), ('ZB', '1000', 'CBOT'), ('ZC', '5000', 'CBOT'), ('ZF', '1000', 'CBOT'),
+                ('ZN', '1000', 'CBOT'), ('ZT', '2000', 'CBOT'), ('ZW', '5000', 'CBOT'),
+                ('SI', '5000', 'COMEX'), ('GC', '100', 'COMEX'), ('CL', '1000', 'NYMEX'), ('NG', '10000', 'NYMEX')]]]
 jp_futures = [ib.ContFuture(symbol='N225M', multiplier='100', exchange='OSE.JPN',currency='JPY')]
 swe_futures = [ib.ContFuture(symbol='OMXS30', multiplier='100', exchange='OMS',currency='SEK')]
 #
@@ -59,8 +61,8 @@ futures = [*eu_futures, *us_futures, *jp_futures, *swe_futures]
 ## %%
 us_etf_symbols = [
   # 'EEM', 'EWZ', 'FXI', 'GDX', 'GLD', 'HYG', 'IEFA', 'IWM', 'LQD', 'QQQ', 'SLV', 'SMH', 'SPY', 'TLT', 'TQQQ',
-  # 'UNG', 'USO', 'XLB', 'XLC', 'XLE',  'XLF',
-  'XLI', 'XLK', 'XLP', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XOP']
+  # 'UNG', 'USO', 'XLB', 'XLC', 'XLE',  'XLF', 'XLI', 'XLK', 'XLP', 'XLRE', 'XLU', 'XLV',
+  'XLY', 'XOP']
 us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
 contracts = [*us_etfs, *commodity_cfds, *indices, *index_cfds, *forex, *futures,]
