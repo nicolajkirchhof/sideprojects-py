@@ -22,7 +22,6 @@ SYMBOLS = {'IBDE40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBES35': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBFR40': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBGB100': {'EX': GB_EXCHANGE, 'DB': DB_CFD},
-
            'IBEU50': {'EX': DE_EXCHANGE, 'DB': DB_CFD},
            'IBUS30': {'EX': US_EXCHANGE, 'DB': DB_CFD},
            'IBUS500': {'EX': US_EXCHANGE, 'DB': DB_CFD},

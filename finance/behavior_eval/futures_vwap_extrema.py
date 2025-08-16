@@ -1,6 +1,7 @@
 #%%
 import pickle
 from datetime import datetime, timedelta
+from glob import glob
 from zoneinfo import ZoneInfo
 
 import dateutil
@@ -27,14 +28,15 @@ mpl.use('QtAgg')
 
 
 #%%
-symbols = ['IBDE40', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225', 'USGOLD' ]
+symbols = ['IBDE40', 'IBEU50', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225', 'USGOLD' ]
 symbol = symbols[0]
-IS_PLOT_ACTIVE=True
+IS_PLOT_ACTIVE=False
+IS_ALL_DAY=True
+RECREATE=True
 
 for symbol in symbols:
   #%% Create a directory
-  ad = True
-  ad_str = '_ad' if ad else ''
+  ad_str = '_ad' if IS_ALL_DAY else ''
   directory_evals = f'N:/My Drive/Trading/Strategies/swing_vwap{ad_str}/{symbol}'
   directory_plots = f'N:/My Drive/Trading/Plots/swing_vwap{ad_str}/{symbol}'
   os.makedirs(directory_evals, exist_ok=True)
@@ -47,6 +49,13 @@ for symbol in symbols:
   dfs_ref_range = []
   dfs_closing = []
   first_day = dateutil.parser.parse('2020-01-02T00:00:00').replace(tzinfo=tz)
+
+  if not RECREATE:
+    basenames = [os.path.basename(f) for f in glob(f'{directory_evals}/*.pkl')]
+    date_strs = [base_name.split('_')[-1].replace('.pkl', '') for base_name in basenames]
+    dates = [datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=tz) for date_str in date_strs]
+    first_day = max(dates) if dates else first_day
+
   # first_day = dateutil.parser.parse('2025-03-06T00:00:00').replace(tzinfo=tz)
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
@@ -63,10 +72,12 @@ for symbol in symbols:
     if not day_data.has_sufficient_data():
       print(f'Skipping day {day_start.date()} because of insufficient data')
       day_start = day_start + timedelta(days=1)
-      continue
-      # raise(Exception('Insufficient data'))
+      # continue
+      raise(Exception('Insufficient data'))
 
-    df_5m = day_data.df_5m_ad if ad else day_data.df_5m
+    df_5m = day_data.df_5m_ad if IS_ALL_DAY else day_data.df_5m
+    df_10m = day_data.df_10m_ad if IS_ALL_DAY else day_data.df_10m
+    df_15m = day_data.df_15m_ad if IS_ALL_DAY else day_data.df_15m
     df_extrema, pullback_threshold = utils.indicators.trading_day_moves(day_data)
 
     pullbacks, df_uptrends, df_downtrends = utils.indicators.trends(df_5m, df_extrema)
@@ -129,24 +140,30 @@ for symbol in symbols:
               "bracket_trigger": bracket_trigger, "bracket_sl_value": bracket_sl_value}
       ##%%
       return result
-    ##%%
-    bracket_moves = []
-    bracket_moves_after_next = []
-    for i in range(len(df_5m)-10):
+
+    def get_bracket_moves(df, offset):
       ##%%
-      candle = df_5m.iloc[i]
-      next_extremas = df_extrema[df_extrema.ts > candle.name]
-      next_extrema = next_extremas.iloc[0]
-      bracket_moves.append(cancel_moves_stats(candle, next_extrema))
+      bracket_moves = []
+      bracket_moves_after_next = []
+      for i in range(len(df)-offset):
+        ##%%
+        candle = df.iloc[i]
+        next_extremas = df_extrema[df_extrema.ts > candle.name]
+        next_extrema = next_extremas.iloc[0]
+        bracket_moves.append(cancel_moves_stats(candle, next_extrema))
 
-      candle = df_5m.iloc[i]
-      after_next_extrema = next_extremas.iloc[1] if len(next_extremas) > 1 else None
-      if after_next_extrema is not None:
-        bracket_moves_after_next.append(cancel_moves_stats(candle, after_next_extrema))
+        candle = df.iloc[i]
+        after_next_extrema = next_extremas.iloc[1] if len(next_extremas) > 1 else None
+        if after_next_extrema is not None:
+          bracket_moves_after_next.append(cancel_moves_stats(candle, after_next_extrema))
 
+      df_bracket_moves = pd.DataFrame(bracket_moves)
+      df_bracket_moves_after_next = pd.DataFrame(bracket_moves_after_next)
+      return df_bracket_moves, df_bracket_moves_after_next
 
-    df_bracket_moves = pd.DataFrame(bracket_moves)
-    df_bracket_moves_after_next = pd.DataFrame(bracket_moves_after_next)
+    df_bracket_moves, df_bracket_moves_after_next = get_bracket_moves(df_5m, 10)
+    df_bracket_moves_10m, df_bracket_moves_after_next_10m = get_bracket_moves(df_10m, 5)
+    df_bracket_moves_15m, df_bracket_moves_after_next_15m = get_bracket_moves(df_15m, 3)
 
     #%%
     df_ohcl_extrema = df_extrema[df_extrema.type.isin(['o', 'h', 'c', 'l'])]
@@ -195,12 +212,12 @@ for symbol in symbols:
       plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save
       plt.close()
     # %%
-    # metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3'], "uptrends": df_uptrends,
-    #             "downtrends": df_downtrends, "firstBars": df_5m[df_5m.index >= day_data.day_open][0:6],
-    #             "ts_oii": ts_oii, "ts_is_high_lh": ts_is_high_lh, "ts_is_high_oc": ts_is_high_oc,
-    #             "df_bracket_moves": df_bracket_moves, "df_bracket_moves_after_next": df_bracket_moves_after_next}
-    # with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
-    #   pickle.dump(metadata, f)
+    metadata = {"pullbacks": pullbacks, "extrema": df_extrema, "VWAP": df_5m['VWAP3'], "uptrends": df_uptrends,
+                "downtrends": df_downtrends, "firstBars": df_5m[df_5m.index >= day_data.day_open][0:6],
+                "ts_oii": ts_oii, "ts_is_high_lh": ts_is_high_lh, "ts_is_high_oc": ts_is_high_oc,
+                "df_bracket_moves": df_bracket_moves, "df_bracket_moves_after_next": df_bracket_moves_after_next}
+    with open(f'{directory_evals}/{symbol}_{date_str}.pkl', "wb") as f:
+      pickle.dump(metadata, f)
 
     print(f'{symbol} finished {date_str}')
     #%%

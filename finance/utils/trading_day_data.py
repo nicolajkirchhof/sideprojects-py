@@ -23,6 +23,8 @@ class TradingDayData:
     self.symbol = symbol
     self.exchange = utils.influx.SYMBOLS[symbol]['EX']
     self.df_5m_cache = pd.DataFrame()
+    self.df_10m_cache = pd.DataFrame()
+    self.df_15m_cache = pd.DataFrame()
     self.df_day_cache = pd.DataFrame()
     self.df_30m_cache = pd.DataFrame()
     self.day_start = None
@@ -55,17 +57,30 @@ class TradingDayData:
       days_since_saturday += 7
     return self.day_start - timedelta(days=days_since_saturday)
 
+  def get_candle_data(self, period: str):
+    cache = utils.influx.get_candles_range_aggregate(self.day_start - timedelta(days=30), self.day_start+self.min_future_cache, self.symbol, period)
+    cache['VWAP3'] = (cache['c']+cache['h']+cache['l'])/3
+    cache['20EMA'] = cache['VWAP3'].ewm(span=20, adjust=False).mean()
+    cache['200EMA'] = cache['VWAP3'].ewm(span=200, adjust=False).mean()
+    cache['lh'] = (cache.h - cache.l)
+    cache['oc'] = (cache.c - cache.o)
+    cache.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
+    return cache
+
+  def filter_all_day_data(self, df):
+    return df[(df.index >= self.day_start) & (df.index <= self.day_start + timedelta(days=1))]
+
+  def filter_rth_day_data(self, df):
+    return df[(df.index >= self.day_start) & (df.index <= self.day_end)]
+
+
   def _process_dataframes(self) -> None:
     """Process and filter DataFrames for different time periods"""
     # Filter 5-minute data
     if self.df_day_cache.empty or self.df_day_cache.iloc[-1].name < self.day_start + self.min_future_data:
-      self.df_5m_cache = utils.influx.get_candles_range_aggregate(self.day_start - timedelta(days=30), self.day_start+self.min_future_cache, self.symbol, '5m')
-      self.df_5m_cache['VWAP3'] = (self.df_5m_cache['c']+self.df_5m_cache['h']+self.df_5m_cache['l'])/3
-      self.df_5m_cache['20EMA'] = self.df_5m_cache['VWAP3'].ewm(span=20, adjust=False).mean()
-      self.df_5m_cache['200EMA'] = self.df_5m_cache['VWAP3'].ewm(span=200, adjust=False).mean()
-      self.df_5m_cache['lh'] = (self.df_5m_cache.h - self.df_5m_cache.l)
-      self.df_5m_cache['oc'] = (self.df_5m_cache.c - self.df_5m_cache.o)
-      self.df_5m_cache.dropna( subset=['o', 'h', 'c', 'l'], inplace=True)
+      self.df_5m_cache = self.get_candle_data('5m')
+      self.df_10m_cache = self.get_candle_data('10m')
+      self.df_15m_cache = self.get_candle_data('15m')
 
       self.df_30m_cache = self.df_5m_cache.resample('30min').agg(o=('o', 'first'), h=('h', 'max'), l=('l', 'min'), c=('c', 'last')).copy()
       self.df_30m_cache['VWAP3'] = (self.df_30m_cache['c']+self.df_30m_cache['h']+self.df_30m_cache['l'])/3
@@ -81,24 +96,19 @@ class TradingDayData:
       self.df_day_cache['lh'] = (self.df_day_cache.h - self.df_day_cache.l)
       self.df_day_cache['oc'] = (self.df_day_cache.c - self.df_day_cache.o)
       self.df_day_cache.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
-    self.df_5m = self.df_5m_cache[
-      (self.df_5m_cache.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
-      (self.df_5m_cache.index <= self.day_end)
-      ].copy()
-    self.df_5m_ad = self.df_5m_cache[
-      (self.df_5m_cache.index >= self.day_start) &
-      (self.df_5m_cache.index <= self.day_start + timedelta(days=1))
-      ].copy()
+
+    self.df_5m = self.filter_rth_day_data(self.df_5m_cache).copy()
+    self.df_5m_ad = self.filter_all_day_data(self.df_5m_cache).copy()
+
+    self.df_10m = self.filter_rth_day_data(self.df_10m_cache).copy()
+    self.df_10m_ad = self.filter_all_day_data(self.df_10m_cache).copy()
+
+    self.df_15m = self.filter_rth_day_data(self.df_15m_cache).copy()
+    self.df_15m_ad = self.filter_all_day_data(self.df_15m_cache).copy()
 
     # Filter 30-minute data
-    self.df_30m = self.df_30m_cache[
-      (self.df_30m_cache.index >= self.day_start + self.exchange['Open'] - timedelta(hours=1)) &
-      (self.df_30m_cache.index <= self.day_end)
-      ].copy()
-    self.df_30m_ad = self.df_30m_cache[
-      (self.df_30m_cache.index >= self.day_start) &
-      (self.df_30m_cache.index <= self.day_start + timedelta(days=1))
-      ].copy()
+    self.df_30m = self.filter_rth_day_data(self.df_30m_cache).copy()
+    self.df_30m_ad = self.filter_all_day_data(self.df_30m_cache).copy()
 
     # Filter daily data
     self.df_day = self.df_day_cache[
