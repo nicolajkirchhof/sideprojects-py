@@ -31,3 +31,11 @@ spyder
 # GUI
 qt
 pyqt
+
+# Database
+Flask
+Flask-Migrate
+SQLAlchemy
+Alembic
+psycopg2-binary
+python-dotenv

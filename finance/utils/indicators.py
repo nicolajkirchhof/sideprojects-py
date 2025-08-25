@@ -35,8 +35,7 @@ def adaptive_moving_average(prices, period=10, fast=3, slow=30):
 
   return pd.Series(ama, index=prices.index)
 
-def trading_day_moves(day_data, use_all_day = True, pullback_threshold_multiplier = 0.3):
-  df_5m = day_data.df_5m_ad if use_all_day else day_data.df_5m
+def trading_day_moves(day_data, df_candles, pullback_threshold_multiplier = 0.3):
 
   # Extrema algorithm
   # 1. Start with the o, h, c, l of the current day
@@ -51,32 +50,32 @@ def trading_day_moves(day_data, use_all_day = True, pullback_threshold_multiplie
     return {"dpdh": day_data.pdh - x, "dpdl": day_data.pdl - x, "dcwh": day_data.cwh - x, "dcwl": day_data.cwl - x,
             "dpwh": day_data.pwh - x, "dpwl": day_data.pwl - x, "donh": day_data.onh - x, "donl": day_data.onl - x}
 
-  start = df_5m.iloc[0]
-  low = df_5m['l'].min()
-  extreme_low = {"ts": df_5m['l'].idxmin(), "type": 'l', "value": low, **calculate_offssets(low)}
-  high = df_5m['h'].max()
-  extreme_high = {"ts": df_5m['h'].idxmax(), "type": 'h', "value": high, **calculate_offssets(high)}
-  end = df_5m.iloc[-1]
+  start = df_candles.iloc[0]
+  low = df_candles['l'].min()
+  extreme_low = {"ts": df_candles['l'].idxmin(), "type": 'l', "value": low, **calculate_offssets(low)}
+  high = df_candles['h'].max()
+  extreme_high = {"ts": df_candles['h'].idxmax(), "type": 'h', "value": high, **calculate_offssets(high)}
+  end = df_candles.iloc[-1]
   is_up_move_day = extreme_low['ts'] < extreme_high['ts']
   extrema = [extreme_low, extreme_high] if is_up_move_day else [extreme_high, extreme_low]
   is_open_extreme = extrema[0]['ts'] == start.name
   is_close_extreme = extrema[-1]['ts'] == end.name
   if not is_open_extreme:
-    extrema.insert(0, {"ts": df_5m.index[0], "type": 'o',
-                       "value": df_5m.o.iloc[0], **calculate_offssets(df_5m.o.iloc[0])})
+    extrema.insert(0, {"ts": df_candles.index[0], "type": 'o',
+                       "value": df_candles.o.iloc[0], **calculate_offssets(df_candles.o.iloc[0])})
   if not is_close_extreme:
-    extrema.append({"ts": df_5m.index[-1], "type": 'c',
-                    "value": df_5m.c.iloc[-1], **calculate_offssets(df_5m.c.iloc[-1])})
+    extrema.append({"ts": df_candles.index[-1], "type": 'c',
+                    "value": df_candles.c.iloc[-1], **calculate_offssets(df_candles.c.iloc[-1])})
   df_extrema = pd.DataFrame(extrema)
   ##%%
-  vwap_tops_filter = ((df_5m['VWAP3'].shift(1) < df_5m['VWAP3']) &
-                      (df_5m['VWAP3'] > df_5m['VWAP3'].shift(-1)))
-  vwap_bottoms_filter = ((df_5m['VWAP3'].shift(1) > df_5m['VWAP3']) &
-                         (df_5m['VWAP3'] < df_5m['VWAP3'].shift(-1)))
-  df_5m['VWAP3_is_top'] = vwap_tops_filter
-  df_5m['VWAP3_is_bottom'] = vwap_bottoms_filter
-  vwap_tops_index = df_5m[vwap_tops_filter].index.tolist()
-  vwap_bottoms_index = df_5m[vwap_bottoms_filter].index.tolist()
+  vwap_tops_filter = ((df_candles['VWAP3'].shift(1) < df_candles['VWAP3']) &
+                      (df_candles['VWAP3'] > df_candles['VWAP3'].shift(-1)))
+  vwap_bottoms_filter = ((df_candles['VWAP3'].shift(1) > df_candles['VWAP3']) &
+                         (df_candles['VWAP3'] < df_candles['VWAP3'].shift(-1)))
+  df_candles['VWAP3_is_top'] = vwap_tops_filter
+  df_candles['VWAP3_is_bottom'] = vwap_bottoms_filter
+  vwap_tops_index = df_candles[vwap_tops_filter].index.tolist()
+  vwap_bottoms_index = df_candles[vwap_bottoms_filter].index.tolist()
   ##%%
   extrema_vwap = []
   # PULLBACK_THRESHOLD_MULTIPLIER = 0.33
@@ -90,9 +89,9 @@ def trading_day_moves(day_data, use_all_day = True, pullback_threshold_multiplie
     start_extrema = df_extrema.iloc[i - 1]
     end_extrema = df_extrema.iloc[i]
     direction = 1 if end_extrema.type == 'h' or start_extrema.type == 'l' else -1
-    extrema_range_filter = ((df_5m.index >= start_extrema['ts']) &
-                            (df_5m.index < end_extrema['ts']))
-    df_dir = df_5m[extrema_range_filter]
+    extrema_range_filter = ((df_candles.index >= start_extrema['ts']) &
+                            (df_candles.index < end_extrema['ts']))
+    df_dir = df_candles[extrema_range_filter]
     if df_dir.empty:
       continue
 

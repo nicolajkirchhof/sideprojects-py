@@ -25,9 +25,11 @@ ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
 ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
 
 #%%
-eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50']]
-us_indices = [ib.Index('SPX', 'CBOE', 'USD'), ib.Index('NDX', 'NASDAQ', 'USD'),
-              ib.Index('RUT', 'RUSSELL', 'USD'), ib.Index('INDU', 'CME', 'USD')]
+eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50', 'V2TX', 'V1X']]
+us_indices = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX', 'VXN', 'RVX', 'VXSLV', 'GVZ', 'OVX']],
+              ib.Index('SPX', 'CBOE', 'USD'),
+              ib.Index('NDX', 'NASDAQ', 'USD'), ib.Index('RUT', 'RUSSELL', 'USD'),
+              ib.Index('INDU', 'CME', 'USD')]
 fr_index = ib.Index('CAC40', 'MONEP', 'EUR')
 # es_index = ib.Index('IBEX35', 'MEFFRV', 'EUR')
 jp_index = ib.Index('N225', 'OSE.JPN', 'JPY')
@@ -65,7 +67,7 @@ us_etf_symbols = [
   'XLY', 'XOP']
 us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
-contracts = [*us_etfs, *commodity_cfds, *indices, *index_cfds, *forex, *futures,]
+contracts = [*indices, *us_etfs, *commodity_cfds, *index_cfds, *forex, *futures,]
 for contract in contracts:
   ib_con.qualifyContracts(contract)
   details = ib_con.reqContractDetails(contract)

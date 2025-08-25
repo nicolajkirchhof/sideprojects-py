@@ -20,14 +20,14 @@ ib_con.connect('127.0.0.1', tws_paper_port, clientId=11, readonly=True)
 # ib_con.connect('127.0.0.1', api_real_port, clientId=11, readonly=True)
 ib_con.reqMarketDataType(2)
 
-## %%
+# %%
 summary = ib_con.accountSummary()
 values = ib_con.accountValues()
 positions = ib_con.positions()
 portfolio = ib_con.portfolio()
 underlying_market_data = {}
 MAX_TRIES = 10
-## %%
+# %%
 option_portfolio_positions = [position for position in portfolio if position.contract.secType == 'OPT']
 SEP = ','
 

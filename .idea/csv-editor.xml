@@ -108,6 +108,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\finance\data\portfolio.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\etf_symbols.csv">
           <value>
             <Attribute>

@@ -13,13 +13,18 @@ from finance.utils.trading_day_data import TradingDayData
 import matplotlib.ticker as mticker
 
 
-def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', atr_vlines=dict(vlines=[], colors=[]), ad=True):
+def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', atr_vlines=dict(vlines=[], colors=[]), ad=True, basetime = '5m'):
   # |-------------------------|
-  # |           5m            |
+  # |        5m/10m/15m       |
   # | ------------------------|
   # |   D   |       30m       |
   # | ------------------------|
-  df_5m = day_data.df_5m_ad if ad else day_data.df_5m
+  if basetime == '5m':
+    df_base = day_data.df_5m_ad if ad else day_data.df_5m
+  elif basetime == '10m':
+    df_base = day_data.df_10m_ad if ad else day_data.df_10m
+  elif basetime == '15m':
+    df_base = day_data.df_15m_ad if ad else day_data.df_15m
   df_30m = day_data.df_30m_ad if ad else day_data.df_30m
 
   fig = mpf.figure(style='yahoo', figsize=(19,11), tight_layout=True)
@@ -41,17 +46,17 @@ def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', atr_v
   hlines_day=dict(hlines=indicator_hlines[1:], colors= ['#bf42f5']*5+['#3179f5']*4, linewidths=[0.6]*3+[0.4]*6, linestyle=['--']+['-']*(len(indicator_hlines)-1))
   vlines=dict(vlines=[day_data.day_open, day_data.day_close], alpha=[0.2], colors= ['deeppink']*2, linewidths=[1], linestyle=['--'])
 
-  ind_5m_ema20_plot = mpf.make_addplot(df_5m['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
-  ind_5m_ema240_plot = mpf.make_addplot(df_5m['200EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
-  ind_vwap3_plot = mpf.make_addplot(df_5m['VWAP3'], ax=ax1, width=2, color='turquoise')
+  ind_5m_ema20_plot = mpf.make_addplot(df_base['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
+  ind_5m_ema240_plot = mpf.make_addplot(df_base['200EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
+  ind_vwap3_plot = mpf.make_addplot(df_base['VWAP3'], ax=ax1, width=2, color='turquoise')
 
   ind_30m_ema20_plot = mpf.make_addplot(df_30m['20EMA'], ax=ax3, width=0.6, color="#FF9900", linestyle='--')
 
   ind_day_ema20_plot = mpf.make_addplot(day_data.df_day['20EMA'], ax=ax2, width=0.6, color="#FF9900", linestyle='--')
 
-  mpf.plot(df_5m, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
+  mpf.plot(df_base, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M', tight_layout=True,
            scale_width_adjustment=dict(candle=1.35), hlines=hlines, alines=alines, vlines=vlines, addplot=[ind_5m_ema20_plot, ind_5m_ema240_plot, ind_vwap3_plot])
-  mpf.plot(df_5m, type='line', ax=ax4, columns=['lh']*5, xrotation=0, datetime_format='%H:%M', vlines=atr_vlines, tight_layout=True)
+  mpf.plot(df_base, type='line', ax=ax4, columns=['lh']*5, xrotation=0, datetime_format='%H:%M', vlines=atr_vlines, tight_layout=True)
 
   mpf.plot(day_data.df_day, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING,  xrotation=0, datetime_format='%m-%d', tight_layout=True,
            hlines=hlines_day, warn_too_much_data=700, addplot=[ind_day_ema20_plot])
