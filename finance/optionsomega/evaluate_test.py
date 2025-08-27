@@ -46,8 +46,12 @@ directory = f'N:/My Drive/Trading/Strategies/OptionOmega'
 # file = f'{directory}/60-DTE-111-Early-Exit-14-DTE-10D-30D-5D.csv'
 # file = f'{directory}/SPY-60DTE-111-10D-30D-5D-5.csv'
 # file = f'{directory}/07-DTE-Naket-put-07D-AM-SL200.csv'
+# file = f'{directory}/07-DTE-Naket-put-07D-AM-SL150.csv'
+# file = f'{directory}/07-DTE-Naket-put-07D-AM-SL250-.csv'
 # file = f'{directory}/07-DTE-Naket-put-05D-AM-SL200.csv'
-file = f'{directory}/56-DTE-Naket-put-10D-AM-SL200.csv'
+# file = f'{directory}/56-DTE-Naket-put-10D-AM-SL200.csv'
+# file = f'{directory}/07-DTE-Strangle-07D-03D-AM-SL250.csv'
+file = f'{directory}/07-DTE-Strangle-07D-03D-AM-SL250PerLeg.csv'
 
 df = pd.read_csv(file)
 df['DateTimeOpened'] = pd.to_datetime(df['Date Opened']+ 'T' +df['Time Opened']).dt.tz_localize('America/New_York')
@@ -85,4 +89,11 @@ df_v.plot.scatter(x='Weekday', y='P/L', style='o')
 plt.show()
 
 
-df_v.groupby(['Year', 'Weekday']).agg({'P/L':['sum']})
+print(df_v.groupby(['Year', 'Weekday']).agg({'P/L':['sum']}))
+#%%
+print(df_v.groupby(['Month']).agg({'P/L':['sum']}))
+df_v.plot.scatter(x='Month', y='P/L', style='o')
+df_v.boxplot(column='P/L', by='Month')
+plt.show()
+
+#%%

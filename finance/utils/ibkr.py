@@ -4,6 +4,13 @@ import ib_async as ib
 import numpy as np
 from datetime import datetime, timedelta
 
+def connect(instance, id, data_type):
+  ib.util.startLoop()
+  ib_con = ib.IB()
+  tws_ports = {'real': 7497, 'paper': 7498, 'api': 4001, 'api_paper': 4002}
+  ib_con.connect('127.0.0.1', tws_ports[instance], clientId=id, readonly=True)
+  ib_con.reqMarketDataType(data_type)
+  return ib_con
 
 # %%
 def get_options_data(ib_con, contracts, tick_list="100, 101, 104, 105, 106, 165, 588", signalParameterLive="ask",

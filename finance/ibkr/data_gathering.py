@@ -14,17 +14,14 @@ mpl.use('QtAgg')
 
 utils.influx.create_databases()
 influx_client_df, influx_client = utils.influx.get_influx_clients()
-ib.util.startLoop()
-ib_con = ib.IB()
-tws_real_port = 7497
-tws_paper_port = 7498
-api_real_port = 4002
-api_paper_port = 4002
-# ib_con.connect('127.0.0.1', api_paper_port, clientId=3, readonly=True)
-ib_con.connect('127.0.0.1', tws_paper_port, clientId=3, readonly=True)
-ib_con.reqMarketDataType(2)  # Use free, delayed, frozen data
+
+tws_instance = 'real'
+ib_con = utils.ibkr.connect(tws_instance, 3, 2)
 
 #%%
+
+no_ooi_indices = ['V2TX', 'V1X', 'VXN', 'RVX', 'VXSLV', 'GVZ']
+no_hv_indices = ['VXSLV']
 eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50', 'V2TX', 'V1X']]
 us_indices = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX', 'VXN', 'RVX', 'VXSLV', 'GVZ', 'OVX']],
               ib.Index('SPX', 'CBOE', 'USD'),
@@ -111,6 +108,9 @@ current_date = startDateTime
 for contract in contracts:
   dfs_contract = {}
   for typ in types_of_data[contract.secType]:
+    if typ == 'OPTION_IMPLIED_VOLATILITY' and contract.symbol in no_ooi_indices \
+        or typ == 'HISTORICAL_VOLATILITY' and contract.symbol in no_hv_indices:
+      continue
     field_name = field_name_lu[typ]['close']
     c_last = influx_client_df.query(f'select last("{field_name}") from {contract_to_fieldname(contract)}',
                                    database=utils.influx.sec_type_to_database_name(contract.secType))
