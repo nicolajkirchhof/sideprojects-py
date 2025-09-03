@@ -10,20 +10,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\ECB_Interest.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\US_Interest.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\finance\_data\Options Strategies - NoonIronButterfly.csv">
           <value>
             <Attribute>
@@ -102,20 +88,6 @@
           </value>
         </entry>
         <entry key="\finance\_data\y_finance\ZPRV.DE.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\data\portfolio.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\etf_symbols.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

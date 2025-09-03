@@ -13,3 +13,4 @@ from . import geometry
 from . import trading_day_data
 from . import colors
 from . import ifttt
+from . import math

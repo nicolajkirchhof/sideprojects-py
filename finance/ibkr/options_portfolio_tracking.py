@@ -29,6 +29,7 @@ header_portfolio = f'ContractId {SEP} Expiry {SEP} Pos {SEP} Right {SEP} Symbol 
 
 underlying_market_data = {}
 last_market_data = {}
+closing_order_states = {}
 #%%
 def print_and_notify(option_portfolio_position):
   #%%
@@ -37,7 +38,7 @@ def print_and_notify(option_portfolio_position):
   sym_strike = f"{option_portfolio_position.contract.symbol}@{option_portfolio_position.contract.strike}"
   exp = option_portfolio_position.contract.lastTradeDateOrContractMonth
   exp_str = f'{exp[:4]}-{exp[4:6]}-{exp[6:8]}'
-  line = f'{option_portfolio_position.contract.conId}{SEP} {exp_str}{SEP}{option_portfolio_position.position:5}{SEP}'
+  line = f'{option_portfolio_position.contract.conId}{SEP}{SEP} {exp_str}{SEP}{option_portfolio_position.position:5}{SEP}'
   line += f'{option_portfolio_position.contract.right:2}{SEP} {sym_strike:15}'
   line += f'{SEP}{option_portfolio_position.averageCost/int(option_portfolio_position.contract.multiplier):10.5f}{SEP}{option_portfolio_position.marketPrice:10.5f}'
   line += f'{SEP}{pnl:8.2f}{SEP}{pnl_pct:8.2f}{SEP}'
@@ -56,14 +57,15 @@ def get_price(market_data, type):
   return getattr(market_data, type) if getattr(market_data, type) > 0 else getattr(market_data, 'prev'+type.capitalize())
 
 
-def log_position(contract):
+def log_position(position):
   #%%
+  contract = position.contract
   ib_con.reqMarketDataType(2)
   market_data = ib_con.reqMktData(contract, "", True, False)
   ib_con.sleep(1)
   tries = 0
   while (market_data.modelGreeks is None or ((isnan(get_price(market_data, 'bid')) or
-         isnan(get_price(market_data, 'ask'))) and isnan(market_data.close) and
+         isnan(get_price(market_data, 'ask')))  and
          isnan(get_price(market_data, 'last')))) and tries < MAX_TRIES:
     #print(f"Waiting {tries} / {MAX_TRIES} for option frozen data...")
     tries += 1
@@ -92,23 +94,26 @@ def log_position(contract):
   bid = get_price(market_data, 'bid')
   ask = get_price(market_data, 'ask')
   last = get_price(market_data, 'last')
-  close = market_data.close
 
   price = last
   if isnan(price) and not isnan(bid) and not isnan(ask):
     price = (bid + ask)/2
-  else:
-    price = close
   iv = greeks.impliedVol if greeks.impliedVol is not None else -1
   ##%% Greeks sometimes return None
   greeks_to_str = lambda x: f'{x:.8f}' if x is not None else 'NaN'
 
   moneyness =  contract.strike - umd.close if contract.right == 'P' else umd.close - contract.strike
   time_value = price - moneyness if moneyness > 0 else price
+  order = ib.MarketOrder("SELL" if position.position > 0 else "BUY", abs(position.position))
+  state = ib_con.whatIfOrder(contract, order)
+  closing_order_states[contract.conId] = [state, order]
+  maintenance_margin = abs(float(state.maintMarginChange))
+
   #%%
   plain = f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}{SEP} {contract.conId}'
   plain += f'{SEP} {umd.close}{SEP} {iv:.2f}{SEP} {price:.5f}{SEP} {time_value:.5f}'
   plain += f'{SEP} {greeks_to_str(greeks.delta)}{SEP} {greeks_to_str(greeks.theta)}{SEP} {greeks_to_str(greeks.gamma)}{SEP} {greeks_to_str(greeks.vega)}'
+  plain += f'{SEP} {maintenance_margin:.2f}'
   print(plain)
   with open(file, 'a', encoding='utf8') as f:
     f.write(plain+'\n')
@@ -118,8 +123,9 @@ file = f'N:/My Drive/Trading/portfolio_{tws_instance}.csv'
 if not os.path.exists(file):
   with open(file, 'w', encoding='utf8') as f:
     f.write(header)
-
+#%%
 while True:
+  #%%
   summary = ib_con.accountSummary()
   values = ib_con.accountValues()
   portfolio = sorted(ib_con.portfolio(), key=lambda x: x.contract.conId)
@@ -135,8 +141,8 @@ while True:
   print("\n Writing positions to file... \n")
   print(header)
   #%%
-  for option_portfolio_contract in option_portfolio_contracts:
-    log_position(option_portfolio_contract)
+  for option_portfolio_position in option_portfolio_positions:
+    log_position(option_portfolio_position)
 
 
 

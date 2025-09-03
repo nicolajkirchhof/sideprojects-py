@@ -4,6 +4,9 @@ import ib_async as ib
 import numpy as np
 from datetime import datetime, timedelta
 
+def get_options_price(market_data, type):
+  return getattr(market_data, type) if getattr(market_data, type) > 0 else getattr(market_data, 'prev'+type.capitalize())
+
 def connect(instance, id, data_type):
   ib.util.startLoop()
   ib_con = ib.IB()

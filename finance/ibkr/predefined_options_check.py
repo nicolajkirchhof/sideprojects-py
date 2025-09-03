@@ -10,17 +10,8 @@ import finance.utils as utils
 %autoreload 2
 
 ##%%
-ib.util.startLoop()
-ib_con = ib.IB()
-tws_real_port = 7497
-tws_paper_port = 7498
-api_real_port = 4001
-api_paper_port = 4002
-# ib_con.connect('127.0.0.1', tws_real_port, clientId=7, readonly=True)
-# ib_con.connect('127.0.0.1', api_paper_port, clientId=7, readonly=True)
-ib_con.connect('127.0.0.1', tws_paper_port, clientId=7, readonly=True)
-# ib_con.connect('127.0.0.1', api_real_port, clientId=7, readonly=True)
-ib_con.reqMarketDataType(2)
+tws_instance = 'real'
+ib_con = utils.ibkr.connect(tws_instance, 7, 2)
 
 # %%
 underlying_market_data = {}
@@ -44,7 +35,9 @@ for contract in contracts:
   ib_con.reqMarketDataType(2)
   market_data = ib_con.reqMktData(contract, "", True, False)
   tries = 0
-  while market_data.modelGreeks is None and tries < MAX_TRIES:
+  while (market_data.modelGreeks is None or ((utils.math.isnan(utils.ibkr.get_options_price(market_data, 'bid')) or
+                                              utils.math.isnan(utils.ibkr.get_options_price(market_data, 'ask')))  and
+                                             utils.math.isnan(utils.ibkr.get_options_price(market_data, 'last')))) and tries < MAX_TRIES:
     print(f"Waiting {tries} / {MAX_TRIES}  for option frozen data...")
     tries += 1
     ib_con.sleep(5)
@@ -62,25 +55,31 @@ for contract in contracts:
                                    whatToShow='TRADES', useRTH=True)[0]
     underlying_market_data[underlying.conId] = umd
   greeks =  ib.OptionComputation(-1, None, None, None, None, None, None, None, None)
-  if market_data.lastGreeks is not None:
+  if market_data.lastGreeks is not None and market_data.lastGreeks.delta is not None \
+      and market_data.lastGreeks.gamma is not None and market_data.lastGreeks.vega is not None \
+      and market_data.lastGreeks.theta is not None and market_data.lastGreeks.impliedVol is not None:
     greeks = market_data.lastGreeks
   elif market_data.modelGreeks is not None:
     greeks = market_data.modelGreeks
 
-  bid = market_data.bid if market_data.bid > 0 else market_data.prevBid
-  ask = market_data.ask if market_data.ask > 0 else market_data.prevAsk
+  bid = utils.ibkr.get_options_price(market_data, 'bid')
+  ask = utils.ibkr.get_options_price(market_data, 'ask')
+  last = utils.ibkr.get_options_price(market_data, 'last')
+
+  price = last
+  if utils.math.isnan(price) and not utils.math.isnan(bid) and not utils.math.isnan(ask):
+    price = (bid + ask)/2
   iv = greeks.impliedVol if greeks.impliedVol is not None else -1
   daily_iv = utils.ibkr.yearly_to_daily_iv(iv)
   ##%% Greeks sometimes return None
   greeks_to_str = lambda x: f'{1000*x:.0f}' if x is not None else 'NaN'
   exp = contract.lastTradeDateOrContractMonth
   exp_str = f'{exp[:4]}-{exp[4:6]}-{exp[6:8]}'
-  last = (bid + ask)/2
   moneyness =  contract.strike - umd.close if contract.right == 'P' else umd.close - contract.strike
-  time_value = last - moneyness if moneyness > 0 else last
+  time_value = price - moneyness if moneyness > 0 else price
   #%%
   plain += f'{contract.symbol}{SEP} {100*iv:.2f}{SEP} {contract.right}{SEP} {datetime.now().strftime("%Y-%m-%d %H:%M")}'
-  plain += f'{SEP} {umd.close}{SEP} {exp_str}{SEP} {contract.strike}{SEP} {last:.2f}{SEP} {time_value:.2f}{SEP}'
+  plain += f'{SEP} {umd.close}{SEP} {exp_str}{SEP} {contract.strike}{SEP} {price:.2f}{SEP} {time_value:.2f}{SEP}'
   plain += f' {greeks_to_str(greeks.delta)}{SEP} {greeks_to_str(greeks.theta)}{SEP}'
   plain += f' {greeks_to_str(greeks.gamma)}{SEP} {greeks_to_str(greeks.vega)}{SEP} Check\n\n'
 
