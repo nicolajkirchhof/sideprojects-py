@@ -51,7 +51,9 @@ directory = f'N:/My Drive/Trading/Strategies/OptionOmega'
 # file = f'{directory}/07-DTE-Naket-put-05D-AM-SL200.csv'
 # file = f'{directory}/56-DTE-Naket-put-10D-AM-SL200.csv'
 # file = f'{directory}/07-DTE-Strangle-07D-03D-AM-SL250.csv'
-file = f'{directory}/07-DTE-Strangle-07D-03D-AM-SL250PerLeg.csv'
+# file = f'{directory}/07-DTE-Strangle-07D-03D-AM-SL250PerLeg.csv'
+# file = f'{directory}/SPY-42-DTE-Strangle-16D-10D-AM-21DTE-SL100-PT50-EE21.csv'
+file = f'{directory}/SPY-42-DTE-Strangle-16D-10D-PM-21DTE-SL100-PT50-EE21.csv'
 
 df = pd.read_csv(file)
 df['DateTimeOpened'] = pd.to_datetime(df['Date Opened']+ 'T' +df['Time Opened']).dt.tz_localize('America/New_York')
@@ -81,19 +83,21 @@ df_v.plot.scatter(x='vhcl', y='P/L', style='o')
 plt.show()
 df_v[['vhcl', 'P/L']].corr()
 #%%
-df_v['VixRegime'] = pd.cut(df_v['vhcl'], bins=[-np.inf, 13, 25, np.inf], labels=['v<13', '13<v<25', 'v>25' ])
-df_v.groupby(['VixRegime']).agg({'P/L':['sum'], 'W/L':['sum' ,'count', lambda x: x.sum()/x.count()]})
+# df_v['VixRegime'] = pd.cut(df_v['vhcl'], bins=[-np.inf, 13, 25, np.inf], labels=['v<13', '13<v<25', 'v>25' ])
+df_v['VixRegime'] = pd.cut(df_v['vhcl'], bins=[-np.inf, *list(range(12,30)), np.inf], labels=['v<12', *list(range(12,29)), 'v>28' ])
+df_v.groupby(['VixRegime']).agg({'P/L':['sum', lambda x: x.sum()/x.count()], 'W/L':['sum' ,'count', lambda x: x.sum()/x.count()]})
 #%%
-print(df_v.groupby(['Weekday']).agg({'P/L':['sum']}))
-df_v.plot.scatter(x='Weekday', y='P/L', style='o')
+df_v_flt = df_v[df_v['P/L'] > -3000]
+print(df_v_flt.groupby(['Weekday']).agg({'P/L':['sum']}))
+df_v_flt.plot.scatter(x='Weekday', y='P/L', style='o')
 plt.show()
 
 
-print(df_v.groupby(['Year', 'Weekday']).agg({'P/L':['sum']}))
+print(df_v_flt.groupby(['Year', 'Weekday']).agg({'P/L':['sum']}))
 #%%
-print(df_v.groupby(['Month']).agg({'P/L':['sum']}))
-df_v.plot.scatter(x='Month', y='P/L', style='o')
-df_v.boxplot(column='P/L', by='Month')
+print(df_v_flt.groupby(['Month']).agg({'P/L':['sum']}))
+df_v_flt.plot.scatter(x='Month', y='P/L', style='o')
+df_v_flt.boxplot(column='P/L', by='Month')
 plt.show()
 
 #%%

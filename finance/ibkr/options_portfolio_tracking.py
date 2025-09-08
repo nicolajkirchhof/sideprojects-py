@@ -21,7 +21,7 @@ MAX_TRIES = 10
 TRIGGER = "PortfolioUpdate"
 KEY = "fjJheEoJRyGZ8IAWRzP2jvZfLgtWEj6PJs2fwbUd1Dz"
 
-#%%
+##%%
 ## %% PNL PCT
 SEP = ','
 header = f'Date {SEP} ContractId {SEP} Underlying {SEP} IV {SEP} Price {SEP} TimeValue {SEP} Δ {SEP} Θ {SEP} Γ {SEP} ν {SEP} Multiplier\n'
@@ -107,7 +107,7 @@ def log_position(position):
   order = ib.MarketOrder("SELL" if position.position > 0 else "BUY", abs(position.position))
   state = ib_con.whatIfOrder(contract, order)
   closing_order_states[contract.conId] = [state, order]
-  maintenance_margin = abs(float(state.maintMarginChange))
+  maintenance_margin = abs(float(state.maintMarginChange)) if hasattr(state, 'maintMarginChange') else 0
 
   #%%
   plain = f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}{SEP} {contract.conId}'
@@ -127,6 +127,15 @@ if not os.path.exists(file):
 while True:
   #%%
   summary = ib_con.accountSummary()
+  net_liq = [x for x in summary if x.account == 'U16408041' and x.tag == 'NetLiquidation'][0]
+  bpr = [x for x in summary if x.account == 'U16408041' and x.tag == 'BuyingPower'][0]
+  maint = [x for x in summary if x.account == 'U16408041' and x.tag == 'MaintMarginReq'][0]
+  excess = [x for x in summary if x.account == 'U16408041' and x.tag == 'AvailableFunds'][0]
+
+  capital = f'Net Liq{SEP} Maintenance{SEP} Excess{SEP} BPR\n'
+  capital += f'{float(net_liq.value):.0f}{SEP} {float(maint.value):.0f}{SEP} {float(excess.value):.0f}{SEP} {float(bpr.value):.0f}'
+  print(capital)
+  #%%
   values = ib_con.accountValues()
   portfolio = sorted(ib_con.portfolio(), key=lambda x: x.contract.conId)
   positions = ib_con.positions()
@@ -140,7 +149,7 @@ while True:
     print_and_notify(option_portfolio_position)
   print("\n Writing positions to file... \n")
   print(header)
-  #%%
+  ##%%
   for option_portfolio_position in option_portfolio_positions:
     log_position(option_portfolio_position)
 
