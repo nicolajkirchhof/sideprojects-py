@@ -38,7 +38,7 @@ def print_and_notify(option_portfolio_position):
   sym_strike = f"{option_portfolio_position.contract.symbol}@{option_portfolio_position.contract.strike}"
   exp = option_portfolio_position.contract.lastTradeDateOrContractMonth
   exp_str = f'{exp[:4]}-{exp[4:6]}-{exp[6:8]}'
-  line = f'{option_portfolio_position.contract.conId}{SEP}{SEP} {exp_str}{SEP}{option_portfolio_position.position:5}{SEP}'
+  line = f'{option_portfolio_position.contract.conId}{SEP}{SEP} {exp_str}{SEP}{SEP}{option_portfolio_position.position:5}{SEP}'
   line += f'{option_portfolio_position.contract.right:2}{SEP} {sym_strike:15}'
   line += f'{SEP}{option_portfolio_position.averageCost/int(option_portfolio_position.contract.multiplier):10.5f}{SEP}{option_portfolio_position.marketPrice:10.5f}'
   line += f'{SEP}{pnl:8.2f}{SEP}{pnl_pct:8.2f}{SEP}'
@@ -135,7 +135,7 @@ while True:
   capital = f'Net Liq{SEP} Maintenance{SEP} Excess{SEP} BPR\n'
   capital += f'{float(net_liq.value):.0f}{SEP} {float(maint.value):.0f}{SEP} {float(excess.value):.0f}{SEP} {float(bpr.value):.0f}'
   print(capital)
-  #%%
+  ##%%
   values = ib_con.accountValues()
   portfolio = sorted(ib_con.portfolio(), key=lambda x: x.contract.conId)
   positions = ib_con.positions()

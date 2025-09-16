@@ -10,6 +10,7 @@ DB_CFD = 'cfd'
 DB_FOREX = 'forex'
 DB_STK = 'stk'
 DB_FUTURE = 'future'
+DB_DAILY = 'daily'
 MPF_COLUMN_MAPPING = ['o', 'h', 'l', 'c', 'v']
 
 SEC_TYPE_DB_MAPPING = {
@@ -52,6 +53,7 @@ def get_influx_clients():
   forex = influx_client.query('show measurements', database=DB_FOREX)
   stk = influx_client.query('show measurements', database=DB_STK)
   futures = influx_client.query('show measurements', database=DB_FUTURE)
+  daily = influx_client.query('show measurements', database=DB_DAILY)
 
   get_values = lambda x: [y[0] for y in x.raw['series'][0]['values']]
   print('Indices: ', get_values(indices))
@@ -59,6 +61,7 @@ def get_influx_clients():
   print('Forex: ', get_values(forex))
   print('Stoks: ', get_values(stk))
   print('Futures: ', get_values(futures))
+  print('Daily: ', get_values(daily))
   return influx_client_df, influx_client
 
 
@@ -105,11 +108,9 @@ def create_databases():
   influx_client.create_database(DB_STK)
   influx_client.create_database(DB_FUTURE)
   influx_client.create_database(DB_CFD)
+  influx_client.create_database(DB_DAILY)
 
 
 def sec_type_to_database_name(sec_type):
   return SEC_TYPE_DB_MAPPING[sec_type]
 
-def get_5m_30m_day_date_range_with_indicators(start, end, symbol, cache_offset = timedelta(days=30)):
-
-  return df_5m, df_30m, df_day

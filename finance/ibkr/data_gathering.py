@@ -20,7 +20,7 @@ ib_con = utils.ibkr.connect(tws_instance, 3, 2)
 
 #%%
 
-no_ooi_indices = ['V2TX', 'V1X', 'VXN', 'RVX', 'VXSLV', 'GVZ']
+no_ooi_indices = ['V2TX', 'V1X', 'VXN', 'RVX', 'VXSLV', 'GVZ', 'OVX']
 no_hv_indices = ['VXSLV']
 eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50', 'V2TX', 'V1X']]
 us_indices = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX', 'VXN', 'RVX', 'VXSLV', 'GVZ', 'OVX']],
