@@ -3,7 +3,7 @@ import ib_async as ib
 import pandas as pd
 
 import matplotlib as mpl
-from datetime import datetime
+from datetime import datetime, timedelta
 import dateutil
 from finance import utils
 from finance.utils.influx import DB_DAILY
@@ -62,13 +62,13 @@ us_etf_symbols = [*market_etf_symbols, *sectors_etf_symbols, *world_etf_symbols,
 
 us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
-us_stock_symbols = ['NVDA', 'TSLA', 'OPEN', 'AAPL', 'PLTR', 'AMD', 'GOOGL', 'AMZN', 'HOOD', 'MSTR', 'AVGO', 'BABA', 'ORCL',
-             'INTC', 'SOFI', 'SMCI', 'CRWV', 'UNH', 'MARA', 'NIO', 'MSFT', 'GME', 'META', 'IREN', 'JD', 'COIN',
-             'RGTI', 'MU', 'SOUN', 'MRVL', 'BMNR', 'LULU', 'PCG', 'BAC', 'HIMS', 'RIOT', 'SNAP', 'BULL', 'RKLB',
-             'TSM', 'NBIS', 'AFRM', 'WULF', 'ASTS', 'CRM', 'SBET', 'AI', 'CIFR', 'NFLX', 'U', 'OKLO', 'SMR', 'AAL',
-             'APP', 'TTD', 'UBER', 'PYPL', 'HPE', 'MRNA', 'BIDU', 'ADBE', 'TGT', 'WMT', 'C', 'WOLF', 'WBD', 'PFE', 'B',
-             'SBUX', 'JPM', 'FIG', 'F', 'ACHR', 'EOSE', 'CSCO', 'HL', 'CVNA', 'WFC', 'XYZ', 'M', 'XOM', 'BE', 'BA',
-             'UPS', 'RDDT', 'CRWD', 'NKE', 'VZ', 'KO', 'CHWY', 'PEP']
+us_stock_symbols = [
+  'AAL', 'AAPL', 'ACHR', 'ADBE', 'AFRM', 'AI', 'AMD', 'AMZN', 'APP', 'ASTS', 'AVGO', 'B', 'BA', 'BABA', 'BAC', 'BE',
+  'BIDU', 'BMNR', 'BULL', 'C', 'CHWY', 'CIFR', 'COIN', 'CRM', 'CRWD', 'CRWV', 'CSCO', 'CVNA', 'EOSE', 'F', 'FIG', 'GME',
+  'GOOGL', 'HIMS', 'HL', 'HOOD', 'HPE', 'INTC', 'IREN', 'JD', 'JNJ', 'JPM', 'KO', 'LLY', 'LULU', 'M', 'MARA', 'META',
+  'MRNA', 'MRVL', 'MSFT', 'MSTR', 'MU', 'NBIS', 'NFLX', 'NIO', 'NKE', 'NVDA', 'OKLO', 'OPEN', 'ORCL', 'PCG',
+  'PEP', 'PFE', 'PLTR', 'PYPL', 'RDDT', 'RGTI', 'RIOT', 'RKLB', 'SBET', 'SBUX', 'SHOP', 'SMCI', 'SMR', 'SNAP', 'SOFI',
+  'SOUN', 'TGT', 'TSLA', 'TSM', 'TTD', 'U', 'UBER', 'UNH', 'UPS', 'VZ', 'WBD', 'WFC', 'WMT', 'WOLF', 'WULF', 'XOM', 'XYZ']
 
 us_stocks = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_stock_symbols]
 
@@ -127,6 +127,8 @@ for contract in contracts:
                                     database=DB_DAILY)
     if c_last:
       current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime()
+      if current_date.date() > (datetime.now() - timedelta(days=3)).date():
+        continue
     else:
       current_date = startDateTime
     while current_date < endDateTime:
