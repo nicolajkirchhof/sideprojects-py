@@ -143,8 +143,5 @@ _backup/
 # Pickle files
 *.pkl
 
-# Flask-Migrate
-migrations/
-
 # Flask-Session
 flask_session/
