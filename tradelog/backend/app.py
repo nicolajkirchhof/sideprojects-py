@@ -13,7 +13,7 @@ def create_app():
     CORS(app)
 
     with app.app_context():
-        from . import models
+        from .models import Trade, TradeLog, TradeIdea, Position
 
     @app.route('/')
     def index():
