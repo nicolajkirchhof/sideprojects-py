@@ -13,4 +13,7 @@ public class DataContext : DbContext
     public DbSet<Trade> Trades { get; set; }
     public DbSet<TradeIdea> TradeIdeas { get; set; }
     public DbSet<TradeLog> TradeLogs { get; set; }
+    public DbSet<Capital> Capitals { get; set; }
+    public DbSet<Tracking> Trackings { get; set; }
+    public DbSet<Instrument> Instruments { get; set; }
 }
