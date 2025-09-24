@@ -30,7 +30,7 @@ header_portfolio = f'ContractId {SEP} Expiry {SEP} Pos {SEP} Right {SEP} Symbol 
 underlying_market_data = {}
 last_market_data = {}
 closing_order_states = {}
-#%%
+##%%
 def print_and_notify(option_portfolio_position):
   #%%
   pnl = option_portfolio_position.unrealizedPNL
@@ -123,41 +123,41 @@ file = f'N:/My Drive/Trading/portfolio_{tws_instance}.csv'
 if not os.path.exists(file):
   with open(file, 'w', encoding='utf8') as f:
     f.write(header)
-#%%
-while True:
-  #%%
-  summary = ib_con.accountSummary()
-  net_liq = [x for x in summary if x.account == 'U16408041' and x.tag == 'NetLiquidation'][0]
-  bpr = [x for x in summary if x.account == 'U16408041' and x.tag == 'BuyingPower'][0]
-  maint = [x for x in summary if x.account == 'U16408041' and x.tag == 'MaintMarginReq'][0]
-  excess = [x for x in summary if x.account == 'U16408041' and x.tag == 'AvailableFunds'][0]
+##%%
+# while True:
+##%%
+summary = ib_con.accountSummary()
+net_liq = [x for x in summary if x.account == 'U16408041' and x.tag == 'NetLiquidation'][0]
+bpr = [x for x in summary if x.account == 'U16408041' and x.tag == 'BuyingPower'][0]
+maint = [x for x in summary if x.account == 'U16408041' and x.tag == 'MaintMarginReq'][0]
+excess = [x for x in summary if x.account == 'U16408041' and x.tag == 'AvailableFunds'][0]
 
-  capital = f'Net Liq{SEP} Maintenance{SEP} Excess{SEP} BPR\n'
-  capital += f'{float(net_liq.value):.0f}{SEP} {float(maint.value):.0f}{SEP} {float(excess.value):.0f}{SEP} {float(bpr.value):.0f}'
-  print(capital)
-  ##%%
-  values = ib_con.accountValues()
-  portfolio = sorted(ib_con.portfolio(), key=lambda x: x.contract.conId)
-  positions = ib_con.positions()
-  option_portfolio_positions = [position for position in portfolio if position.contract.secType in ['OPT', 'FOP']  ]
-  option_portfolio_contracts = [position.contract for position in option_portfolio_positions  ]
-  ib_con.qualifyContracts(*option_portfolio_contracts)
+capital = f'Net Liq{SEP} Maintenance{SEP} Excess{SEP} BPR\n'
+capital += f'{float(net_liq.value):.0f}{SEP} {float(maint.value):.0f}{SEP} {float(excess.value):.0f}{SEP} {float(bpr.value):.0f}'
+print(capital)
+##%%
+values = ib_con.accountValues()
+portfolio = sorted(ib_con.portfolio(), key=lambda x: x.contract.conId)
+positions = ib_con.positions()
+option_portfolio_positions = [position for position in portfolio if position.contract.secType in ['OPT', 'FOP']  ]
+option_portfolio_contracts = [position.contract for position in option_portfolio_positions  ]
+ib_con.qualifyContracts(*option_portfolio_contracts)
 
-  print(f"---------------------{datetime.now().strftime("%Y-%m-%d %H:%M")}--------------------------------")
-  print(header_portfolio)
-  for option_portfolio_position in option_portfolio_positions:
-    print_and_notify(option_portfolio_position)
-  print("\n Writing positions to file... \n")
-  print(header)
-  ##%%
-  for option_portfolio_position in option_portfolio_positions:
-    log_position(option_portfolio_position)
+print(f"---------------------{datetime.now().strftime("%Y-%m-%d %H:%M")}--------------------------------")
+print(header_portfolio)
+for option_portfolio_position in option_portfolio_positions:
+  print_and_notify(option_portfolio_position)
+print("\n Writing positions to file... \n")
+print(header)
+##%%
+for option_portfolio_position in option_portfolio_positions:
+  log_position(option_portfolio_position)
 
 
 
-  #%%
-  print(f"---------------------------------------------------------------------\n\n")
-  time.sleep(1800)
+  # #%%
+  # print(f"---------------------------------------------------------------------\n\n")
+  # time.sleep(1800)
 
 #%%
 for option_portfolio_contract in option_portfolio_contracts:
