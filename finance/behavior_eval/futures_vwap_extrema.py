@@ -1,4 +1,5 @@
 #%%
+import glob
 import pickle
 from datetime import datetime, timedelta
 from glob import glob
@@ -31,6 +32,8 @@ mpl.use('QtAgg')
 symbols = ['IBDE40', 'IBEU50', 'IBES35', 'IBGB100', 'IBUS30', 'IBUS500', 'IBUST100', 'IBJP225', 'USGOLD' ]
 symbol = symbols[0]
 IS_PLOT_ACTIVE=True
+START_AT_LAST=True
+ALL_DAY = True
 IS_ALL_DAY=True
 RECREATE=True
 
@@ -48,14 +51,23 @@ for symbol in symbols:
 
   dfs_ref_range = []
   dfs_closing = []
-  first_day = dateutil.parser.parse('2020-01-02T00:00:00').replace(tzinfo=tz)
+
+  if START_AT_LAST:
+    import re
+
+    pattern = r'\\[^\\]+_(\d{4}-\d{2}-\d{2})\.pkl$'
+    test_string = 'N:/My Drive/Trading/Strategies/swing_vwap_ad/IBDE40\\IBDE40_2023-02-15.pkl'
+
+    files = glob.glob(f'{directory_evals}/*.pkl')
+    dates =
+  else:
+    first_day = dateutil.parser.parse('2020-01-02T00:00:00').replace(tzinfo=tz)
 
   if not RECREATE:
     basenames = [os.path.basename(f) for f in glob(f'{directory_evals}/*.pkl')]
     date_strs = [base_name.split('_')[-1].replace('.pkl', '') for base_name in basenames]
     dates = [datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=tz) for date_str in date_strs]
     first_day = max(dates) if dates else first_day
-
   # first_day = dateutil.parser.parse('2025-03-06T00:00:00').replace(tzinfo=tz)
   now = datetime.now(tz)
   last_day = datetime(now.year, now.month, now.day, tzinfo=tz)
