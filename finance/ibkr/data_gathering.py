@@ -3,7 +3,7 @@ import ib_async as ib
 import pandas as pd
 
 import matplotlib as mpl
-from datetime import datetime
+from datetime import datetime, timedelta
 import dateutil
 from finance import utils
 
@@ -116,6 +116,8 @@ for contract in contracts:
                                    database=utils.influx.sec_type_to_database_name(contract.secType))
     if c_last:
       current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime()
+      if current_date.date() > (datetime.now() - timedelta(days=3)).date():
+        continue
     else:
       current_date = startDateTime
     while current_date < endDateTime:

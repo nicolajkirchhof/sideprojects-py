@@ -25,7 +25,7 @@ KEY = "fjJheEoJRyGZ8IAWRzP2jvZfLgtWEj6PJs2fwbUd1Dz"
 ## %% PNL PCT
 SEP = ','
 header = f'Date {SEP} ContractId {SEP} Underlying {SEP} IV {SEP} Price {SEP} TimeValue {SEP} Δ {SEP} Θ {SEP} Γ {SEP} ν {SEP} Multiplier\n'
-header_portfolio = f'ContractId {SEP} Expiry {SEP} Pos {SEP} Right {SEP} Symbol {SEP} Cost {SEP} Price {SEP} PnL {SEP} PnL%'
+header_portfolio = f'Symbol {SEP} ContractId {SEP} Expiry {SEP} Pos {SEP} Right {SEP} Strike {SEP} Cost {SEP} Price {SEP} PnL {SEP} PnL%'
 
 underlying_market_data = {}
 last_market_data = {}
@@ -35,11 +35,11 @@ def print_and_notify(option_portfolio_position):
   #%%
   pnl = option_portfolio_position.unrealizedPNL
   pnl_pct = pnl * 100 / (abs(option_portfolio_position.position) * option_portfolio_position.averageCost)
-  sym_strike = f"{option_portfolio_position.contract.symbol}@{option_portfolio_position.contract.strike}"
   exp = option_portfolio_position.contract.lastTradeDateOrContractMonth
   exp_str = f'{exp[:4]}-{exp[4:6]}-{exp[6:8]}'
-  line = f'{option_portfolio_position.contract.conId}{SEP}{SEP} {exp_str}{SEP}{SEP}{option_portfolio_position.position:5}{SEP}'
-  line += f'{option_portfolio_position.contract.right:2}{SEP} {sym_strike:15}'
+  line = f'{option_portfolio_position.contract.symbol}{SEP} {option_portfolio_position.contract.conId}{SEP}'
+  line += f'{SEP} {exp_str}{SEP}{SEP}{option_portfolio_position.position:5}{SEP}'
+  line += f'{option_portfolio_position.contract.right:2}{SEP} {option_portfolio_position.contract.strike}'
   line += f'{SEP}{option_portfolio_position.averageCost/int(option_portfolio_position.contract.multiplier):10.5f}{SEP}{option_portfolio_position.marketPrice:10.5f}'
   line += f'{SEP}{pnl:8.2f}{SEP}{pnl_pct:8.2f}{SEP}'
   color = utils.colors.Colors.BRIGHT_GREEN if pnl > 0 else utils.colors.Colors.BRIGHT_RED
@@ -125,7 +125,7 @@ if not os.path.exists(file):
     f.write(header)
 ##%%
 # while True:
-##%%
+#%%
 summary = ib_con.accountSummary()
 net_liq = [x for x in summary if x.account == 'U16408041' and x.tag == 'NetLiquidation'][0]
 bpr = [x for x in summary if x.account == 'U16408041' and x.tag == 'BuyingPower'][0]
@@ -133,7 +133,8 @@ maint = [x for x in summary if x.account == 'U16408041' and x.tag == 'MaintMargi
 excess = [x for x in summary if x.account == 'U16408041' and x.tag == 'AvailableFunds'][0]
 
 capital = f'Net Liq{SEP} Maintenance{SEP} Excess{SEP} BPR\n'
-capital += f'{float(net_liq.value):.0f}{SEP} {float(maint.value):.0f}{SEP} {float(excess.value):.0f}{SEP} {float(bpr.value):.0f}'
+capital += f'{datetime.now().strftime("%Y-%m-%d")}{SEP} {float(net_liq.value):.0f}{SEP} {float(maint.value):.0f}'
+capital += f'{SEP} {float(excess.value):.0f}{SEP} {float(bpr.value):.0f}'
 print(capital)
 ##%%
 values = ib_con.accountValues()
