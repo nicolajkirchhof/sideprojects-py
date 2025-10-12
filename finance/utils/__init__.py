@@ -14,3 +14,5 @@ from . import trading_day_data
 from . import colors
 from . import ifttt
 from . import math
+from . import hourly_data
+from . import daily_data

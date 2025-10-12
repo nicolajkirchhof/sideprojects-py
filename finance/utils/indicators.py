@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from finance import utils
 
 
 def adaptive_moving_average(prices, period=10, fast=3, slow=30):
@@ -237,3 +238,14 @@ def trends(df_5m, df_extrema):
       df_downtrends['trend_support'] = df_downtrends['ema20_o'] > df_downtrends['ema20_c']
 
     return pullbacks, df_uptrends, df_downtrends
+
+def basic_indicators_from_df(df):
+  df['VWAP3'] = (df['c'] + df['h'] + df['l']) / 3
+  df['20EMA'] = df['VWAP3'].ewm(span=20, adjust=False).mean()
+  df['200EMA'] = df['VWAP3'].ewm(span=200, adjust=False).mean()
+  df['lh'] = (df.h - df.l)
+  df['oc'] = (df.c - df.o)
+  df['chg'] = df.c - df.o
+  df['pc'] = utils.pct.percentage_change_array(df.o, df.c)
+  df.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
+  return df

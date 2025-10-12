@@ -14,6 +14,18 @@ def percentage_change(old_value, new_value):
     return float('nan')  # Or handle it differently, e.g., return 0 or raise an exception
   return ((new_value - old_value) / old_value) * 100
 
+def percentage_change_array(old_value, new_value):
+  """Calculates the percentage change between two numbers.
+
+    Args:
+        old_value: The original value.
+        new_value: The new value.
+
+    Returns:
+        The percentage change, or NaN if the old value is zero.
+    """
+  return ((new_value - old_value) / old_value) * 100
+
 
 def subtract_percentage(number, percentage):
   """Subtracts a percentage from a number.

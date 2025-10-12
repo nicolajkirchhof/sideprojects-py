@@ -1,5 +1,6 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
+import dateutil
 import influxdb as idb
 
 from finance.utils.exchanges import DE_EXCHANGE, US_EXCHANGE, GB_EXCHANGE, JP_EXCHANGE, HK_EXCHANGE, AU_EXCHANGE, \
@@ -70,11 +71,25 @@ def get_candles_range_aggregate(start, end, symbol, group_by_time=None):
   if symbol_def is None:
     return None
   influx_client_df = idb.DataFrameClient()
-  query = get_candles_range_aggregate_query(start, end, symbol, group_by_time, with_volatility=symbol_def['DB'] == DB_INDEX)
+  query = get_candles_range_all_aggregate_tz_query(start, end, symbol, symbol_def['EX']['TZ'], group_by_time, with_volatility=symbol_def['DB'] == DB_INDEX)
   influx_data = influx_client_df.query(query, database=symbol_def['DB'])
   if symbol not in influx_data:
     return None
   return influx_data[symbol].tz_convert(symbol_def['EX']['TZ'])
+
+def get_candles_range_all_aggregate_tz(symbol, group_by_time=None):
+  symbol_def = SYMBOLS[symbol]
+  exchange = symbol_def['EX']
+  tz = exchange['TZ']
+
+  if symbol_def is None:
+    return None
+  influx_client_df = idb.DataFrameClient()
+  query = get_candles_range_all_aggregate_tz_query(dateutil.parser.parse('2000-01-01').replace(tzinfo=tz), datetime.now(tz), symbol, tz, group_by_time, True)
+  influx_data = influx_client_df.query(query, database=DB_DAILY)
+  if symbol not in influx_data:
+    return None
+  return influx_data[symbol].tz_convert(tz)
 
 def get_candles_range_raw(start, end, symbol, with_volatility=False):
   symbol_def = SYMBOLS[symbol]
@@ -87,13 +102,12 @@ def get_candles_range_raw(start, end, symbol, with_volatility=False):
     return None
   return influx_data[symbol].tz_convert(symbol_def['EX']['TZ'])
 
-def get_candles_range_aggregate_query(start, end, symbol, group_by_time=None, with_volatility=False):
-  timezone_offset_h = start.utcoffset().total_seconds()/3600
+def get_candles_range_all_aggregate_tz_query(start, end, symbol, tz, group_by_time=None, with_volatility=False):
   volatility_query_addon = ', first(hvo) as hvo, last(hvc) as hvc, max(hvh) as hvh, min(hvl) as hvl, first(ivo) as ivo, last(ivc) as ivc, min(ivl) as ivl, max(ivh) as ivh' if with_volatility else ''
   base_query = f'select first(o) as o, last(c) as c, max(h) as h, min(l) as l {volatility_query_addon} from {symbol} where time >= \'{start.isoformat()}\' and time < \'{end.isoformat()}\''
   if group_by_time is None:
     return base_query
-  return base_query + f' group by time({group_by_time}, {timezone_offset_h:.0f}h) fill(none)'
+  return base_query + f' group by time({group_by_time}) fill(none) tz(\'{tz}\')'
 
 
 def get_candles_range_raw_query(start, end, symbol, with_volatility):
