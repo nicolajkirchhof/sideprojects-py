@@ -1,0 +1,97 @@
+<app-content-area [showRightSidebar]="false">
+  <div main>
+    <div class="mat-elevation-z8">
+      <table mat-table [dataSource]="positions">
+
+        <!-- ID Column -->
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef> ID </th>
+          <td mat-cell *matCellDef="let element"> {{ element.id }} </td>
+        </ng-container>
+
+        <!-- InstrumentId Column -->
+        <ng-container matColumnDef="instrumentId">
+          <th mat-header-cell *matHeaderCellDef> Instrument ID </th>
+          <td mat-cell *matCellDef="let element"> {{ element.instrumentId }} </td>
+        </ng-container>
+
+        <!-- ContractId Column -->
+        <ng-container matColumnDef="contractId">
+          <th mat-header-cell *matHeaderCellDef> Contract ID </th>
+          <td mat-cell *matCellDef="let element"> {{ element.contractId }} </td>
+        </ng-container>
+
+        <!-- Type Column -->
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef> Type </th>
+          <td mat-cell *matCellDef="let element"> {{ element.type }} </td>
+        </ng-container>
+
+        <!-- Opened Column -->
+        <ng-container matColumnDef="opened">
+          <th mat-header-cell *matHeaderCellDef> Opened </th>
+          <td mat-cell *matCellDef="let element"> {{ element.opened | date:'short' }} </td>
+        </ng-container>
+
+        <!-- Expiry Column -->
+        <ng-container matColumnDef="expiry">
+          <th mat-header-cell *matHeaderCellDef> Expiry </th>
+          <td mat-cell *matCellDef="let element"> {{ element.expiry | date:'short' }} </td>
+        </ng-container>
+
+        <!-- Closed Column -->
+        <ng-container matColumnDef="closed">
+          <th mat-header-cell *matHeaderCellDef> Closed </th>
+          <td mat-cell *matCellDef="let element"> {{ element.closed ? (element.closed | date:'short') : '—' }} </td>
+        </ng-container>
+
+        <!-- Size Column -->
+        <ng-container matColumnDef="size">
+          <th mat-header-cell *matHeaderCellDef> Size </th>
+          <td mat-cell *matCellDef="let element"> {{ element.size }} </td>
+        </ng-container>
+
+        <!-- Strike Column -->
+        <ng-container matColumnDef="strike">
+          <th mat-header-cell *matHeaderCellDef> Strike </th>
+          <td mat-cell *matCellDef="let element"> {{ element.strike }} </td>
+        </ng-container>
+
+        <!-- Cost Column -->
+        <ng-container matColumnDef="cost">
+          <th mat-header-cell *matHeaderCellDef> Cost </th>
+          <td mat-cell *matCellDef="let element"> {{ element.cost }} </td>
+        </ng-container>
+
+        <!-- Close Column -->
+        <ng-container matColumnDef="close">
+          <th mat-header-cell *matHeaderCellDef> Close </th>
+          <td mat-cell *matCellDef="let element"> {{ element.close ?? '—' }} </td>
+        </ng-container>
+
+        <!-- Comission Column -->
+        <ng-container matColumnDef="comission">
+          <th mat-header-cell *matHeaderCellDef> Commission </th>
+          <td mat-cell *matCellDef="let element"> {{ element.comission ?? '—' }} </td>
+        </ng-container>
+
+        <!-- Multiplier Column -->
+        <ng-container matColumnDef="multiplier">
+          <th mat-header-cell *matHeaderCellDef> Multiplier </th>
+          <td mat-cell *matCellDef="let element"> {{ element.multiplier }} </td>
+        </ng-container>
+
+        <!-- CloseReason Column -->
+        <ng-container matColumnDef="closeReason">
+          <th mat-header-cell *matHeaderCellDef> Close Reason </th>
+          <td mat-cell *matCellDef="let element"> {{ element.closeReason || '—' }} </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+    </div>
+  </div>
+  <!-- Optional sidebar content placeholder; can be populated by specific pages later -->
+  <div sidebar></div>
+</app-content-area>

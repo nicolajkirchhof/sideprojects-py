@@ -21,14 +21,11 @@ ib_con = utils.ibkr.connect(tws_instance, 3, 2)
 
 # %%
 
-cboe_volatility_indices = ['VIX', 'VXN', 'RVX', 'GVZ', 'OVX', 'VXSLV', 'VXEEM', 'VXEFA', 'VXEWZ', 'VXAPL', 'VXGOG',
-                           'VXAZN', 'VXIBM', 'VXTLT', 'VXGS']
-eurex_volatility_indices = ['V2TX', 'V1X']
-no_ooi_indices = cboe_volatility_indices + eurex_volatility_indices
+no_ooi_indices = utils.underlyings.cboe_volatility_indices + utils.underlyings.eu_volatility_indices
 no_hv_indices = no_ooi_indices
 
-eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50', 'V2TX', 'V1X']]
-us_indices = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX'] + cboe_volatility_indices],
+eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in utils.underlyings.eu_indices]
+us_indices = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX'] + utils.underlyings.cboe_volatility_indices],
               ib.Index('SPX', 'CBOE', 'USD'),
               ib.Index('NDX', 'NASDAQ', 'USD'), ib.Index('RUT', 'RUSSELL', 'USD'),
               ib.Index('INDU', 'CME', 'USD')]
@@ -48,29 +45,14 @@ us_futures = [*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange=x[2], curre
 futures = [*eu_futures, *us_futures]
 
 ## %%
-market_etf_symbols = ['SPY', 'QQQ', 'IWM', 'DIA']
-sectors_etf_symbols = ['SMH', 'XBI', 'XLB', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY']
-world_etf_symbols = ['EEM', 'EFA', 'EWZ', 'FXI', 'EWJ', 'EWW', 'EWC']
-crypto_etf_symbols = ['IBIT', 'ETHA']
-forex_etf_symbols = ['FXY', 'FXE', 'FXF', 'FXC', 'FXA', 'FXB']
-metals_etf_symbols = ['GLD', 'GDX', 'SLV', 'COPX', 'SIL']
-energy_etf_symbols = ['UNG', 'USO', 'XOP']
-agriculture_etf_symbols = ['SOYB', 'CORN', 'WEAT', 'CANE']
-
-us_etf_symbols = [*market_etf_symbols, *sectors_etf_symbols, *world_etf_symbols, *crypto_etf_symbols,
-                  *forex_etf_symbols, *metals_etf_symbols, *energy_etf_symbols, *agriculture_etf_symbols]
+us_etf_symbols = [*utils.underlyings.market_etf_symbols, *utils.underlyings.sectors_etf_symbols,
+                  *utils.underlyings.world_etf_symbols, *utils.underlyings.crypto_etf_symbols,
+                  *utils.underlyings.forex_etf_symbols, *utils.underlyings.metals_etf_symbols,
+                  *utils.underlyings.energy_etf_symbols, *utils.underlyings.agriculture_etf_symbols]
 
 us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
-us_stock_symbols = [
-  'AAL', 'AAPL', 'ACHR', 'ADBE', 'AFRM', 'AI', 'AMD', 'AMZN', 'APP', 'ASTS', 'AVGO', 'B', 'BA', 'BABA', 'BAC', 'BE',
-  'BIDU', 'BMNR', 'BULL', 'C', 'CHWY', 'CIFR', 'COIN', 'CRM', 'CRWD', 'CRWV', 'CSCO', 'CVNA', 'EOSE', 'F', 'FIG', 'GME',
-  'GOOGL', 'HIMS', 'HL', 'HOOD', 'HPE', 'INTC', 'IREN', 'JD', 'JNJ', 'JPM', 'KO', 'LLY', 'LULU', 'M', 'MARA', 'META',
-  'MRNA', 'MRVL', 'MSFT', 'MSTR', 'MU', 'NBIS', 'NFLX', 'NIO', 'NKE', 'NVDA', 'OKLO', 'OPEN', 'ORCL', 'PCG',
-  'PEP', 'PFE', 'PLTR', 'PYPL', 'RDDT', 'RGTI', 'RIOT', 'RKLB', 'SBET', 'SBUX', 'SHOP', 'SMCI', 'SMR', 'SNAP', 'SOFI',
-  'SOUN', 'TGT', 'TSLA', 'TSM', 'TTD', 'U', 'UBER', 'UNH', 'UPS', 'VZ', 'WBD', 'WFC', 'WMT', 'WOLF', 'WULF', 'XOM', 'XYZ']
-
-us_stocks = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_stock_symbols]
+us_stocks = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in utils.underlyings.us_stock_symbols]
 
 contracts = [*indices, *us_etfs, *forex, *futures, *us_stocks]
 

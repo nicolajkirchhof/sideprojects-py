@@ -1,7 +1,8 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { MatTableModule } from '@angular/material/table';
-import {DatePipe} from '@angular/common';
+import { DatePipe } from '@angular/common';
+import { ContentArea } from '../shared/content-area/content-area';
 
 export interface TradeIdea {
   id: number;
@@ -12,7 +13,7 @@ export interface TradeIdea {
 @Component({
   selector: 'app-trade-ideas',
   standalone: true,
-  imports: [MatTableModule, DatePipe],
+  imports: [MatTableModule, DatePipe, ContentArea],
   templateUrl: './trade-ideas.html',
   styleUrl: './trade-ideas.css'
 })

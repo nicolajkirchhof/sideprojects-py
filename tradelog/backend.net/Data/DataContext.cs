@@ -10,9 +10,7 @@ public class DataContext : DbContext
     }
 
     public DbSet<Position> Positions { get; set; }
-    public DbSet<Trade> Trades { get; set; }
-    public DbSet<TradeIdea> TradeIdeas { get; set; }
-    public DbSet<TradeLog> TradeLogs { get; set; }
+    public DbSet<Log> Logs { get; set; }
     public DbSet<Capital> Capitals { get; set; }
     public DbSet<Tracking> Trackings { get; set; }
     public DbSet<Instrument> Instruments { get; set; }

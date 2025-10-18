@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using backend.net.Data;
 
@@ -11,9 +12,11 @@ using backend.net.Data;
 namespace backend.net.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20251018190119_Initial")]
+    partial class Initial
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -55,11 +58,16 @@ namespace backend.net.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("ContractId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Multiplier")
                         .HasColumnType("int");
 
-                    b.Property<int>("SecType")
-                        .HasColumnType("int");
+                    b.Property<string>("SecType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Sector")
                         .IsRequired()
@@ -67,6 +75,7 @@ namespace backend.net.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Subsector")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -154,10 +163,6 @@ namespace backend.net.Migrations
                     b.Property<int>("InstrumentId")
                         .HasColumnType("int");
 
-                    b.Property<string>("InstrumentSpecifics")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
                     b.Property<int>("Multiplier")
                         .HasColumnType("int");
 
@@ -174,8 +179,6 @@ namespace backend.net.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("InstrumentId");
 
                     b.ToTable("Positions");
                 });
@@ -223,17 +226,6 @@ namespace backend.net.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Trackings");
-                });
-
-            modelBuilder.Entity("backend.net.Models.Position", b =>
-                {
-                    b.HasOne("backend.net.Models.Instrument", "Instrument")
-                        .WithMany()
-                        .HasForeignKey("InstrumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Instrument");
                 });
 #pragma warning restore 612, 618
         }

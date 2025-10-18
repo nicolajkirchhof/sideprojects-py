@@ -17,7 +17,6 @@ import { RouterOutlet, RouterLink } from '@angular/router';
     RouterOutlet,
     RouterLink,
     AsyncPipe,
-    NgIf,
     MatToolbarModule,
     MatButtonModule,
     MatSidenavModule,

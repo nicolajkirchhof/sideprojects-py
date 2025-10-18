@@ -1,0 +1,98 @@
+<app-content-area [showRightSidebar]="showSidebar" title="Instruments">
+  <div main>
+    <div class="actions" style="display:flex; justify-content:flex-end; margin: 0 16px 8px;">
+      <button mat-raised-button color="primary" (click)="onNew()">
+        New Instrument
+      </button>
+    </div>
+    <div class="mat-elevation-z8">
+      <table mat-table [dataSource]="instruments">
+
+        <!-- ID Column -->
+        <ng-container matColumnDef="id">
+          <th mat-header-cell *matHeaderCellDef> ID </th>
+          <td mat-cell *matCellDef="let element"> {{ element.id }} </td>
+        </ng-container>
+
+        <!-- SecType Column -->
+        <ng-container matColumnDef="secType">
+          <th mat-header-cell *matHeaderCellDef> SecType </th>
+          <td mat-cell *matCellDef="let element"> {{ element.secType }} </td>
+        </ng-container>
+
+        <!-- Symbol Column -->
+        <ng-container matColumnDef="symbol">
+          <th mat-header-cell *matHeaderCellDef> Symbol </th>
+          <td mat-cell *matCellDef="let element"> {{ element.symbol }} </td>
+        </ng-container>
+
+        <!-- Multiplier Column -->
+        <ng-container matColumnDef="multiplier">
+          <th mat-header-cell *matHeaderCellDef> Multiplier </th>
+          <td mat-cell *matCellDef="let element"> {{ element.multiplier }} </td>
+        </ng-container>
+
+        <!-- Sector Column -->
+        <ng-container matColumnDef="sector">
+          <th mat-header-cell *matHeaderCellDef> Sector </th>
+          <td mat-cell *matCellDef="let element"> {{ element.sector || '—' }} </td>
+        </ng-container>
+
+        <!-- Subsector Column -->
+        <ng-container matColumnDef="subsector">
+          <th mat-header-cell *matHeaderCellDef> Subsector </th>
+          <td mat-cell *matCellDef="let element"> {{ element.subsector || '—' }} </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="onRowSelect(row)" style="cursor:pointer"></tr>
+      </table>
+    </div>
+  </div>
+  <div sidebar>
+    @if (showSidebar) {
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="instrument-form" style="display:flex; flex-direction:column; gap:12px;">
+        @if (!isCreating) {
+          <mat-form-field appearance="outline">
+            <mat-label>ID</mat-label>
+            <input matInput formControlName="id" readonly>
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline">
+          <mat-label>SecType</mat-label>
+          <mat-select formControlName="secType">
+            <mat-option [value]="'Stock'">Stock</mat-option>
+            <mat-option [value]="'Future'">Future</mat-option>
+            <mat-option [value]="'Forex'">Forex</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Symbol</mat-label>
+          <input matInput formControlName="symbol">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Multiplier</mat-label>
+          <input matInput type="number" formControlName="multiplier">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Sector</mat-label>
+          <input matInput formControlName="sector">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Subsector</mat-label>
+          <input matInput formControlName="subsector">
+        </mat-form-field>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+          <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
+          <button mat-flat-button color="primary" type="submit">Save</button>
+        </div>
+      </form>
+    }
+  </div>
+</app-content-area>

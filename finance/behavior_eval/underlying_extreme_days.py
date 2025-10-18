@@ -41,8 +41,6 @@ symbol = symbols[1]
 #%%
 
 #%%
-cache = utils.influx.get_candles_range_all_aggregate_tz(symbol, '1d')
-#%%
 for symbol in symbols:
   #%%
   print(f"Processing {symbol}")
@@ -50,6 +48,12 @@ for symbol in symbols:
   dd = utils.daily_data.DailyData(symbol)
 
   df_day = dd.df_day
+#%%
+  distribution = df_day.pc.hist(bins = 100)
+  plt.show()
+
+  stats = df_day.pc.describe()
+  print(stats)
 #%%
   extrema = df_day[df_day.pc.abs() > 2]
   extrema.plot(y='pc', style='o')

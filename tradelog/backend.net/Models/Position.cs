@@ -3,25 +3,33 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace backend.net.Models;
 
+public enum PositionTypes
+{
+    Call,
+    Put,
+    Underlying,
+}
+
 public class Position
 {
     public int Id { get; set; }
-    public int TradeId { get; set; }
+    public int InstrumentId { get; set; }
+    public Instrument Instrument { get; set; }
+
+    [StringLength(20)]
+    public string? InstrumentSpecifics { get; set; } // E.G. Future Contract
+
     [StringLength(20)]
     public string ContractId { get; set; }
-    [StringLength(20)]
-    public string Type { get; set; }
+    public PositionTypes Type { get; set; }
     public DateTime Opened { get; set; }
     public DateTime Expiry { get; set; }
     public DateTime? Closed { get; set; }
-    public int PositionValue { get; set; }
-    [StringLength(1)]
-    public string? Right { get; set; }
+    public int Size{ get; set; }
     public double Strike { get; set; }
     public double Cost { get; set; }
     public double? Close { get; set; }
+    public double? Comission { get; set; }
     public int Multiplier { get; set; }
-
-    [ForeignKey("TradeId")]
-    public Trade Trade { get; set; }
+    public string? CloseReason { get; set; }
 }

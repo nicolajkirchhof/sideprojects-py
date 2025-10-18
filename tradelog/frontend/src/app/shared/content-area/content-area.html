@@ -1,0 +1,15 @@
+<div class="content-area" [class.has-right]="showRightSidebar">
+  @if (title) {
+    <header class="content-header">
+      <h2>{{ title }}</h2>
+    </header>
+  }
+  <section class="main">
+    <ng-content select="[main]"></ng-content>
+  </section>
+  @if (showRightSidebar) {
+    <aside class="right" [style.width]="sidebarWidth">
+      <ng-content select="[sidebar]"></ng-content>
+    </aside>
+  }
+</div>

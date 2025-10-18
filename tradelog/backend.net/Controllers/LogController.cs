@@ -6,19 +6,20 @@ using Microsoft.EntityFrameworkCore;
 namespace backend.net.Controllers;
 
 [ApiController]
-[Route("[controller]")]
-public class TradeIdeasController : ControllerBase
+[Route("api/[controller]")]
+[Produces("application/json")]
+public class LogController : ControllerBase
 {
     private readonly DataContext _context;
 
-    public TradeIdeasController(DataContext context)
+    public LogController(DataContext context)
     {
         _context = context;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TradeIdea>>> GetTradeIdeas()
+    public async Task<ActionResult<IEnumerable<Log>>> GetTradeIdeas()
     {
-        return await _context.TradeIdeas.ToListAsync();
+        return await _context.Logs.ToListAsync();
     }
 }
