@@ -8,11 +8,11 @@ namespace backend.net.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
-public class LogController : ControllerBase
+public class LogsController : ControllerBase
 {
     private readonly DataContext _context;
 
-    public LogController(DataContext context)
+    public LogsController(DataContext context)
     {
         _context = context;
     }

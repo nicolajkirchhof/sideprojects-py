@@ -4,7 +4,7 @@ import { Component } from '@angular/core';
   selector: 'app-about',
   imports: [],
   templateUrl: './about.html',
-  styleUrl: './about.css'
+  host: {class: 'flex flex-col flex-1'}
 })
 export class About {
 

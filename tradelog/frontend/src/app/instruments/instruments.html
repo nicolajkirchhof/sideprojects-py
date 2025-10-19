@@ -1,12 +1,12 @@
-<app-content-area [showRightSidebar]="showSidebar" title="Instruments">
+<app-content-area [showRightSidebar]="showSidebar">
   <div main>
-    <div class="actions" style="display:flex; justify-content:flex-end; margin: 0 16px 8px;">
+    <div class="actions flex justify-end mx-4 mb-2">
       <button mat-raised-button color="primary" (click)="onNew()">
         New Instrument
       </button>
     </div>
-    <div class="mat-elevation-z8">
-      <table mat-table [dataSource]="instruments">
+    <div class="mat-elevation-z8 m-4">
+      <table mat-table [dataSource]="instruments" class="w-full">
 
         <!-- ID Column -->
         <ng-container matColumnDef="id">
@@ -45,13 +45,13 @@
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="onRowSelect(row)" style="cursor:pointer"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="onRowSelect(row)" class="cursor-pointer"></tr>
       </table>
     </div>
   </div>
   <div sidebar>
     @if (showSidebar) {
-      <form [formGroup]="form" (ngSubmit)="onSave()" class="instrument-form" style="display:flex; flex-direction:column; gap:12px;">
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="instrument-form flex flex-col gap-3">
         @if (!isCreating) {
           <mat-form-field appearance="outline">
             <mat-label>ID</mat-label>
@@ -88,7 +88,7 @@
           <input matInput formControlName="subsector">
         </mat-form-field>
 
-        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+        <div class="flex gap-2 justify-end mt-2">
           <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
           <button mat-flat-button color="primary" type="submit">Save</button>
         </div>

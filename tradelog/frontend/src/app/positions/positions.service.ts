@@ -27,11 +27,22 @@ export interface Position {
   closeReason?: string | null;
 }
 
+// DTO for create/update without id when creating
+export type PositionUpsert = Omit<Position, 'id'> & Partial<Pick<Position, 'id'>>;
+
 @Injectable({ providedIn: 'root' })
 export class PositionsService {
   private http = inject(HttpClient);
 
   getPositions(): Observable<Position[]> {
     return this.http.get<Position[]>('/api/positions');
+  }
+
+  createPosition(payload: PositionUpsert): Observable<Position> {
+    return this.http.post<Position>('/api/positions', payload);
+  }
+
+  updatePosition(id: number, payload: PositionUpsert): Observable<Position> {
+    return this.http.put<Position>(`/api/positions/${id}`, payload);
   }
 }

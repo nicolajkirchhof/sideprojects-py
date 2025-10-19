@@ -23,7 +23,7 @@ import { MatButtonModule } from '@angular/material/button';
     MatButtonModule,
   ],
   templateUrl: './instruments.html',
-  styleUrl: './instruments.css'
+  host: {class: 'flex flex-col flex-1'}
 })
 export class Instruments implements OnInit {
   private instrumentsService = inject(InstrumentsService);
