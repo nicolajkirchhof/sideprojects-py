@@ -19,19 +19,14 @@
   border-right: none;
 }
 
-/* Make ngx-quill editors resizable and ensure inner container fills wrapper */
-.quill-resizable {
-  display: block;
-  resize: vertical;
-  overflow: auto;
-  min-height: 120px;
-  max-height: 70vh;
+/* Quill internals: let the content container fill remaining space when host is flex */
+quill-editor .ql-container {
+  flex: 1 1 auto;
+  height: auto !important;
+  min-height: 0;
 }
 
-.quill-resizable .ql-container {
-  height: 100% !important;
-}
-
-.quill-resizable .ql-editor {
+/* Ensure editor can shrink inside flex container */
+quill-editor .ql-editor {
   min-height: 0;
 }

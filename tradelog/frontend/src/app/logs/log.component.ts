@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { LogsService, LogEntry, LogUpsert, Sentiments } from './logs.service';
@@ -25,6 +26,7 @@ import { QuillModule } from 'ngx-quill';
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
+    MatIconModule,
     MatDatepickerModule,
     MatNativeDateModule,
     QuillModule,
@@ -46,11 +48,7 @@ export class Log implements OnInit {
     'date',
     'notes',
     'strategy',
-    'sentiment',
-    'ta',
-    'expectedOutcome',
-    'lernings',
-    'fa'
+    'sentiment'
   ];
 
   // sidebar state
@@ -75,11 +73,26 @@ export class Log implements OnInit {
     ['link', 'image', 'code-block', 'blockquote'],
     ['clean']
   ];
-  quillModules: any = { toolbar: false };
+  // Toolbar configurations
+  quillModules: any = { toolbar: this.toolbarOptions };
+  quillModulesOff: any = { toolbar: false };
+
+  // Default notes template for the Quill editor
+  notesTemplate: string = `
+    <p><strong>General</strong></p>
+    <p><br></p>
+    <p><strong>Technical Analysis</strong></p>
+    <p><br></p>
+    <p><strong>Fundamental Analysis</strong></p>
+    <p><br></p>
+    <p><strong>Expected Outcome</strong></p>
+    <p><br></p>
+    <p><strong>Learnings</strong></p>
+    <p><br></p>
+  `;
 
   toggleQuillToolbar(): void {
     this.showToolbar = !this.showToolbar;
-    this.quillModules = { toolbar: this.showToolbar ? this.toolbarOptions : false };
   }
 
   ngOnInit(): void {
@@ -98,11 +111,7 @@ export class Log implements OnInit {
       date: [null, [Validators.required]],
       notes: [''],
       strategy: [''],
-      sentiment: [[] as number[]],
-      ta: [''],
-      expectedOutcome: [''],
-      lernings: [''],
-      fa: ['']
+      sentiment: [[] as number[]]
     });
   }
 
@@ -125,11 +134,7 @@ export class Log implements OnInit {
       date: row.date ? new Date(row.date) : null,
       notes: row.notes ?? '',
       strategy: row.strategy ?? '',
-      sentiment: this.sentimentToArray(row.sentiment),
-      ta: row.ta ?? '',
-      expectedOutcome: row.expectedOutcome ?? '',
-      lernings: row.lernings ?? '',
-      fa: row.fa ?? ''
+      sentiment: this.sentimentToArray(row.sentiment)
     });
     this.showSidebar = true;
   }
@@ -141,13 +146,9 @@ export class Log implements OnInit {
       id: null,
       instrumentId: null,
       date: null,
-      notes: '',
+      notes: this.notesTemplate,
       strategy: '',
-      sentiment: [],
-      ta: '',
-      expectedOutcome: '',
-      lernings: '',
-      fa: ''
+      sentiment: []
     });
     this.showSidebar = true;
   }
@@ -199,10 +200,6 @@ export class Log implements OnInit {
       notes: v.notes || null,
       strategy: v.strategy || null,
       sentiment: this.arrayToSentiment(v.sentiment),
-      ta: v.ta || null,
-      expectedOutcome: v.expectedOutcome || null,
-      lernings: v.lernings || null,
-      fa: v.fa || null,
     };
 
     const obs = this.isCreating || !payload.id

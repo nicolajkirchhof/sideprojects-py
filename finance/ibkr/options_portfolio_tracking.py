@@ -125,7 +125,7 @@ if not os.path.exists(file):
     f.write(header)
 ##%%
 # while True:
-#%%
+##%%
 summary = ib_con.accountSummary()
 net_liq = [x for x in summary if x.account == 'U16408041' and x.tag == 'NetLiquidation'][0]
 bpr = [x for x in summary if x.account == 'U16408041' and x.tag == 'BuyingPower'][0]

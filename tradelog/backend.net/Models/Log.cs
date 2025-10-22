@@ -20,8 +20,4 @@ public class Log
     public string? Strategy { get; set; }
 
     public int? Sentiment { get; set; }
-    public string? TA { get; set; }
-    public string? ExpectedOutcome { get; set; }
-    public string? Lernings { get; set; }
-    public string? FA { get; set; }
 }
