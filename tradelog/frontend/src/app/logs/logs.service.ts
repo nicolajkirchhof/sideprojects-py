@@ -10,13 +10,22 @@ export enum Sentiments {
   Bearish = 4,
 }
 
+// [Flags] enum mirror for ProfitMechanisms
+export enum ProfitMechanisms {
+  Momentum = 1,
+  Time = 2,
+  Volatility = 4,
+  Drift = 8,
+  Other = 16,
+}
+
 // Mirror of backend Log model (camelCase JSON)
 export interface LogEntry {
   id: number;
   instrumentId: number;
   date: string; // ISO date string
   notes?: string | null;
-  strategy?: string | null;
+  profitMechanism?: number | null; // flags bitmask
   sentiment?: number | null; // flags bitmask
   ta?: string | null;
   expectedOutcome?: string | null;

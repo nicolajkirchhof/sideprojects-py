@@ -11,13 +11,23 @@ public enum Sentiments
     Bearish = 4,
 }
 
+[Flags]
+public enum ProfitMechanisms
+{
+    Momentum = 1,
+    Time = 2,
+    Volatility = 4,
+    Drift = 8,
+    Other = 16,
+}
+
 public class Log
 {
     public int Id { get; set; }
     public int InstrumentId { get; set; }
     public DateTime Date { get; set; }
     public string? Notes { get; set; }
-    public string? Strategy { get; set; }
+    public int? ProfitMechanism { get; set; }
 
     public int? Sentiment { get; set; }
 }

@@ -10,7 +10,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
-import { LogsService, LogEntry, LogUpsert, Sentiments } from './logs.service';
+import { LogsService, LogEntry, LogUpsert, Sentiments, ProfitMechanisms } from './logs.service';
 import { InstrumentsService, Instrument } from '../instruments/instruments.service';
 import { QuillModule } from 'ngx-quill';
 
@@ -47,7 +47,7 @@ export class Log implements OnInit {
     'instrumentId',
     'date',
     'notes',
-    'strategy',
+    'profitMechanism',
     'sentiment'
   ];
 
@@ -110,7 +110,7 @@ export class Log implements OnInit {
       instrumentId: [null, [Validators.required]],
       date: [null, [Validators.required]],
       notes: [''],
-      strategy: [''],
+      profitMechanism: [[] as number[]],
       sentiment: [[] as number[]]
     });
   }
@@ -133,7 +133,7 @@ export class Log implements OnInit {
       instrumentId: row.instrumentId,
       date: row.date ? new Date(row.date) : null,
       notes: row.notes ?? '',
-      strategy: row.strategy ?? '',
+      profitMechanism: this.profitToArray(row.profitMechanism),
       sentiment: this.sentimentToArray(row.sentiment)
     });
     this.showSidebar = true;
@@ -147,7 +147,7 @@ export class Log implements OnInit {
       instrumentId: null,
       date: null,
       notes: this.notesTemplate,
-      strategy: '',
+      profitMechanism: [],
       sentiment: []
     });
     this.showSidebar = true;
@@ -182,7 +182,32 @@ export class Log implements OnInit {
     return parts.length ? parts.join(', ') : 'None';
   }
 
-  private arrayToSentiment(values: number[] | null | undefined): number | null {
+  private profitToArray(value?: number | null): number[] {
+    if (!value) return [];
+    const vals: number[] = [];
+    const all = [
+      ProfitMechanisms.Momentum,
+      ProfitMechanisms.Time,
+      ProfitMechanisms.Volatility,
+      ProfitMechanisms.Drift,
+      ProfitMechanisms.Other,
+    ];
+    for (const v of all) if ((value & v) === v) vals.push(v);
+    return vals;
+  }
+
+  profitToLabels(value?: number | null): string {
+    if (!value) return '—';
+    const parts: string[] = [];
+    if ((value & ProfitMechanisms.Momentum) === ProfitMechanisms.Momentum) parts.push('Momentum');
+    if ((value & ProfitMechanisms.Time) === ProfitMechanisms.Time) parts.push('Time');
+    if ((value & ProfitMechanisms.Volatility) === ProfitMechanisms.Volatility) parts.push('Volatility');
+    if ((value & ProfitMechanisms.Drift) === ProfitMechanisms.Drift) parts.push('Drift');
+    if ((value & ProfitMechanisms.Other) === ProfitMechanisms.Other) parts.push('Other');
+    return parts.length ? parts.join(', ') : '—';
+  }
+
+  private arrayToBitmask(values: number[] | null | undefined): number | null {
     if (!values || !values.length) return null;
     return values.reduce((acc, v) => acc | Number(v), 0);
   }
@@ -198,8 +223,8 @@ export class Log implements OnInit {
       instrumentId: Number(v.instrumentId),
       date: this.toIsoOrNull(v.date) as string, // required
       notes: v.notes || null,
-      strategy: v.strategy || null,
-      sentiment: this.arrayToSentiment(v.sentiment),
+      profitMechanism: this.arrayToBitmask(v.profitMechanism),
+      sentiment: this.arrayToBitmask(v.sentiment),
     };
 
     const obs = this.isCreating || !payload.id

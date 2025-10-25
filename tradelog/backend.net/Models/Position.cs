@@ -10,6 +10,17 @@ public enum PositionTypes
     Underlying,
 }
 
+[Flags]
+public enum CloseReasons
+{
+   TakeLoss = 1,
+    TakeProfit = 2,
+    Roll = 4,
+    AssumptionInvalidated = 8,
+    TimeLimit = 16,
+    Other = 32,
+}
+
 public class Position
 {
     public int Id { get; set; }
@@ -30,6 +41,5 @@ public class Position
     public double Cost { get; set; }
     public double? Close { get; set; }
     public double? Comission { get; set; }
-    public int Multiplier { get; set; }
-    public string? CloseReason { get; set; }
+    public int? CloseReasons { get; set; }
 }

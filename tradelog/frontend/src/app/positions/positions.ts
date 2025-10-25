@@ -1,13 +1,14 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
-import { PositionsService, Position, PositionUpsert, PositionTypes } from './positions.service';
+import { PositionsService, Position, PositionUpsert, PositionTypes, CloseReasons } from './positions.service';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { InstrumentsService, Instrument } from '../instruments/instruments.service';
@@ -24,6 +25,7 @@ import { InstrumentsService, Instrument } from '../instruments/instruments.servi
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatNativeDateModule,
   ],
@@ -51,7 +53,7 @@ export class Positions implements OnInit {
     'close',
     'comission',
     'multiplier',
-    'closeReason',
+    'closeReasons',
   ];
 
   // sidebar state
@@ -59,6 +61,38 @@ export class Positions implements OnInit {
   form!: FormGroup;
   isCreating = false;
   selected: Position | null = null;
+
+  // CloseReasons helpers
+  readonly CloseReasons = CloseReasons;
+  readonly closeReasonsList = [
+    { label: 'Take Loss', value: CloseReasons.TakeLoss },
+    { label: 'Take Profit', value: CloseReasons.TakeProfit },
+    { label: 'Roll', value: CloseReasons.Roll },
+    { label: 'Assumption Invalidated', value: CloseReasons.AssumptionInvalidated },
+    { label: 'Time Limit', value: CloseReasons.TimeLimit },
+    { label: 'Other', value: CloseReasons.Other },
+  ];
+
+  hasReason(flag: number): boolean {
+    const v = this.form?.get('closeReasons')?.value ?? 0;
+    return (Number(v) & flag) === flag;
+  }
+
+  toggleReason(flag: number, checked: boolean): void {
+    const control = this.form.get('closeReasons');
+    const current = Number(control?.value ?? 0);
+    const next = checked ? (current | flag) : (current & ~flag);
+    control?.setValue(next === 0 ? null : next);
+  }
+
+  renderCloseReasons(value?: number | null): string {
+    const v = Number(value ?? 0);
+    if (!v) return '—';
+    return this.closeReasonsList
+      .filter(r => (v & r.value) === r.value)
+      .map(r => r.label)
+      .join(', ');
+  }
 
   ngOnInit(): void {
     this.load();
@@ -85,7 +119,7 @@ export class Positions implements OnInit {
       close: [null],
       comission: [null],
       multiplier: [1, [Validators.required]],
-      closeReason: ['']
+      closeReasons: [null]
     });
   }
 
@@ -117,7 +151,7 @@ export class Positions implements OnInit {
       close: row.close ?? null,
       comission: row.comission ?? null,
       multiplier: row.multiplier,
-      closeReason: row.closeReason ?? ''
+      closeReasons: row.closeReasons ?? null
     });
     this.showSidebar = true;
   }
@@ -140,7 +174,7 @@ export class Positions implements OnInit {
       close: null,
       comission: null,
       multiplier: 1,
-      closeReason: ''
+      closeReasons: null
     });
     this.showSidebar = true;
   }
@@ -177,7 +211,9 @@ export class Positions implements OnInit {
       close: v.close !== null && v.close !== undefined && v.close !== '' ? Number(v.close) : null,
       comission: v.comission !== null && v.comission !== undefined && v.comission !== '' ? Number(v.comission) : null,
       multiplier: Number(v.multiplier),
-      closeReason: v.closeReason || null,
+      closeReasons: v.closeReasons !== null && v.closeReasons !== undefined && v.closeReasons !== ''
+        ? Number(v.closeReasons)
+        : null,
       // instrumentSpecifics is not part of Position interface but may be supported by backend per model; include if present
       ...(v.instrumentSpecifics ? { instrumentSpecifics: v.instrumentSpecifics } as any : {})
     } as any;

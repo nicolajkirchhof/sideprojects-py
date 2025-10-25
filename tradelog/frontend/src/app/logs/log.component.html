@@ -32,10 +32,10 @@
           <td mat-cell *matCellDef="let element"> {{ element.notes || '—' }} </td>
         </ng-container>
 
-        <!-- Strategy Column -->
-        <ng-container matColumnDef="strategy">
-          <th mat-header-cell *matHeaderCellDef> Strategy </th>
-          <td mat-cell *matCellDef="let element"> {{ element.strategy || '—' }} </td>
+        <!-- Profit Mechanism Column -->
+        <ng-container matColumnDef="profitMechanism">
+          <th mat-header-cell *matHeaderCellDef> Profit Mechanism </th>
+          <td mat-cell *matCellDef="let element"> {{ profitToLabels(element.profitMechanism) }} </td>
         </ng-container>
 
         <!-- Sentiment Column -->
@@ -82,8 +82,14 @@
 
 
         <mat-form-field appearance="outline">
-          <mat-label>Strategy</mat-label>
-          <input matInput formControlName="strategy">
+          <mat-label>Profit Mechanism</mat-label>
+          <mat-select formControlName="profitMechanism" multiple>
+            <mat-option [value]="1">Momentum</mat-option>
+            <mat-option [value]="2">Time</mat-option>
+            <mat-option [value]="4">Volatility</mat-option>
+            <mat-option [value]="8">Drift</mat-option>
+            <mat-option [value]="16">Other</mat-option>
+          </mat-select>
         </mat-form-field>
 
         <mat-form-field appearance="outline">

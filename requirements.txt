@@ -39,3 +39,6 @@ SQLAlchemy
 Alembic
 psycopg2-binary
 python-dotenv
+
+# HTTP client for Tradelog REST integration
+requests

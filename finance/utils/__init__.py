@@ -17,3 +17,4 @@ from . import math
 from . import hourly_data
 from . import daily_data
 from . import underlyings
+from . import tradelog_client

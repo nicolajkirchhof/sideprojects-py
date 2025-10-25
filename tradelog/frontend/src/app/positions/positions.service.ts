@@ -2,11 +2,21 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-// Mirror of backend enum
+// Mirror of backend enums
 export enum PositionTypes {
   Call = 'Call',
   Put = 'Put',
   Underlying = 'Underlying',
+}
+
+// [Flags] enum mirror. Use bitmask number in payloads.
+export enum CloseReasons {
+  TakeLoss = 1,
+  TakeProfit = 2,
+  Roll = 4,
+  AssumptionInvalidated = 8,
+  TimeLimit = 16,
+  Other = 32,
 }
 
 // Mirror of backend Position class (using camelCase JSON names)
@@ -24,7 +34,7 @@ export interface Position {
   close?: number | null;
   comission?: number | null;
   multiplier: number;
-  closeReason?: string | null;
+  closeReasons?: number | null; // bitmask of CloseReasons
 }
 
 // DTO for create/update without id when creating
