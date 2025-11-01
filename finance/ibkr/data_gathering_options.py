@@ -17,7 +17,7 @@ utils.influx.create_databases()
 influx_client_df, influx_client = utils.influx.get_influx_clients()
 
 tws_instance = 'real'
-ib_con = utils.ibkr.connect(tws_instance, 3, 2)
+ib_con = utils.ibkr.connect(tws_instance, 4, 2)
 
 # %%
 

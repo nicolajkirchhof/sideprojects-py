@@ -109,7 +109,7 @@ def log_position(position):
   closing_order_states[contract.conId] = [state, order]
   maintenance_margin = abs(float(state.maintMarginChange)) if hasattr(state, 'maintMarginChange') else 0
 
-  #%%
+  ##%%
   plain = f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}{SEP} {contract.conId}'
   plain += f'{SEP} {umd.close}{SEP} {iv:.2f}{SEP} {price:.5f}{SEP} {time_value:.5f}'
   plain += f'{SEP} {greeks_to_str(greeks.delta)}{SEP} {greeks_to_str(greeks.theta)}{SEP} {greeks_to_str(greeks.gamma)}{SEP} {greeks_to_str(greeks.vega)}'
