@@ -105,6 +105,7 @@ def log_position(position):
   moneyness =  contract.strike - umd.close if contract.right == 'P' else umd.close - contract.strike
   time_value = price - moneyness if moneyness > 0 else price
   order = ib.MarketOrder("SELL" if position.position > 0 else "BUY", abs(position.position))
+  order.tif = "DAY"
   state = ib_con.whatIfOrder(contract, order)
   closing_order_states[contract.conId] = [state, order]
   maintenance_margin = abs(float(state.maintMarginChange)) if hasattr(state, 'maintMarginChange') else 0
