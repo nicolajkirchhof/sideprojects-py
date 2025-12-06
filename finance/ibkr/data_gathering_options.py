@@ -112,7 +112,11 @@ for contract in contracts:
       if current_date.date() > (datetime.now() - timedelta(days=3)).date():
         continue
     else:
-      current_date = startDateTime
+      # current_date = startDateTime
+      endDateTimeString = datetime.now().strftime('%Y%m%d %H:%M:%S') if not contract.secType == 'CONTFUT' else ""
+      data = ib_con.reqHistoricalData(contract, endDateTime=endDateTimeString, durationStr='20 Y',
+                                    barSizeSetting='1 month', whatToShow=typ, useRTH=rth)
+      current_date = datetime.combine(data[0].date, datetime.min.time())
     while current_date < endDateTime:
       ##%%
       current_date = current_date + pd.Timedelta(days=offset_days)
