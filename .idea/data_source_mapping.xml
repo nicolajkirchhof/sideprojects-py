@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/queries/Query.sql" value="8505bf98-e877-4a95-a009-ab0c558685f9" />
+    <file url="file://$PROJECT_DIR$/queries/optimize disc_change.sql" value="5cd2aa7a-1c70-4f7b-90c7-942a7759bacc" />
+  </component>
+</project>

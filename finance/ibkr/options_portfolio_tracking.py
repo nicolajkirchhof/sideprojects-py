@@ -40,8 +40,8 @@ def print_and_notify(option_portfolio_position):
   line = f'{option_portfolio_position.contract.symbol}{SEP} {option_portfolio_position.contract.conId}{SEP}'
   line += f'{SEP} {exp_str}{SEP}{SEP}{option_portfolio_position.position:5}{SEP}'
   line += f'{option_portfolio_position.contract.right:2}{SEP} {option_portfolio_position.contract.strike}'
-  line += f'{SEP}{option_portfolio_position.averageCost/int(option_portfolio_position.contract.multiplier):10.5f}{SEP}{option_portfolio_position.marketPrice:10.5f}'
-  line += f'{SEP}{pnl:8.2f}{SEP}{pnl_pct:8.2f}{SEP}'
+  line += f'{SEP}{option_portfolio_position.averageCost/int(option_portfolio_position.contract.multiplier):10.5f}'
+  # line += f'{SEP}{option_portfolio_position.marketPrice:10.5f}{SEP}{pnl:8.2f}{SEP}{pnl_pct:8.2f}{SEP}'
   color = utils.colors.Colors.BRIGHT_GREEN if pnl > 0 else utils.colors.Colors.BRIGHT_RED
   # Short PUT attention
   if option_portfolio_position.position < 0 and pnl_pct < -100:
@@ -147,11 +147,13 @@ ib_con.qualifyContracts(*option_portfolio_contracts)
 
 print(f"---------------------{datetime.now().strftime("%Y-%m-%d %H:%M")}--------------------------------")
 print(header_portfolio)
+option_portfolio_positions.sort(key=lambda x: x.contract.symbol)
 for option_portfolio_position in option_portfolio_positions:
   print_and_notify(option_portfolio_position)
 print("\n Writing positions to file... \n")
 print(header)
 ##%%
+option_portfolio_positions.sort(key=lambda x: x.contract.conId)
 for option_portfolio_position in option_portfolio_positions:
   log_position(option_portfolio_position)
 
