@@ -152,7 +152,7 @@ for option_portfolio_position in option_portfolio_positions:
   print_and_notify(option_portfolio_position)
 print("\n Writing positions to file... \n")
 print(header)
-#%%
+##%%
 option_portfolio_positions.sort(key=lambda x: x.contract.conId)
 for option_portfolio_position in option_portfolio_positions:
   log_position(option_portfolio_position)

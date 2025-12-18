@@ -249,3 +249,40 @@ def basic_indicators_from_df(df):
   df['pc'] = utils.pct.percentage_change_array(df.o, df.c)
   df.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
   return df
+
+def swing_indicators(df_stk, lrc = [50, 100, 200]):
+  df_stk['gap'] = df_stk.o - df_stk.shift().c
+  df_stk['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o)
+  df_stk['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c)
+  df_stk['vwap3'] = (df_stk['c']+df_stk['h']+df_stk['l'])/3
+  df_stk['ema20'] = df_stk['vwap3'].ewm(span=20, adjust=False).mean()
+  df_stk['ema50'] = df_stk['vwap3'].ewm(span=50, adjust=False).mean()
+  df_stk['ema200'] = df_stk['vwap3'].ewm(span=200, adjust=False).mean()
+  # ATR Calculation
+  df_stk['hl'] = df_stk['h'] - df_stk['l']
+  df_stk['hpc'] = np.abs(df_stk['h'] - df_stk['c'].shift())
+  df_stk['lpc'] = np.abs(df_stk['l'] - df_stk['c'].shift())
+
+  tr = df_stk[['hl', 'hpc', 'lpc']].max(axis=1)
+  df_stk['atr14'] = tr.ewm(alpha=1/14, adjust=False).mean()
+  df_stk['atr20'] = tr.ewm(alpha=1/20, adjust=False).mean()
+
+  # Linear Regression Channels
+  def calc_lrc(df, window):
+    def lin_reg(subset):
+      y = subset
+      x = np.arange(len(y))
+      slope, intercept = np.polyfit(x, y, 1)
+      return slope * (len(y) - 1) + intercept
+
+    base_col = f'lrc{window}'
+    df[base_col] = df['c'].rolling(window=window).apply(lin_reg, raw=True)
+    rolling_std = df['c'].rolling(window=window).std()
+    df[f'{base_col}_ub'] = df[base_col] + (rolling_std * 2)
+    df[f'{base_col}_lb'] = df[base_col] - (rolling_std * 2)
+    return df
+
+  for w in lrc:
+    df_stk = calc_lrc(df_stk, w)
+
+  return df_stk

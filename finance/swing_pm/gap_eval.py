@@ -112,6 +112,8 @@ df_gaps_sym.to_pickle(f'finance/_data/gaps_sym.pkl')
 df_gaps = pd.read_pickle(f'finance/_data/gaps_sym.pkl')
 
 #%%
+t_cols = df_gaps.filter(regex=r"^t-?\d+$").columns
+
 def boxplot_t_columns_with_labels(
     df,
     regex=r"^t-?\d+$",
@@ -244,7 +246,10 @@ def plot_gap_lines_df(gap_stats_df, alpha=0.2, lw=1.0, show_mean=True, title='')
 
 #%%
 #%%
+max_diff = 75
 gap_diffs = [3, 4] #, 5, 6, 7, 9, 11, 13, 15, 20, 30, 50, 100]
+# Uncommon behavior
+df_gap_uc = df_gaps[(df_gaps[t_cols] > 100).any(axis=1)]
 for i, g_min in enumerate(gap_diffs[:-1]):
   g_max = gap_diffs[i+1]
   df_gaps_plt = df_gaps[(df_gaps.is_etf == 0) & (df_gaps.gappct >= g_min) & (df_gaps.gappct < g_max) & (df_gaps.t0 > g_min)]
@@ -259,7 +264,7 @@ for i, g_min in enumerate(gap_diffs[:-1]):
 t_cols = df_gaps.filter(regex=r"^t-?\d+$").columns
 
 # Uncommon behavior
-df_gap_uc = df_gaps[(df_gaps[t_cols] > 1000).any(axis=1)]
+df_gap_uc = df_gaps[(df_gaps[t_cols] > 100).any(axis=1)]
 
 #%%
 gap = next(gaps.itertuples())

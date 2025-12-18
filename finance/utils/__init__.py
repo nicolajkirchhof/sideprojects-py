@@ -18,3 +18,5 @@ from . import hourly_data
 from . import daily_data
 from . import underlyings
 from . import tradelog_client
+from . import dolt_data
+from . import swing_trading_data

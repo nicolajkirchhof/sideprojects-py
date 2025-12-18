@@ -66,3 +66,4 @@ def angle_rowwise_v2(A, B):
   p3 = np.einsum('ij,ij->i',B,B)
   p4 = p1 / np.sqrt(p2*p3)
   return np.arccos(np.clip(p4,-1.0,1.0))*180/np.pi
+
