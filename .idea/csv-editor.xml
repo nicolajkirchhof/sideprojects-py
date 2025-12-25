@@ -17,6 +17,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\finance\_data\barchart\spy_daily_historical-data-12-18-2025.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\_data\barchart\spy_options-overview-history-12-18-2025.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\_data\earnings_cleaned\MSFT.csv">
           <value>
             <Attribute>

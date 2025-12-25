@@ -254,18 +254,41 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
   df_stk['gap'] = df_stk.o - df_stk.shift().c
   df_stk['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o)
   df_stk['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c)
+
+  # Historic Volatility (Annualized)
+  # Standard formula: std(log_returns) * sqrt(252)
+  log_ret = np.log(df_stk['c'] / df_stk['c'].shift(1))
+  for days in [14, 30, 50, 90]:
+    df_stk[f'hv{days}'] = log_ret.rolling(window=days).std() * np.sqrt(252)
+
   df_stk['vwap3'] = (df_stk['c']+df_stk['h']+df_stk['l'])/3
+  df_stk['ema10'] = df_stk['vwap3'].ewm(span=10, adjust=False).mean()
   df_stk['ema20'] = df_stk['vwap3'].ewm(span=20, adjust=False).mean()
   df_stk['ema50'] = df_stk['vwap3'].ewm(span=50, adjust=False).mean()
+  df_stk['ema100'] = df_stk['vwap3'].ewm(span=100, adjust=False).mean()
   df_stk['ema200'] = df_stk['vwap3'].ewm(span=200, adjust=False).mean()
+
+  # EMA Slopes (Difference between current and previous value)
+  df_stk['ema10_slope'] = df_stk['ema10'].diff()
+  df_stk['ema20_slope'] = df_stk['ema20'].diff()
+  df_stk['ema50_slope'] = df_stk['ema50'].diff()
+  df_stk['ema100_slope'] = df_stk['ema100'].diff()
+  df_stk['ema200_slope'] = df_stk['ema200'].diff()
+
   # ATR Calculation
   df_stk['hl'] = df_stk['h'] - df_stk['l']
   df_stk['hpc'] = np.abs(df_stk['h'] - df_stk['c'].shift())
   df_stk['lpc'] = np.abs(df_stk['l'] - df_stk['c'].shift())
 
   tr = df_stk[['hl', 'hpc', 'lpc']].max(axis=1)
+  df_stk['atr9'] = tr.ewm(alpha=1/14, adjust=False).mean()
   df_stk['atr14'] = tr.ewm(alpha=1/14, adjust=False).mean()
   df_stk['atr20'] = tr.ewm(alpha=1/20, adjust=False).mean()
+
+  # ATR Percentage (Normalizing ATR by Price)
+  df_stk['atrp9'] = (df_stk['atr9'] / df_stk['c']) * 100
+  df_stk['atrp14'] = (df_stk['atr14'] / df_stk['c']) * 100
+  df_stk['atrp20'] = (df_stk['atr20'] / df_stk['c']) * 100
 
   # Linear Regression Channels
   def calc_lrc(df, window):

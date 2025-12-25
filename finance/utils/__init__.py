@@ -20,3 +20,5 @@ from . import underlyings
 from . import tradelog_client
 from . import dolt_data
 from . import swing_trading_data
+from . import barchart_data
+from . import definitions

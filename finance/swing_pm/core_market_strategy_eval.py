@@ -34,5 +34,11 @@ mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
+#%%
+hist_data_name = '_daily_historical-data'
+options_data_name = '_options-overview-history'
 
 #%%
+symbol = 'SPY'
+
+files = glob(f'../data/barchart/{hist_data_name}/{symbol}*.pkl')
