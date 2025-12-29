@@ -25,7 +25,7 @@ def daily_w_volatility(symbol):
   df_price = pd.read_csv(file_prices[0])
 
   # Define a converter function
-  pct_to_float = lambda x: float(x.strip('%')) / 100 if isinstance(x, str) and '%' in x else x
+  pct_to_float = lambda x: float(x.strip('%')) / 100 if isinstance(x, str) and '%' in x else np.nan
 
   df_vol = pd.read_csv(file_volatility[0],
                        converters={'IV Pctl': pct_to_float, 'IV Rank': pct_to_float, 'Imp Vol': pct_to_float,
@@ -48,6 +48,7 @@ def daily_w_volatility(symbol):
   df_vol.set_index('date', inplace=True)
 
   df_comb = pd.merge(df_price[['o', 'c', 'h', 'l', 'v']], df_vol, on='date', how='outer')
+  df_comb['symbol'] = symbol
 
   # %%
   return df_comb

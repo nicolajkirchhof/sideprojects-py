@@ -9,6 +9,31 @@ from finance import utils
 DB_URL = 'mysql+pymysql://root:@localhost:3306/'
 db_stocks_connection = create_engine(DB_URL + 'stocks')
 db_options_connection = create_engine(DB_URL + 'options')
+db_earnings_connection = create_engine(DB_URL + 'earnings')
+
+def daily_time_range(symbol, start_date=None, end_date=None):
+  ohclv_query = """select * from ohlcv where act_symbol = :symbol and date >= :start_date and date <= :end_date"""
+  # Example usage with pandas:
+  df_stk = pd.read_sql(text(ohclv_query), db_stocks_connection, params={'symbol': symbol, 'start_date': start_date, 'end_date': end_date})
+
+  df_stk = df_stk.rename(columns={'act_symbol':'symbol', 'open':'o', 'close':'c', 'high':'h', 'low':'l', 'volume':'v'})
+  df_stk['date'] = pd.to_datetime(df_stk.date)
+  df_stk.set_index('date', inplace=True)
+
+def symbol_info(symbol):
+  query = """select * from symbol where act_symbol = :symbol"""
+  df = pd.read_sql(text(query), db_stocks_connection, params={'symbol': symbol})
+  df = df.rename(columns={'act_symbol':'symbol', 'security_name': 'name'})
+  return df.iloc[0]
+
+
+def shares_outstanding_info(symbol):
+  query = """select date, shares_outstanding from balance_sheet_equity where act_symbol = :symbol"""
+  df = pd.read_sql(text(query), db_earnings_connection, params={'symbol': symbol})
+  df['date'] = pd.to_datetime(df.date)
+  df.set_index('date', inplace=True)
+  return df
+
 
 #%%
 def daily_w_volatility(symbol):
@@ -49,7 +74,8 @@ def daily_w_volatility(symbol):
     .rolling(window=window)
     .apply(calculate_percentile, raw=False)
   )
-  df_stk_vol = pd.merge(df_stk, df_vol, on='date', how='outer')
+  df_stk_vol = pd.merge(df_stk[utils.definitions.OHLCLV], df_vol[['hv', 'iv', 'iv_year_high', 'iv_year_low', 'iv_rank', 'iv_pct']], on='date', how='outer')
+  df_stk_vol['symbol'] = symbol
   #%%
   return df_stk_vol
 

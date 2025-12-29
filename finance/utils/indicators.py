@@ -249,11 +249,31 @@ def basic_indicators_from_df(df):
   df['pc'] = utils.pct.percentage_change_array(df.o, df.c)
   df.dropna(subset=['o', 'h', 'c', 'l'], inplace=True)
   return df
+def hurst(ts):
+  lags = range(2, 20)
+  tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
+  poly = np.polyfit(np.log(lags), np.log(tau), 1)
+  return poly[0] * 2.0
 
 def swing_indicators(df_stk, lrc = [50, 100, 200]):
   df_stk['gap'] = df_stk.o - df_stk.shift().c
-  df_stk['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o)
-  df_stk['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c)
+  df_stk['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o).fillna(0)
+  df_stk['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c).fillna(0)
+
+  # RVOL Calculation (Relative Volume)
+  # 20-day is standard for swing trading
+  df_stk['v20'] = df_stk['v'].rolling(window=20).mean()
+  df_stk['rvol'] = df_stk['v'] / df_stk['v20']
+
+  # How "sticky" is the current volatility regime?
+
+  # 2. Multi-Lag Autocorrelations (Legs)
+  # Lag 1: Daily momentum/mean-reversion
+  # Lag 5: Weekly cycle persistence
+  # Lag 21: Monthly cycle (Institutional window)
+  for lag in [1, 5, 21]:
+    df_stk[f'ac_lag_{lag}'] = df_stk['pct'].rolling(window=100).apply(lambda x: x.autocorr(lag=lag))
+    df_stk[f'ac_lag_{lag}'] = df_stk['iv'].rolling(window=100).apply(lambda x: x.autocorr(lag=lag))
 
   # Historic Volatility (Annualized)
   # Standard formula: std(log_returns) * sqrt(252)
@@ -275,6 +295,13 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
   df_stk['ema100_slope'] = df_stk['ema100'].diff()
   df_stk['ema200_slope'] = df_stk['ema200'].diff()
 
+  # Distance from EMAs (Percentage)
+  df_stk['ema10_dist'] = ((df_stk['c'] - df_stk['ema10']) / df_stk['ema10']) * 100
+  df_stk['ema20_dist'] = ((df_stk['c'] - df_stk['ema20']) / df_stk['ema20']) * 100
+  df_stk['ema50_dist'] = ((df_stk['c'] - df_stk['ema50']) / df_stk['ema50']) * 100
+  df_stk['ema100_dist'] = ((df_stk['c'] - df_stk['ema100']) / df_stk['ema100']) * 100
+  df_stk['ema200_dist'] = ((df_stk['c'] - df_stk['ema200']) / df_stk['ema200']) * 100
+
   # ATR Calculation
   df_stk['hl'] = df_stk['h'] - df_stk['l']
   df_stk['hpc'] = np.abs(df_stk['h'] - df_stk['c'].shift())
@@ -290,6 +317,23 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
   df_stk['atrp14'] = (df_stk['atr14'] / df_stk['c']) * 100
   df_stk['atrp20'] = (df_stk['atr20'] / df_stk['c']) * 100
 
+  # Hurst Exponent (Trend vs Mean Reversion)
+  # Calculated over a rolling 100-day window
+  # H < 0.5: Mean Reverting | H > 0.5: Trending
+  df_stk['hurst'] = df_stk['c'].rolling(window=100).apply(hurst, raw=True)
+
+  df_stk['year'] = df_stk.index.year
+  df_stk['month'] = df_stk.index.month
+  df_stk['day'] = df_stk.index.day
+
+  # Consecutive Up/Down Days
+  # 1 if up, -1 if down, 0 if flat
+  change_sign = np.sign(df_stk['pct'].fillna(0))
+  # Create groups: a new group starts every time the sign changes
+  streak_groups = (change_sign != change_sign.shift()).cumsum()
+  # Cumulate the signs within each group
+  df_stk['streak'] = change_sign.groupby(streak_groups).cumsum()
+
   # Linear Regression Channels
   def calc_lrc(df, window):
     def lin_reg(subset):
@@ -303,6 +347,11 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
     rolling_std = df['c'].rolling(window=window).std()
     df[f'{base_col}_ub'] = df[base_col] + (rolling_std * 2)
     df[f'{base_col}_lb'] = df[base_col] - (rolling_std * 2)
+
+    # Distance from LRC lines (Percentage)
+    df[f'{base_col}_dist'] = ((df['c'] - df[base_col]) / df[base_col]) * 100
+    df[f'{base_col}_ub_dist'] = ((df['c'] - df[f'{base_col}_ub']) / df[f'{base_col}_ub']) * 100
+    df[f'{base_col}_lb_dist'] = ((df['c'] - df[f'{base_col}_lb']) / df[f'{base_col}_lb']) * 100
     return df
 
   for w in lrc:

@@ -1,112 +1,18 @@
 #%%
-import glob
-import pickle
-from datetime import datetime, timedelta
-from glob import glob
-from zoneinfo import ZoneInfo
 
-import dateutil
 import numpy as np
-import scipy
 
 import pandas as pd
-import os
-
-import influxdb as idb
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import matplotlib.dates as mdates
-import matplotlib.ticker as mticker
-import mplfinance as mpf
-from sqlalchemy import create_engine, text, bindparam
-from sqlalchemy.dialects.mssql.information_schema import columns
 
-import finance.utils as utils
-
-import yfinance as yf
-import requests
-
-from finance.swing_pm.earnings_dates import EarningsDates
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-
-#%%
-def gap_statistics(gaps):
-  gap_data = []
-  for gap in gaps.itertuples():
-    idx = gap[0]
-    closes = df_stk.iloc[idx-1:idx+21, :]['c'].to_numpy()
-    closes_norm = (closes-closes[0])/closes[0] * 100
-    postEarnings = df_earnings.loc[df_earnings.date.eq(df_stk.iloc[idx-1].date), 'when']
-    preEarnings = df_earnings.loc[df_earnings.date.eq(df_stk.iloc[idx].date), 'when']
-    hasEarnings = postEarnings.iat[0] == 'post' if not postEarnings.empty else preEarnings.iat[0] == 'pre' if not preEarnings.empty else False
-    gap_eval = {'symbol': getattr(gap, 'symbol'), 'earnings': hasEarnings, 'date': getattr(gap, 'date'), 'gappct':getattr(gap, 'gappct') }
-    for i, y in enumerate(closes_norm):
-      gap_eval[f't{i-1}']=y
-    gap_data.append(gap_eval)
-  return pd.DataFrame(gap_data)
-
-
-# MySQL connection setup (localhost:3306)
-# Note: This requires a driver like 'pymysql'. Install it via: pip install pymysql
-# Format: mysql+driver://user:password@host:port/database
-db_connection_str = 'mysql+pymysql://root:@localhost:3306/stocks'
-db_connection = create_engine(db_connection_str)
-# for ticker in utils.underlyings.us_stock_symbols:
-##%% Get liquid underlyings
-with open('finance/_data/liquid_stocks.pkl', 'rb') as f: liquid_symbols = pickle.load(f)
-
-ticker = liquid_symbols[0]
-for ticker in liquid_symbols:
-  print(f'Processing {ticker}...')
-  #%%
-  df_earnings = pd.read_csv(f'finance/_data/earnings_cleaned/{ticker}.csv')
-  df_earnings['date'] = pd.to_datetime(df_earnings['date'], format='%Y-%m-%d')
-
-  #%%
-  query = """select * from ohlcv where act_symbol = :ticker"""
-  stmt = text(query)
-  # Example usage with pandas:
-  df_stk = pd.read_sql(stmt, db_connection, params={'ticker': ticker})
-
-  df_stk = df_stk.rename(columns={'act_symbol':'symbol', 'open':'o', 'close':'c', 'high':'h', 'low':'l', 'volume':'v'})
-  df_stk['date'] = pd.to_datetime(df_stk.date)
-
-  #%%
-  df_stk['gap'] = df_stk.o - df_stk.shift().c
-  df_stk['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o)
-  df_stk['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c)
-
-  ##%% Dataset of gaps: gap%, after 3 days, after 6 days, after 9 days, after 14 days
-  gaps = df_stk[df_stk.gappct.abs() > 2]
-
-  #%%
-  gap_stats_df = gap_statistics(gaps)
-  gap_stats_df.to_pickle(f'finance/_data/gaps/{ticker}.pkl')
-
-
-#%% Load tickers and add symbol information
-dfs_gaps = []
-for ticker in liquid_symbols:
-  dfs_gaps.append(pd.read_pickle(f'finance/_data/gaps/{ticker}.pkl'))
-
-df_gaps = pd.concat(dfs_gaps)
-
-df_gaps_clean = df_gaps.dropna(how='any')
-
-#%% Add symbol information
-stmt = text("select * from symbol where act_symbol in :tickers").bindparams(bindparam("tickers", expanding=True))
-df_symbols = pd.read_sql(stmt, db_connection, params={'tickers': liquid_symbols})
-df_symbols = df_symbols.rename(columns={'act_symbol':'symbol', 'security_name': 'name'})
-
-#%%
-df_gaps_sym = pd.merge(df_gaps_clean, df_symbols[['symbol','name', 'is_etf']], on=['symbol'], how='inner')
-df_gaps_sym.to_pickle(f'finance/_data/gaps_sym.pkl')
 
 #%%
 df_gaps = pd.read_pickle(f'finance/_data/gaps_sym.pkl')
