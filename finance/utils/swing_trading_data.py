@@ -42,10 +42,19 @@ class SwingTradingData:
     self.df_month = utils.indicators.swing_indicators(self.df_month, [50])
     self.symbol_info = utils.dolt_data.symbol_info(symbol)
     self.market_cap = None
-    df_shares_outstanding = utils.dolt_data.shares_outstanding_info(symbol)
-    if not df_shares_outstanding.empty:
-      df_market_cap = pd.merge(df_shares_outstanding, self.df_day.c, left_index=True, right_index=True)
-      df_market_cap['market_cap'] = df_market_cap['c'] * df_market_cap['sharesOutstanding']
+    self.df_shares_outstanding = utils.dolt_data.shares_outstanding_info(symbol)
+    if not self.df_shares_outstanding.empty:
+      df_market_cap = self.df_shares_outstanding.copy()
+      df_market_cap = df_market_cap[~df_market_cap.index.duplicated(keep='first')]
+      flt_market_cap = df_market_cap.index >= self.df_day.index.min()      # Align price to shares outstanding index using forward-fill (captures the last 'closed' price)
+      if not any(flt_market_cap):
+        df_market_cap['c'] = self.df_day['c'].iloc[0]
+      else:
+        df_market_cap['c'] = self.df_day['c'].reindex(df_market_cap.index[flt_market_cap], method='ffill')
+      # Remove any dates that occurred before our available price data
+      df_market_cap.dropna(subset=['c'], inplace=True)
+
+      df_market_cap['market_cap'] = df_market_cap['c'] * df_market_cap['shares_outstanding']
       self.market_cap = df_market_cap
 
 

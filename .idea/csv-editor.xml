@@ -31,6 +31,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\finance\_data\earnings_cleaned\FI.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\_data\earnings_cleaned\MSFT.csv">
           <value>
             <Attribute>

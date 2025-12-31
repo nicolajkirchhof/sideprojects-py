@@ -6,3 +6,4 @@ EMA_DISTS = ['ema10_dist', 'ema20_dist', 'ema50_dist', 'ema100_dist', 'ema200_di
 HVs = ['hv14', 'hv30', 'hv50', 'hv90']
 ATRPs = ['atrp9', 'atrp14', 'atrp20']
 
+

@@ -322,7 +322,7 @@ def violinplot_columns_with_labels(
       pc.set_alpha(0.7)
 
   ax.set_xticks(np.arange(1, len(cols) + 1))
-  ax.set_xticklabels(cols)
+  ax.set_xticklabels(cols, fontsize=10)
   ax.axhline(0, color="gray", linewidth=1)
   if title:
     ax.set_title(title)

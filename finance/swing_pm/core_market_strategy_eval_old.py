@@ -885,334 +885,153 @@ evaluate_regime_improvement(df_eval_nc, "NC Strategy")
 evaluate_regime_improvement(df_eval_p, "P Strategy")
 
 #%%
-def evaluate_frequency_outcomes_yearly(df_filtered, freq_weeks=[1, 2, 3, 4]):
+def analyze_feature_permutation_influence(df_eval, name, features, max_features=5):
     """
-    Calculates best/worst annual PnL % for various trading frequencies.
-    Returns a dataframe grouped by year and frequency for bar plotting.
-    """
-    df_daily = df_filtered[['pnl_pct']].resample('D').sum().fillna(0)
-    yearly_results = []
-    
-    for wk in freq_weeks:
-        days_step = wk * 5
-        for offset in range(min(len(df_daily), days_step)):
-            sampled = df_daily.iloc[offset::days_step]
-            # Sum PnL per year for this specific offset/frequency
-            annual_pnl = sampled.groupby(sampled.index.year)['pnl_pct'].sum()
-            for year, pnl in annual_pnl.items():
-                yearly_results.append({
-                    'frequency': f'{wk}wk',
-                    'year': year,
-                    'pnl': pnl
-                })
-                
-    df_all = pd.DataFrame(yearly_results)
-    if df_all.empty: return pd.DataFrame()
-    
-    # Aggregate to find the luck-based bounds per year
-    return df_all.groupby(['year', 'frequency'])['pnl'].agg(['max', 'min']).reset_index()
-
-def shorten_regime_label(label):
-  """Shortens long indicator names for plot readability."""
-  replacements = {
-    'ac_lag_': 'ac', 'ema': 'e', '_dist': 'd', '_slope': 's',
-    'atrp': 'ap', 'hurst': 'h', 'iv_pct': 'ivp'
-  }
-  for old, new in replacements.items():
-    label = label.replace(old, new)
-  return label
-
-def analyze_feature_permutation_influence(df_eval, name, features, num_features=3):
-    """
-    Targeted complexity analysis with logic reduction report and full visual overview.
+    Analyzes permutations using a Conservative Mean (Lower Bound).
+    Applies logic reduction to show summarized trading conditions.
     """
     df = df_eval.copy().sort_index()
+    results = []
     baseline_avg_pct = df['pnl_pct'].mean()
     total_trades_baseline = len(df)
-    results = []
     
+    equity_curves = {'Baseline': df['pnl_pct'].cumsum()}
+
+    # Thresholds to ensure robust influence factors
     MIN_REGIME_SAMPLES = 10
+    # Minimum total trades for a logic set to be considered valid
     MIN_TOTAL_TRADES = 50
 
-    print(f"Deep Targeted Evaluation: {name} - Complexity {num_features}...")
-    
-    for combo in itertools.combinations(features, num_features):
-        temp_df = df.copy()
-        regime_cols = []; slots = []
-        for feat in combo:
-            reg_name = f"reg_{feat}"
-            if 'hurst' in feat:
-                states = ["MR", "TR"]; temp_df[reg_name] = np.where(temp_df[feat] < 0.45, "MR", "TR")
-            elif any(x in feat for x in ['ac_lag', 'slope', 'dist']):
-                states = [f"{feat}+", f"{feat}-"]; temp_df[reg_name] = np.where(temp_df[feat] > 0, f"{feat}+", f"{feat}-")
-            elif 'iv' in feat or 'atrp' in feat:
-                med = temp_df[feat].median(); states = [f"{feat}H", f"{feat}L"]
-                temp_df[reg_name] = np.where(temp_df[feat] > med, f"{feat}H", f"{feat}L")
-            else:
-                states = [f"{feat}P", f"{feat}N"]; temp_df[reg_name] = np.where(temp_df[feat] > 0, f"{feat}P", f"{feat}N")
-            regime_cols.append(reg_name); slots.append(states)
-        
-        temp_df['reg_key'] = temp_df[regime_cols].agg(' | '.join, axis=1)
-        reg_stats = temp_df.groupby('reg_key')['pnl_pct'].agg(['mean', 'count', 'std']).fillna(0)
-        reg_stats['conservative_mean'] = reg_stats['mean'] - (reg_stats['std'] / np.sqrt(reg_stats['count']))
-        
-        keep_regimes = reg_stats[(reg_stats['conservative_mean'] > 0) & (reg_stats['count'] >= MIN_REGIME_SAMPLES)].index
-        df_filtered = temp_df[temp_df['reg_key'].isin(keep_regimes)].copy()
-        
-        if len(df_filtered) >= MIN_TOTAL_TRADES:
-            # Yearly Best/Worst bounds
-            yearly_bounds = evaluate_frequency_outcomes_yearly(df_filtered)
+    for r in range(1, max_features + 1):
+        print(f"Analyzing {name}: Combinations of size {r}...")
+        group_results = []
 
-            # Margin analysis
-            margin_events = []
-            for _, row in df_filtered.iterrows():
-                margin_events.append({'time': row.name, 'change': row.margin})
-                margin_events.append({'time': row.date_closed, 'change': -row.margin})
-            df_margin = pd.DataFrame(margin_events).sort_values('time')
-            df_margin['total_margin'] = df_margin['change'].cumsum()
-            peak_margin = df_margin.set_index('time')['total_margin'].resample('D').max().fillna(0)
+        for combo in itertools.combinations(features, r):
+            temp_df = df.copy()
+            regime_cols = []
+            slots = [] # For logic reduction
 
-            res_item = {
-                'features': combo, 'regimes': keep_regimes.tolist(), 'slots': slots,
-                'avg_pnl_pct': df_filtered['pnl_pct'].mean(), 'trade_count': len(df_filtered),
-                'score': df_filtered['pnl_pct'].mean() * np.sqrt(len(df_filtered)),
-                'filter_rate': 1 - (len(df_filtered) / total_trades_baseline),
-                'df_filtered': df_filtered, 'yearly_bounds': evaluate_frequency_outcomes_yearly(df_filtered)
-            }
-            results.append(res_item)
+            for feat in combo:
+                reg_name = f"reg_{feat}"
+                if 'hurst' in feat:
+                    states = ["MR", "TR"]
+                    temp_df[reg_name] = np.where(temp_df[feat] < 0.45, "MR", "TR")
+                elif any(x in feat for x in ['ac_lag', 'slope', 'dist']):
+                    states = [f"{feat}+", f"{feat}-"]
+                    temp_df[reg_name] = np.where(temp_df[feat] > 0, f"{feat}+", f"{feat}-")
+                elif 'iv' in feat or 'atrp' in feat:
+                    states = [f"{feat}H", f"{feat}L"]
+                    temp_df[reg_name] = np.where(temp_df[feat] > temp_df[feat].median(), f"{feat}H", f"{feat}L")
+                else:
+                    states = [f"{feat}P", f"{feat}N"]
+                    temp_df[reg_name] = np.where(temp_df[feat] > 0, f"{feat}P", f"{feat}N")
+                regime_cols.append(reg_name)
+                slots.append(states)
 
-    if not results: return pd.DataFrame()
+            temp_df['reg_key'] = temp_df[regime_cols].agg(' | '.join, axis=1)
+
+            # Calculate stats including Standard Deviation for Standard Error calculation
+            reg_stats = temp_df.groupby('reg_key')['pnl_pct'].agg(['mean', 'count', 'std']).fillna(0)
+
+            # Penalize variance: Conservative Mean = Mean - StdError
+            reg_stats['std_err'] = reg_stats['std'] / np.sqrt(reg_stats['count'])
+            reg_stats['conservative_mean'] = reg_stats['mean'] - reg_stats['std_err']
+
+            keep_regimes = reg_stats[(reg_stats['conservative_mean'] > 0) & (reg_stats['count'] >= MIN_REGIME_SAMPLES)].index
+            df_filtered = temp_df[temp_df['reg_key'].isin(keep_regimes)]
+
+            if len(df_filtered) >= MIN_TOTAL_TRADES:
+                avg_conservative_eff = df_filtered['pnl_pct'].mean()
+
+                # Perform Logic Reduction on the winning regimes
+                current_rules = [{'pattern': k.split(' | '), 'n': 1, 'sum_pnl': 0} for k in keep_regimes]
+
+                def simplify_step(rules, current_slots):
+                    new_rules = []
+                    used = set()
+                    for i in range(len(rules)):
+                        for j in range(i + 1, len(rules)):
+                            r1, r2 = rules[i], rules[j]
+                            diff_idx = [idx for idx in range(len(r1['pattern'])) if r1['pattern'][idx] != r2['pattern'][idx]]
+                            if len(diff_idx) == 1:
+                                idx = diff_idx[0]
+                                if r1['pattern'][idx] != '*' and r2['pattern'][idx] != '*' and \
+                                   r1['pattern'][idx] in current_slots[idx] and r2['pattern'][idx] in current_slots[idx]:
+                                    merged_pattern = list(r1['pattern'])
+                                    merged_pattern[idx] = '*'
+                                    if merged_pattern not in [nr['pattern'] for nr in new_rules]:
+                                        new_rules.append({'pattern': merged_pattern})
+                                    used.add(i); used.add(j)
+                    unpaired = [rules[k] for k in range(len(rules)) if k not in used]
+                    return new_rules, unpaired
+
+                reduced_rules = current_rules
+                while True:
+                    combined, unique = simplify_step(reduced_rules, slots)
+                    if not combined: break
+                    reduced_rules = combined + unique
+
+                # Format using vertical dividers: MR | ac5+ | *
+                logic_blocks = [" | ".join(r['pattern']) for r in reduced_rules]
+                summarized_condition = " || ".join(logic_blocks)
+
+                res_item = {
+                    'feature_count': r,
+                    'features': combo,
+                    'condition': summarized_condition,
+                    'avg_pnl_pct': avg_conservative_eff,
+                    'trade_count': len(df_filtered),
+                    'filter_rate': 1 - (len(df_filtered) / total_trades_baseline),
+                    'score': avg_conservative_eff * np.sqrt(len(df_filtered)),
+                    'equity_curve': df_filtered['pnl_pct'].reindex(df.index).fillna(0).cumsum()
+                }
+                results.append(res_item)
+                group_results.append(res_item)
+
+        if group_results:
+            best_in_group = max(group_results, key=lambda x: x['score'])
+            equity_curves[f'{r} Feat'] = best_in_group['equity_curve']
 
     df_res = pd.DataFrame(results).sort_values('score', ascending=False)
-    best_res = df_res.iloc[0]
+    
+    # Visualization
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(24, 18))
+    sns.boxenplot(x='feature_count', y='avg_pnl_pct', data=df_res, hue='feature_count', palette='viridis', legend=False, ax=ax1)
+    ax1.set_title(f"{name}: Conservative Efficiency Distribution")
+    ax1.axhline(baseline_avg_pct, color='red', ls='--', label='Baseline Avg PnL %')
 
-    # 1. Logic Reduction for Summary
-    current_rules = [{'pattern': k.split(' | ')} for k in best_res['regimes']]
-    def simplify_step(rules, current_slots):
-        new_rules = []; used = set()
-        for i in range(len(rules)):
-            for j in range(i + 1, len(rules)):
-                r1, r2 = rules[i], rules[j]
-                diff = [idx for idx in range(num_features) if r1['pattern'][idx] != r2['pattern'][idx]]
-                if len(diff) == 1:
-                    idx = diff[0]
-                    if r1['pattern'][idx] != '*' and r2['pattern'][idx] != '*' and \
-                       r1['pattern'][idx] in current_slots[idx] and r2['pattern'][idx] in current_slots[idx]:
-                        merged = list(r1['pattern']); merged[idx] = '*'
-                        if merged not in [nr['pattern'] for nr in new_rules]: new_rules.append({'pattern': merged})
-                        used.add(i); used.add(j)
-        return new_rules, [rules[k] for k in range(len(rules)) if k not in used]
-
-    reduced = current_rules
-    while True:
-        combined, unique = simplify_step(reduced, best_res['slots'])
-        if not combined: break
-        reduced = combined + unique
-    logic_str = " || ".join([" | ".join(r['pattern']) for r in reduced])
-
-    # 2. Margin analysis for Best
-    margin_events = []
-    for _, row in best_res['df_filtered'].iterrows():
-        margin_events.append({'time': row.name, 'change': row.margin})
-        margin_events.append({'time': row.date_closed, 'change': -row.margin})
-    df_margin = pd.DataFrame(margin_events).sort_values('time')
-    df_margin['total_margin'] = df_margin['change'].cumsum()
-    peak_margin = df_margin.set_index('time')['total_margin'].resample('D').max().fillna(0)
-
-    # 3. Visuals
-    fig = plt.figure(figsize=(28, 22))
-    gs = fig.add_gridspec(4, 3, height_ratios=[1, 1.2, 1.2, 1.2])
-    ax_box = fig.add_subplot(gs[0, 0]); ax_margin = fig.add_subplot(gs[0, 1:3])
-    ax_freq = fig.add_subplot(gs[1, :]); ax_equity = fig.add_subplot(gs[2, :]); ax_violin = fig.add_subplot(gs[3, :])
-    
-    sns.boxenplot(data=pd.DataFrame({'Strategy': df_res['avg_pnl_pct'], 'Baseline': df['pnl_pct']}), ax=ax_box, palette='Set2')
-    ax_box.set_title("Efficiency vs Baseline Trade Dist"); ax_box.axhline(baseline_avg_pct, color='red', ls='--')
-    
-    peak_margin.plot(ax=ax_margin, color='purple', lw=1); ax_margin.set_title("Strategy Capital Requirements")
-    
-    # Yearly Luck Bounds
-    df_f = best_res['yearly_bounds']
-    if not df_f.empty:
-        years = sorted(df_f['year'].unique()); freqs = df_f['frequency'].unique()
-        x = np.arange(len(years)); width = 0.8 / len(freqs)
-        for i, fq in enumerate(freqs):
-            d = df_f[df_f['frequency'] == fq].set_index('year').reindex(years)
-            off = (i - len(freqs)/2 + 0.5) * width
-            ax_freq.bar(x + off, d['max'], width, label=f'{fq} Best', color=plt.cm.tab10(i), alpha=0.8)
-            ax_freq.bar(x + off, d['min'], width, label=f'{fq} Worst', color=plt.cm.tab10(i), alpha=0.3, edgecolor='black', hatch='//')
-        ax_freq.set_xticks(x); ax_freq.set_xticklabels(years); ax_freq.legend(loc='upper left', ncol=len(freqs))
-
-    ax_equity.plot(df.index, df['pnl_pct'].cumsum(), label='Baseline', color='black', alpha=0.3)
-    ax_equity.plot(df.index, best_res['df_filtered']['pnl_pct'].reindex(df.index).fillna(0).cumsum(), label='Filtered', lw=2.5)
-    ax_equity.set_title(f"Cumulative path: {' + '.join(best_res['features'])}"); ax_equity.legend()
-    
-    df_comp = pd.DataFrame({shorten_regime_label(r): best_res['df_filtered'][best_res['df_filtered']['reg_key'] == r]['pnl_pct'].reset_index(drop=True) for r in best_res['regimes']})
-    utils.plots.violinplot_columns_with_labels(df_comp, rotate=30, ax=ax_violin, title="Component Breakdown")
-    
-    plt.suptitle(f"STRATEGY: {name} | {num_features} FEATURES", fontsize=22, fontweight='bold'); plt.show()
-
-    print(f"\n" + "="*60 + f"\nREPORT: {name}\n" + "="*60)
-    print(f"CONDITION  : IF {logic_str}\nEFFICIENCY : {best_res['avg_pnl_pct']:.2f}% (Vs {baseline_avg_pct:.2f}%)\nRELIABILITY: {best_res['trade_count']} trades ({best_res['filter_rate']:.1%} filtered)\n" + "-"*60)
-    return df_res
-
-
-def _discretize_features(df, combo):
-    """Encapsulates the discretization logic for regimes and reduction slots."""
-    temp_df = df.copy()
-    regime_cols = []; slots = []
-    for feat in combo:
-        reg_name = f"reg_{feat}"
-        if 'hurst' in feat:
-            states = ["MR", "TR"]; temp_df[reg_name] = np.where(temp_df[feat] < 0.45, "MR", "TR")
-        elif any(x in feat for x in ['ac_lag', 'slope', 'dist']):
-            states = [f"{feat}+", f"{feat}-"]; temp_df[reg_name] = np.where(temp_df[feat] > 0, f"{feat}+", f"{feat}-")
-        elif 'iv' in feat or 'atrp' in feat:
-            med = temp_df[feat].median(); states = [f"{feat}H", f"{feat}L"]
-            temp_df[reg_name] = np.where(temp_df[feat] > med, f"{feat}H", f"{feat}L")
-        else:
-            states = [f"{feat}P", f"{feat}N"]; temp_df[reg_name] = np.where(temp_df[feat] > 0, f"{feat}P", f"{feat}N")
-        regime_cols.append(reg_name); slots.append(states)
-    return temp_df, regime_cols, slots
-
-def _reduce_logic(regimes, slots):
-    """Applies recursive reduction to simplify vertical divider logic."""
-    current_rules = [{'pattern': k.split(' | ')} for k in regimes]
-    num_feats = len(slots)
-    
-    def simplify_step(rules, current_slots):
-        new_rules = []; used = set()
-        for i in range(len(rules)):
-            for j in range(i + 1, len(rules)):
-                r1, r2 = rules[i], rules[j]
-                diff = [idx for idx in range(num_feats) if r1['pattern'][idx] != r2['pattern'][idx]]
-                if len(diff) == 1:
-                    idx = diff[0]
-                    if r1['pattern'][idx] != '*' and r2['pattern'][idx] != '*' and \
-                       r1['pattern'][idx] in current_slots[idx] and r2['pattern'][idx] in current_slots[idx]:
-                        merged = list(r1['pattern']); merged[idx] = '*'
-                        if merged not in [nr['pattern'] for nr in new_rules]: new_rules.append({'pattern': merged})
-                        used.add(i); used.add(j)
-        return new_rules, [rules[k] for k in range(len(rules)) if k not in used]
-
-    reduced = current_rules
-    while True:
-        combined, unique = simplify_step(reduced, slots)
-        if not combined: break
-        reduced = combined + unique
-    return " || ".join([" | ".join(r['pattern']) for r in reduced])
-
-def _plot_permutation_results(df_res, best_res, df_baseline, name, num_features, logic_str):
-    """Orchestrates the visualization dashboard for the targeted complexity level."""
-    fig = plt.figure(figsize=(28, 22))
-    gs = fig.add_gridspec(4, 3, height_ratios=[1, 1.2, 1.2, 1.2])
-    
-    ax_box = fig.add_subplot(gs[0, 0]); ax_scatter = fig.add_subplot(gs[0, 1])
-    ax_margin = fig.add_subplot(gs[0, 2]); ax_freq = fig.add_subplot(gs[1, :])
-    ax_equity = fig.add_subplot(gs[2, :]); ax_violin = fig.add_subplot(gs[3, :])
-    
-    # 1. Efficiency vs Baseline Dist
-    baseline_avg = df_baseline['pnl_pct'].mean()
-    plot_data = pd.DataFrame({'Strategy': df_res['avg_pnl_pct'], 'Baseline Trades': df_baseline['pnl_pct']})
-    sns.boxenplot(data=plot_data, ax=ax_box, palette='Set2')
-    ax_box.axhline(baseline_avg, color='red', ls='--'); ax_box.set_title("Strategy vs Baseline Distribution")
-    
-    # 2. Efficiency vs Frequency (Scatter)
-    sns.scatterplot(x='trade_count', y='avg_pnl_pct', data=df_res, ax=ax_scatter, color='tab:blue', alpha=0.6)
-    ax_scatter.scatter(best_res['trade_count'], best_res['avg_pnl_pct'], color='red', s=100, label='Best Score')
-    ax_scatter.set_title("Efficiency vs Frequency Trade-off"); ax_scatter.grid(True, alpha=0.2); ax_scatter.legend()
-    
-    # 3. Margin utilization for filtered subset
-    m_events = []
-    for _, row in best_res['df_filtered'].iterrows():
-        m_events.append({'time': row.name, 'change': row.margin})
-        m_events.append({'time': row.date_closed, 'change': -row.margin})
-    df_m = pd.DataFrame(m_events).sort_values('time')
-    df_m['total_margin'] = df_m['change'].cumsum()
-    df_m.set_index('time')['total_margin'].resample('D').max().fillna(0).plot(ax=ax_margin, color='purple', lw=1)
-    ax_margin.set_title("Strategy Margin Requirements"); ax_margin.set_ylabel("Margin ($)")
-    
-    # 4. Yearly Stability Bar Chart
-    df_f = best_res['yearly_bounds']
-    if not df_f.empty:
-        years = sorted(df_f['year'].unique()); freqs = df_f['frequency'].unique()
-        x = np.arange(len(years)); width = 0.8 / len(freqs)
-        for i, fq in enumerate(freqs):
-            d = df_f[df_f['frequency'] == fq].set_index('year').reindex(years)
-            off = (i - len(freqs)/2 + 0.5) * width
-            ax_freq.bar(x + off, d['max'], width, label=f'{fq} Best', color=plt.cm.tab10(i), alpha=0.8)
-            ax_freq.bar(x + off, d['min'], width, label=f'{fq} Worst', color=plt.cm.tab10(i), alpha=0.3, edgecolor='black', hatch='//')
-        ax_freq.set_xticks(x); ax_freq.set_xticklabels(years); ax_freq.legend(loc='upper left', ncol=len(freqs))
-        ax_freq.set_title("Annual Range by Trading Interval (Luck-sensitivity)")
-
-    # 5. Continuous Equity path
-    ax_equity.plot(df_baseline.index, df_baseline['pnl_pct'].cumsum(), label='Baseline (All)', color='black', alpha=0.3)
-    ax_equity.plot(df_baseline.index, best_res['df_filtered']['pnl_pct'].reindex(df_baseline.index).fillna(0).cumsum(), 
-                   label='Filtered Strategy', color='tab:blue', lw=2.5)
-    ax_equity.set_title(f"Cumulative path: {' + '.join(best_res['features'])}"); ax_equity.legend()
-    
-    # 6. Logic components using custom violin function with shortened labels
-    df_comp = pd.DataFrame({shorten_regime_label(r): best_res['df_filtered'][best_res['df_filtered']['reg_key'] == r]['pnl_pct'].reset_index(drop=True) 
-                            for r in best_res['regimes']})
-    utils.plots.violinplot_columns_with_labels(df_comp, rotate=30, ax=ax_violin, title="Logic Component Distribution")
-    
-    plt.suptitle(f"STRATEGY: {name} | COMPLEXITY: {num_features} FEATURES", fontsize=22, fontweight='bold')
+    for label, curve in equity_curves.items():
+        lw = 3 if label == 'Baseline' else 1.5
+        ax2.plot(curve.index, curve, label=label, linewidth=lw, alpha=0.8)
+    ax2.set_title(f"{name}: Equity Comparison (Pruned to Robust Regimes)")
+    ax2.set_ylabel("Cumulative PnL %")
+    ax2.legend(); ax2.grid(True, alpha=0.3)
     plt.tight_layout(); plt.show()
 
-def _print_strategy_summary(name, logic_str, best_res, baseline_avg):
-    """Prints the detailed analysis report in structured blocks."""
-    print(f"\n" + "="*60)
-    print(f"ANALYSIS REPORT: {name}")
-    print("="*60)
-    print(f"BEST FEATURES : {' + '.join(best_res['features'])}")
-    print(f"LOGIC SUMMARY : IF {logic_str}")
-    print(f"--- PERFORMANCE ---")
-    print(f"EFFICIENCY    : {best_res['avg_pnl_pct']:.2f}% per trade")
-    print(f"BASELINE MEAN : {baseline_avg:.2f}% per trade")
-    print(f"--- RELIABILITY ---")
-    print(f"TRADE VOLUME  : {best_res['trade_count']} trades found")
-    print(f"FILTER RATE   : {best_res['filter_rate']:.1%} of baseline trades removed")
-    print("="*60 + "\n")
+    print(f"\n--- Simplified Trading Conditions for {name} ---")
+    best_overall = df_res.sort_values(['feature_count', 'score'], ascending=[True, False]).groupby('feature_count').head(1)
+    for _, row in best_overall.iterrows():
+        print(f"SIZE {row['feature_count']}: {' + '.join(row['features'])}")
+        print(f"  -> LOGIC: {row['condition']}")
+        print(f"  -> Efficiency: {row['avg_pnl_pct']:.2f}% | Trades: {row['trade_count']} ({row['filter_rate']:.1%} filtered)")
 
-def analyze_feature_permutation_influence(df_eval, name, features, num_features=3):
-    """Main orchestrator for targeted permutation evaluation."""
-    df = df_eval.copy().sort_index()
-    baseline_avg_pct = df['pnl_pct'].mean()
-    results = []
-    
-    MIN_REGIME_SAMPLES, MIN_TOTAL_TRADES = 10, 50
-    print(f"Evaluating Strategy permutations for {name} (size {num_features})...")
-    
-    for combo in itertools.combinations(features, num_features):
-        temp_df, reg_cols, slots = _discretize_features(df, combo)
-        temp_df['reg_key'] = temp_df[reg_cols].agg(' | '.join, axis=1)
-        
-        reg_stats = temp_df.groupby('reg_key')['pnl_pct'].agg(['mean', 'count', 'std']).fillna(0)
-        reg_stats['conservative_mean'] = reg_stats['mean'] - (reg_stats['std'] / np.sqrt(reg_stats['count']))
-        
-        keep_regimes = reg_stats[(reg_stats['conservative_mean'] > 0) & (reg_stats['count'] >= MIN_REGIME_SAMPLES)].index
-        df_filtered = temp_df[temp_df['reg_key'].isin(keep_regimes)].copy()
-        
-        if len(df_filtered) >= MIN_TOTAL_TRADES:
-            results.append({
-                'features': combo, 'regimes': keep_regimes.tolist(), 'slots': slots,
-                'avg_pnl_pct': df_filtered['pnl_pct'].mean(), 'trade_count': len(df_filtered),
-                'score': df_filtered['pnl_pct'].mean() * np.sqrt(len(df_filtered)),
-                'filter_rate': 1 - (len(df_filtered) / len(df)),
-                'df_filtered': df_filtered, 'yearly_bounds': evaluate_frequency_outcomes_yearly(df_filtered)
-            })
-
-    if not results:
-        print(f"No robust {num_features}-feature strategies found for {name}.")
-        return pd.DataFrame()
-
-    df_res = pd.DataFrame(results).sort_values('score', ascending=False)
-    best_res = df_res.iloc[0]
-    
-    logic_str = _reduce_logic(best_res['regimes'], best_res['slots'])
-    _plot_permutation_results(df_res, best_res, df, name, num_features, logic_str)
-    _print_strategy_summary(name, logic_str, best_res, baseline_avg_pct)
-    
     return df_res
+# %% Execute permutation search using final_candidates
+# final_candidates was defined in the previous block (ac_lag_1, hurst, ema200_dist, etc.)
+# %% Execute Standard Evaluations for all strategies
+for df_eval, name in strategy_list:
+    eval_correlations_rational(df_eval, name)
+    eval_correlations_discrete(df_eval, name)
+    eval_non_linear_dependencies(df_eval, target='pnl_pct', name=name)
+
+    pnl_per_year(df_eval, 'pnl_pct', f'{name}: PnL %')
+    pnl_per_year(df_eval, 'pnl', f'{name}: PnL')
+
+    run_strategy_permutations(df_eval, name)
+    analyze_margin_utilization(df_eval, name)
+    analyze_iv_performance_bands(df_eval, name)
+    analyze_regime_performance(df_eval, name)
+    evaluate_regime_improvement(df_eval, name)
 
 # %% Execute Frequency Comparison Summary
 strategies_dict = {name: df for df, name in strategy_list}
@@ -1241,7 +1060,3 @@ print("="*50)
 results = {}
 for df_eval, name in strategy_list:
     results[name] = analyze_feature_permutation_influence(df_eval, name, final_candidates)
-#%%
-# analyze_feature_permutation_influence(*strategy_list[0], final_candidates, num_features=2)
-# analyze_feature_permutation_influence(*strategy_list[1], final_candidates, num_features=3)
-analyze_feature_permutation_influence(*strategy_list[2], final_candidates, num_features=2)

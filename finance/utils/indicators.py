@@ -273,7 +273,8 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
   # Lag 21: Monthly cycle (Institutional window)
   for lag in [1, 5, 21]:
     df_stk[f'ac_lag_{lag}'] = df_stk['pct'].rolling(window=100).apply(lambda x: x.autocorr(lag=lag))
-    df_stk[f'ac_lag_{lag}'] = df_stk['iv'].rolling(window=100).apply(lambda x: x.autocorr(lag=lag))
+    if df_stk.columns.str.contains('iv').any():
+      df_stk[f'ac_iv_lag_{lag}'] = df_stk['iv'].rolling(window=100).apply(lambda x: x.autocorr(lag=lag))
 
   # Historic Volatility (Annualized)
   # Standard formula: std(log_returns) * sqrt(252)

@@ -27,44 +27,26 @@ import finance.utils as utils
 import yfinance as yf
 import requests
 
-from finance.ibkr.options_gex import last_expiration
-from finance.swing_pm.earnings_dates import EarningsDates
-
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
 
+##%% Get liquid underlyings
+with open('finance/_data/liquid_stocks.pkl', 'rb') as f: liquid_symbols = pickle.load(f)
 #%%
-def gap_statistics(gaps):
-  gap_data = []
-  for gap in gaps.itertuples():
-    idx = gap[0]
-    closes = df_stk.iloc[idx-1:idx+21, :]['c'].to_numpy()
-    closes_norm = (closes-closes[0])/closes[0] * 100
-    postEarnings = df_earnings.loc[df_earnings.date.eq(df_stk.iloc[idx-1].date), 'when']
-    preEarnings = df_earnings.loc[df_earnings.date.eq(df_stk.iloc[idx].date), 'when']
-    hasEarnings = postEarnings.iat[0] == 'post' if not postEarnings.empty else preEarnings.iat[0] == 'pre' if not preEarnings.empty else False
-    gap_eval = {'symbol': getattr(gap, 'symbol'), 'earnings': hasEarnings, 'date': getattr(gap, 'date'), 'gappct':getattr(gap, 'gappct') }
-    for i, y in enumerate(closes_norm):
-      gap_eval[f't{i-1}']=y
-    gap_data.append(gap_eval)
-  return pd.DataFrame(gap_data)
-
-
 # MySQL connection setup (localhost:3306)
 # Note: This requires a driver like 'pymysql'. Install it via: pip install pymysql
 # Format: mysql+driver://user:password@host:port/database
 db_connection_str = 'mysql+pymysql://root:@localhost:3306/stocks'
 db_connection = create_engine(db_connection_str)
 # for ticker in utils.underlyings.us_stock_symbols:
-##%% Get liquid underlyings
-with open('finance/_data/liquid_stocks.pkl', 'rb') as f: liquid_symbols = pickle.load(f)
 
 #%%
 ticker = liquid_symbols[0]
-for ticker in liquid_symbols:
+start_at = liquid_symbols.index('ARVL')
+for ticker in liquid_symbols[start_at:]:
   print(f'Processing {ticker}...')
   #%%
   df_earnings = pd.read_csv(f'finance/_data/earnings_cleaned/{ticker}.csv')
@@ -73,21 +55,27 @@ for ticker in liquid_symbols:
   swing_data = utils.swing_trading_data.SwingTradingData(ticker)
   df_day = swing_data.df_day
 
-  ##%% Dataset of gaps: gap%, after 3 days, after 6 days, after 9 days, after 14 days
+  #%% Dataset of gaps: gap%, after 3 days, after 6 days, after 9 days, after 14 days
+
   gaps = df_day[df_day.gappct.abs() > 2]
   gap_data = []
   for gap in gaps.itertuples():
     idx = df_day.index.get_loc(gap[0])
     df_gap = df_day.iloc[idx, :]
-    df_tracking_data = df_day.iloc[idx-1:idx+21, :][['c', 'v' 'rvol', 'iv', 'hv30']]
-    df_tracking_data['cpct'] = df_tracking_data['c'] / df_tracking_data['c'].iloc[0] * 100
+    df_tracking_data = df_day.iloc[idx-1:idx+21, :][['c', 'v', 'rvol', 'iv', 'hv30']]
+    df_tracking_data['cpct'] = (df_tracking_data['c'] - df_tracking_data['c'].iloc[0])/ df_tracking_data['c'].iloc[0] * 100
     postEarnings = df_earnings.loc[df_earnings.date.eq(df_day.index[idx-1]), 'when']
     preEarnings = df_earnings.loc[df_earnings.date.eq(df_day.index[idx]), 'when']
     hasEarnings = postEarnings.iat[0] == 'post' if not postEarnings.empty else preEarnings.iat[0] == 'pre' if not preEarnings.empty else False
-    latestEarnings = df_earnings.loc[df_earnings.date >= df_day.index[idx]].iloc[0]
     gap_eval = {'symbol': ticker, 'earnings': hasEarnings, 'date': df_tracking_data.index[0], 'gappct': df_gap.gappct, 'c': df_gap.c,
                 'is_etf': swing_data.symbol_info.is_etf}
-    # Elegant flattening:
+
+    if not swing_data.symbol_info.is_etf and swing_data.market_cap is not None:
+      nearest_mc = swing_data.market_cap.iloc[swing_data.market_cap.index.get_indexer([gap[0]], method='nearest')[0]]
+      gap_eval['market_cap'] = nearest_mc['market_cap']
+      gap_eval['market_cap_date'] = nearest_mc.name
+
+  # Elegant flattening:
     # 1. Set index to the desired suffixes (-1, 0, 1...)
     df_tracking_data.index = np.arange(len(df_tracking_data)) - 1
 
@@ -96,28 +84,51 @@ for ticker in liquid_symbols:
     flat_metrics = {f"{col}{idx}": val for (col, idx), val in df_tracking_data.unstack().items()}
     gap_eval.update(flat_metrics)
     gap_data.append(gap_eval)
-
+  df_gap_stats = pd.DataFrame(gap_data)
 
   #%%
-  gap_stats_df = gap_statistics(gaps)
-  gap_stats_df.to_pickle(f'finance/_data/gaps/{ticker}.pkl')
+  df_gap_stats.to_pickle(f'finance/_data/gaps/{ticker}.pkl')
+
+
+#%% Adding the movement of the SPY in the same range as information
+# TODO integrate into the upper part when touching it again
+
+spy_data = utils.swing_trading_data.SwingTradingData('SPY')
+df_spy_day = spy_data.df_day
+# ticker = liquid_symbols[0]
+start_at = liquid_symbols.index('AGG')
+# start_at = 0
+for ticker in liquid_symbols[start_at:]:
+  #%%
+  print(f'Processing {ticker}...')
+  df_ticker = pd.read_pickle(f'finance/_data/gaps/{ticker}.pkl')
+  if df_ticker.empty: continue
+  idx_spys = df_spy_day.index.get_indexer(df_ticker.date, method='nearest')
+  for i, idx_spy in enumerate(idx_spys):
+    #%%
+    spy_ref_value = df_spy_day['c'].iloc[idx_spy-1]
+    for j in range(-1, 21):
+      idx_last = idx_spy+j
+      if idx_spy+j < len(df_spy_day):
+        df_ticker.loc[df_ticker.index[i], f'spy{j}'] = (df_spy_day['c'].iloc[idx_spy+j] - spy_ref_value) / spy_ref_value * 100
+      else:
+        df_ticker.loc[df_ticker.index[i], f'spy{j}'] = np.nan
+
+  df_ticker.to_pickle(f'finance/_data/gaps/{ticker}.pkl')
+
+#%% Combine all gaps
+# ticker = liquid_symbols[0]
+start_at = liquid_symbols.index('AGG')
+# start_at = 0
+gap_data = []
+for ticker in liquid_symbols[start_at:]:
+  #%%
+  print(f'Processing {ticker}...')
+  df_ticker = pd.read_pickle(f'finance/_data/gaps/{ticker}.pkl')
+  if df_ticker.empty: continue
+  gap_data.append(df_ticker)
 
 #%%
-dfs_gaps = []
-for ticker in liquid_symbols:
-  df_ticker_gaps = pd.read_pickle(f'finance/_data/gaps/{ticker}.pkl')
-  df_ticker_data = utils.dolt_data.daily_time_range(ticker, df_ticker_gaps.date.min(), df_ticker_gaps.date.max())
-
-df_gaps = pd.concat(dfs_gaps)
-
-df_gaps_clean = df_gaps.dropna(how='any')
-
-#%% Add symbol information
-stmt = text("select * from symbol where act_symbol in :tickers").bindparams(bindparam("tickers", expanding=True))
-df_symbols = pd.read_sql(stmt, db_connection, params={'tickers': liquid_symbols})
-df_symbols = df_symbols.rename(columns={'act_symbol':'symbol', 'security_name': 'name'})
-
-#%%
-df_gaps_sym = pd.merge(df_gaps_clean, df_symbols[['symbol','name', 'is_etf']], on=['symbol'], how='inner')
-df_gaps_sym.to_pickle(f'finance/_data/gaps_sym.pkl')
+df_gaps = pd.concat(gap_data)
+df_gaps.to_pickle(f'finance/_data/all_gaps.pkl')
 
