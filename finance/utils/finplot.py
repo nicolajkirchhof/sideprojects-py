@@ -1,4 +1,4 @@
-import finplot as fplt
+# import finplot as fplt
 import pandas as pd
 
 def create_interactive_plot(ax, symbol, interval, df):

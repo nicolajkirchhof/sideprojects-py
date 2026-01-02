@@ -16,7 +16,6 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import mplfinance as mpf
 
-import finplot as fplt
 
 import finance.utils as utils
 from finance.utils.influx import DB_CFD, DB_INDEX, DB_FOREX

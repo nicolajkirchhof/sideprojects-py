@@ -10,7 +10,7 @@ import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 
-import finplot as fplt
+# import finplot as fplt
 import mplfinance as mpf
 import numpy as np
 

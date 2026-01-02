@@ -18,7 +18,7 @@ tickers.tickers['GOOG'].actions
 
 tickers.tickers['MSFT'].info
 #%%
-import finplot as fplt
+# import finplot as fplt
 # import yfinance
 
 # fdf = yfinance.download('AAPL')

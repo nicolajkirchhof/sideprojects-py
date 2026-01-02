@@ -5,7 +5,7 @@ conda create -n ds311 python=3.11 ipython matplotlib qt pyqt pandas numpy scipy 
 conda activate ds311
 
 # Install additional packages using pip
-pip install yfinance backtesting backtrader ib_async mplfinance finplot influxdb blackscholes python-dateutil pytz
+pip install yfinance backtesting backtrader ib_async mplfinance influxdb blackscholes python-dateutil pytz
 
 # Print success message
 Write-Host "Environment setup complete. All required packages have been installed."

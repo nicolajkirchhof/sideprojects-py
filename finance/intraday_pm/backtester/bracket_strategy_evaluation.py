@@ -15,7 +15,7 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 
 from finance.utils import percentage_change
-import finplot as fplt
+# import finplot as fplt
 import pytz
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression, LinearRegression

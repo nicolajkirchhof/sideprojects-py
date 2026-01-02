@@ -87,7 +87,6 @@ fcntl
 filecmp
 fileinput
 finance
-finplot
 flask
 flask_cors
 flask_migrate

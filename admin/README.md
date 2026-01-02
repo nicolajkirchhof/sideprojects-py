@@ -43,7 +43,6 @@ The script installs the following packages:
 ### Visualization
 - matplotlib
 - mplfinance
-- finplot
 
 ### Finance-specific
 - yfinance
