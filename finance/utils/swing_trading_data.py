@@ -5,11 +5,11 @@ import pandas as pd
 
 from finance import utils
 
-DATASOURCES = ['dolt', 'barchart']
+DATASOURCES = ['dolt', 'barchart', 'ibkr']
 
 
 class SwingTradingData:
-  def __init__(self, symbol: string, datasource='dolt'):
+  def __init__(self, symbol: string, datasource='auto', offline=False):
     """
     Initialize trading day data with start time and exchange settings
 
@@ -22,13 +22,28 @@ class SwingTradingData:
     """
     self.symbol = symbol
     self.df_day = pd.DataFrame()
+    self.datasource = datasource
+
     match datasource:
+      case 'auto':
+        self.datasource = 'ibkr'
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline)
+        if self.df_day is None or self.df_day.empty:
+          self.df_day = utils.dolt_data.daily_w_volatility(symbol)
+          self.datasource = 'dolt'
       case 'dolt':
         self.df_day = utils.dolt_data.daily_w_volatility(symbol)
       case 'barchart':
         self.df_day = utils.barchart_data.daily_w_volatility(symbol)
+      case 'ibkr':
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline)
       case _:
         raise ValueError(f'Invalid datasource: {datasource}')
+
+    if self.df_day is None or self.df_day.empty:
+      self.empty = True
+      return
+    self.empty = False
 
     self.df_week = self.df_day[utils.definitions.OHLCLV].resample('1W').agg(o=('o', 'first'), h=('h', 'max'),
                                                                             l=('l', 'min'), c=('c', 'last'),
@@ -38,11 +53,14 @@ class SwingTradingData:
                                                                              v=('v', 'sum')).copy()
 
     self.df_day = utils.indicators.swing_indicators(self.df_day)
-    self.df_week = utils.indicators.swing_indicators(self.df_week, [50, 100])
-    self.df_month = utils.indicators.swing_indicators(self.df_month, [50])
-    self.symbol_info = utils.dolt_data.symbol_info(symbol)
+    self.df_week = utils.indicators.swing_indicators(self.df_week, [50, 100], timeframe=None)
+    self.df_month = utils.indicators.swing_indicators(self.df_month, [50], timeframe=None)
+    self.info = utils.dolt_data.symbol_info(symbol)
     self.market_cap = None
-    self.df_shares_outstanding = utils.dolt_data.shares_outstanding_info(symbol)
+    self.df_shares_outstanding = None
+
+
+    self.df_shares_outstanding = utils.dolt_data.financial_info(symbol)
     if not self.df_shares_outstanding.empty:
       df_market_cap = self.df_shares_outstanding.copy()
       df_market_cap = df_market_cap[~df_market_cap.index.duplicated(keep='first')]

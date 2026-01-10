@@ -17,14 +17,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\barchart\spy_daily_historical-data-12-18-2025.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\barchart\spy_options-overview-history-12-18-2025.csv">
+        <entry key="\finance\_data\earnings_cleaned\A.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -38,7 +31,21 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\finance\_data\earnings_cleaned\INDI.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\_data\earnings_cleaned\MSFT.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\_data\financials\A.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -52,21 +59,35 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\ibkr\DUE299894_20250303_20250414.csv">
+        <entry key="\finance\_data\ibkr\stk\QQQ_contract.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\ibkr\DUE299894_20250310_20250326.csv">
+        <entry key="\finance\_data\ibkr\stk\SPY_contract.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\ibkr\U16408041_20250324_20250326.csv">
+        <entry key="\finance\_data\optionsomega\SPY-NP-Delta-Band-45DTE-25D-50D-5D-PM.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\_data\stocks-screener-eval-stocks-etfs-01-07-2026.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\_data\stocks-screener-stocks-liquid-01-07-2026.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -126,6 +147,118 @@
           <value>
             <Attribute>
               <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\C_Strategy\2feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\C_Strategy\3feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="|" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\NC_Strategy\2feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\NC_Strategy\3feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\NC_Strategy\4feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\NC_Strategy\5feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\NP_Strategy\2feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\P_Strategy\2feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\P_Strategy\3feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\P_Strategy\4feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\QQQ\P_Strategy\5feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\SPY\C_Strategy\1feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\SPY\C_Strategy\2feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core\SPY\P_Strategy\5feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core_hurst_wrong\SPY\C_Strategy\2feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\analysis\core_hurst_wrong\SPY\C_Strategy\3feat_metrics.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="|" />
             </Attribute>
           </value>
         </entry>

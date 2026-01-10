@@ -74,7 +74,7 @@ duration = '365 D'
 offset_days = 360
 barSize = '1 hour'
 
-startDateTime = dateutil.parser.parse('2005-01-01')
+startDateTime = dateutil.parser.parse('1993-01-01')
 endDateTime = datetime.now()
 
 

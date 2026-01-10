@@ -255,34 +255,76 @@ def hurst(ts):
   poly = np.polyfit(np.log(lags), np.log(tau), 1)
   return poly[0] * 2.0
 
-def swing_indicators(df_stk, lrc = [50, 100, 200]):
+def rolling_autocorr(series, window, lag):
+  """
+  Calculates the rolling autocorrelation of log returns.
+  """
+  # Calculate Log Returns (Literature Standard)
+  log_returns = np.log(series / series.shift(1))
+
+  # Calculate rolling correlation between returns and their lagged version
+  return log_returns.rolling(window=window).corr(log_returns.shift(lag))
+
+def get_composite_autocorr(series, window=20, max_lag=3):
+  """
+  Calculates the average autocorrelation across multiple lags
+  to filter out single-day noise.
+  """
+  log_returns = np.log(series / series.shift(1))
+  corrs = []
+  for l in range(1, max_lag + 1):
+    corrs.append(log_returns.rolling(window=window).corr(log_returns.shift(l)))
+
+  # Return the average of Lags 1, 2, and 3
+  return pd.concat(corrs, axis=1).mean(axis=1)
+
+def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
   df_stk['gap'] = df_stk.o - df_stk.shift().c
   df_stk['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o).fillna(0)
   df_stk['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c).fillna(0)
+  df_stk['vwap3'] = (df_stk['c']+df_stk['h']+df_stk['l'])/3
+  if 'iv' not in df_stk.columns:
+    df_stk['iv'] = np.nan
 
   # RVOL Calculation (Relative Volume)
   # 20-day is standard for swing trading
   df_stk['v20'] = df_stk['v'].rolling(window=20).mean()
-  df_stk['rvol'] = df_stk['v'] / df_stk['v20']
-
-  # How "sticky" is the current volatility regime?
+  df_stk['v50'] = df_stk['v'].rolling(window=50).mean()
+  df_stk['rvol20'] = df_stk['v'] / df_stk['v20']
+  df_stk['rvol50'] = df_stk['v'] / df_stk['v50']
 
   # 2. Multi-Lag Autocorrelations (Legs)
   # Lag 1: Daily momentum/mean-reversion
   # Lag 5: Weekly cycle persistence
   # Lag 21: Monthly cycle (Institutional window)
-  for lag in [1, 5, 21]:
-    df_stk[f'ac_lag_{lag}'] = df_stk['pct'].rolling(window=100).apply(lambda x: x.autocorr(lag=lag))
-    if df_stk.columns.str.contains('iv').any():
-      df_stk[f'ac_iv_lag_{lag}'] = df_stk['iv'].rolling(window=100).apply(lambda x: x.autocorr(lag=lag))
+  for window in [100]:
+    for lag in [1, 5, 10, 20]:
+      df_stk[f'ac{window}_lag_{lag}'] = rolling_autocorr(df_stk['c'], window=window, lag=lag)
+
+  # --- Implementation on a DataFrame 'df' ---
+  # 1. Standard Momentum (20-day, Lag-1)
+  # Use this to confirm trend persistence.
+  df_stk['ac_mom'] = rolling_autocorr(df_stk['c'], window=20, lag=1)
+
+  # 2. Short-Term Mean Reversion (10-day, Lag-1)
+  # Look for values < -0.2 for "snap-back" opportunities.
+  df_stk['ac_mr'] = rolling_autocorr(df_stk['c'], window=10, lag=1)
+
+  # # 3. Institutional "Hidden" Momentum (60-day, Lag-5)
+  # # If this is higher than Lag-1, institutions are likely accumulating.
+  df_stk['ac_inst'] = rolling_autocorr(df_stk['c'], window=50, lag=5)
+
+  # 4. Composite Swing Signal (20-day, Avg Lags 1-3)
+  # Best for general trend-following filters.
+  df_stk['ac_comp'] = get_composite_autocorr(df_stk['c'], window=20, max_lag=3)
 
   # Historic Volatility (Annualized)
   # Standard formula: std(log_returns) * sqrt(252)
   log_ret = np.log(df_stk['c'] / df_stk['c'].shift(1))
-  for days in [14, 30, 50, 90]:
-    df_stk[f'hv{days}'] = log_ret.rolling(window=days).std() * np.sqrt(252)
+  for days in [9, 14, 20, 30, 60]:
+    window = f'{days}{timeframe}' if timeframe is not None else days
+    df_stk[f'hv{days}'] = log_ret.rolling(window=window).std() * np.sqrt(260)
 
-  df_stk['vwap3'] = (df_stk['c']+df_stk['h']+df_stk['l'])/3
   df_stk['ema10'] = df_stk['vwap3'].ewm(span=10, adjust=False).mean()
   df_stk['ema20'] = df_stk['vwap3'].ewm(span=20, adjust=False).mean()
   df_stk['ema50'] = df_stk['vwap3'].ewm(span=50, adjust=False).mean()
@@ -309,7 +351,7 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
   df_stk['lpc'] = np.abs(df_stk['l'] - df_stk['c'].shift())
 
   tr = df_stk[['hl', 'hpc', 'lpc']].max(axis=1)
-  df_stk['atr9'] = tr.ewm(alpha=1/14, adjust=False).mean()
+  df_stk['atr9'] = tr.ewm(alpha=1/9, adjust=False).mean()
   df_stk['atr14'] = tr.ewm(alpha=1/14, adjust=False).mean()
   df_stk['atr20'] = tr.ewm(alpha=1/20, adjust=False).mean()
 
@@ -321,7 +363,8 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
   # Hurst Exponent (Trend vs Mean Reversion)
   # Calculated over a rolling 100-day window
   # H < 0.5: Mean Reverting | H > 0.5: Trending
-  df_stk['hurst'] = df_stk['c'].rolling(window=100).apply(hurst, raw=True)
+  df_stk['hurst50'] = df_stk['c'].rolling(window=50).apply(hurst, raw=True)
+  df_stk['hurst100'] = df_stk['c'].rolling(window=100).apply(hurst, raw=True)
 
   df_stk['year'] = df_stk.index.year
   df_stk['month'] = df_stk.index.month
@@ -335,27 +378,27 @@ def swing_indicators(df_stk, lrc = [50, 100, 200]):
   # Cumulate the signs within each group
   df_stk['streak'] = change_sign.groupby(streak_groups).cumsum()
 
-  # Linear Regression Channels
-  def calc_lrc(df, window):
-    def lin_reg(subset):
-      y = subset
-      x = np.arange(len(y))
-      slope, intercept = np.polyfit(x, y, 1)
-      return slope * (len(y) - 1) + intercept
+  # # Linear Regression Channels
+  # def calc_lrc(df, window):
+  #   def lin_reg(subset):
+  #     y = subset
+  #     x = np.arange(len(y))
+  #     slope, intercept = np.polyfit(x, y, 1)
+  #     return slope * (len(y) - 1) + intercept
+  #
+  #   base_col = f'lrc{window}'
+  #   df[base_col] = df['c'].rolling(window=window).apply(lin_reg, raw=True)
+  #   rolling_std = df['c'].rolling(window=window).std()
+  #   df[f'{base_col}_ub'] = df[base_col] + (rolling_std * 2)
+  #   df[f'{base_col}_lb'] = df[base_col] - (rolling_std * 2)
+  #
+  #   # Distance from LRC lines (Percentage)
+  #   df[f'{base_col}_dist'] = ((df['c'] - df[base_col]) / df[base_col]) * 100
+  #   df[f'{base_col}_ub_dist'] = ((df['c'] - df[f'{base_col}_ub']) / df[f'{base_col}_ub']) * 100
+  #   df[f'{base_col}_lb_dist'] = ((df['c'] - df[f'{base_col}_lb']) / df[f'{base_col}_lb']) * 100
+  #   return df
 
-    base_col = f'lrc{window}'
-    df[base_col] = df['c'].rolling(window=window).apply(lin_reg, raw=True)
-    rolling_std = df['c'].rolling(window=window).std()
-    df[f'{base_col}_ub'] = df[base_col] + (rolling_std * 2)
-    df[f'{base_col}_lb'] = df[base_col] - (rolling_std * 2)
-
-    # Distance from LRC lines (Percentage)
-    df[f'{base_col}_dist'] = ((df['c'] - df[base_col]) / df[base_col]) * 100
-    df[f'{base_col}_ub_dist'] = ((df['c'] - df[f'{base_col}_ub']) / df[f'{base_col}_ub']) * 100
-    df[f'{base_col}_lb_dist'] = ((df['c'] - df[f'{base_col}_lb']) / df[f'{base_col}_lb']) * 100
-    return df
-
-  for w in lrc:
-    df_stk = calc_lrc(df_stk, w)
+  # for w in lrc:
+  #   df_stk = calc_lrc(df_stk, w)
 
   return df_stk

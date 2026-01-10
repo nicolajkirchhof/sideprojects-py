@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -24,10 +26,14 @@ def symbol_info(symbol):
   query = """select * from symbol where act_symbol = :symbol"""
   df = pd.read_sql(text(query), db_stocks_connection, params={'symbol': symbol})
   df = df.rename(columns={'act_symbol':'symbol', 'security_name': 'name'})
+  if df.empty: return None
   return df.iloc[0]
 
 
-def shares_outstanding_info(symbol):
+def financial_info(symbol):
+  if os.path.exists(f'finance/_data/financials/{symbol}.csv'):
+    df_financial = pd.read_csv(f'finance/_data/financials/{symbol}.csv', index_col='date', parse_dates=True)
+    return df_financial
   query = """select date, shares_outstanding from balance_sheet_equity where act_symbol = :symbol"""
   df = pd.read_sql(text(query), db_earnings_connection, params={'symbol': symbol})
   df['date'] = pd.to_datetime(df.date)

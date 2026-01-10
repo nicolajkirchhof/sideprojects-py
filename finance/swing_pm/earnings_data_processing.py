@@ -1,5 +1,4 @@
 # %%
-import os
 import pickle
 
 import numpy as np
@@ -16,44 +15,37 @@ mpl.use('QtAgg')
 %autoreload 2
 
 #%% Get liquid underlyings
-# df_liquid_symbols = pd.read_csv('finance/_data/stocks-screener-eval-stocks-etfs-01-07-2026.csv', skipfooter=1, engine='python', keep_default_na=False, na_values=['N/A'])
-liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
+with open('finance/_data/liquid_stocks.pkl', 'rb') as f: liquid_symbols = pickle.load(f)
 
-spy_data = utils.swing_trading_data.SwingTradingData('SPY')
+spy_data = utils.swing_trading_data.SwingTradingData('SPY', datasource='barchart')
 df_spy_day = spy_data.df_day
 
 # %%
-# ticker = df_liquid_symbols[0]
-start_at = 0
-start_at = liquid_symbols.index('PSNY')
-# TO DO AGAIN RGEN
-# start_at = df_liquid_symbols[df_liquid_symbols.Symbol == 'OUT'].index[0] + 1
+ticker = liquid_symbols[0]
+start_at = liquid_symbols.index('ABT')
+# start_at = 0
+# end_at = liquid_symbols.index('ARVL') + 1
 end_at = len(liquid_symbols)
-##%%
-# for ticker in df_liquid_symbols[start_at:end_at]:
-for ticker in liquid_symbols[start_at:end_at]:
-  if os.path.exists(f'finance/_data/ibkr/stk/{ticker}.pkl'): continue
+#%% for ticker in liquid_symbols[start_at:end_at]:
   print(f'Processing {ticker}...')
   # %%
   df_earnings = pd.read_csv(f'finance/_data/earnings_cleaned/{ticker}.csv')
   df_earnings['date'] = pd.to_datetime(df_earnings['date'], format='%Y-%m-%d')
 
   swing_data = utils.swing_trading_data.SwingTradingData(ticker)
-  if swing_data.empty or swing_data.info is None: continue
   df_day = swing_data.df_day
   # %% Dataset of gaps: gap%, after 3 days, after 6 days, after 9 days, after 14 days
-  PREV_DAYS = 5
 
   atr2xs = df_day[df_day.pct.abs() > 2 * df_day.atrp20]
   atr2x_data = []
   for atr2x in atr2xs.itertuples():
     idx = df_day.index.get_loc(atr2x[0])
-    if idx < PREV_DAYS: continue
     df_atr2x = df_day.iloc[idx, :]
-    df_tracking_data = df_day.iloc[idx - PREV_DAYS:idx + 21, :][
-      ['c', 'v', 'atrp9', 'atrp14', 'atrp20', 'ac100_lag_1', 'ac100_lag_5', 'ac100_lag_20', 'ac_comp', 'ac_mom', 'ac_mr',
-       'ac_inst', 'pct', 'rvol20', 'rvol50', 'iv', 'hv9', 'hv14', 'hv30', 'hv60', 'ema20_dist', 'ema10_dist', 'ema10_slope', 'ema20_slope']]
-    df_tracking_data['cpct'] = (df_tracking_data['c'] - df_tracking_data['c'].iloc[PREV_DAYS-1]) / df_tracking_data['c'].iloc[PREV_DAYS-1] * 100
+    df_tracking_data = df_day.iloc[idx - 1:idx + 21, :][
+      ['c', 'v', 'atrp9', 'atrp14', 'atrp20', 'ac_lag_1', 'ac_lag_5', 'ac_lag_21', 'ac_comp', 'ac_mom', 'ac_mr',
+       'ac_inst', 'pct', 'rvol20', 'rvol50', 'iv', 'hv9', 'hv14', 'hv20', 'hv30']]
+    df_tracking_data['cpct'] = (df_tracking_data['c'] - df_tracking_data['c'].iloc[0]) / df_tracking_data['c'].iloc[
+      0] * 100
 
     if not any(df_spy_day.index == atr2x[0]):
       print(
@@ -61,17 +53,17 @@ for ticker in liquid_symbols[start_at:end_at]:
       )
       continue
     idx_spy = df_spy_day.index.get_loc(atr2x[0])
-    spy_ref_value = df_spy_day['c'].iloc[idx_spy - PREV_DAYS]
-    df_tracking_data[f'spy'] = (df_spy_day['c'].iloc[idx_spy - PREV_DAYS:idx_spy + 21] - spy_ref_value) / spy_ref_value * 100
+    spy_ref_value = df_spy_day['c'].iloc[idx_spy - 1]
+    df_tracking_data[f'spy'] = (df_spy_day['c'].iloc[idx_spy - 1:idx_spy + 21] - spy_ref_value) / spy_ref_value * 100
     postEarnings = df_earnings.loc[df_earnings.date.eq(df_day.index[idx - 1]), 'when']
     preEarnings = df_earnings.loc[df_earnings.date.eq(df_day.index[idx]), 'when']
     hasEarnings = postEarnings.iat[0] == 'post' if not postEarnings.empty else preEarnings.iat[
                                                                                  0] == 'pre' if not preEarnings.empty else False
     atr2x_eval = {'symbol': ticker, 'earnings': hasEarnings, 'date': df_tracking_data.index[0],
                   'gappct': df_atr2x.gappct, 'c': df_atr2x.c,
-                  'is_etf': swing_data.info.is_etf, 'atrp20': df_atr2x.atrp20}
+                  'is_etf': swing_data.symbol_info.is_etf, 'atrp20': df_atr2x.atrp20}
 
-    if not swing_data.info.is_etf and swing_data.market_cap is not None and swing_data.market_cap.empty is False:
+    if not swing_data.symbol_info.is_etf and swing_data.market_cap is not None:
       nearest_mc = swing_data.market_cap.iloc[swing_data.market_cap.index.get_indexer([atr2x[0]], method='nearest')[0]]
       atr2x_eval['market_cap'] = nearest_mc['market_cap']
       atr2x_eval['market_cap_date'] = nearest_mc.name

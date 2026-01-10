@@ -1,32 +1,9 @@
 #%%
-import glob
-import pickle
-from datetime import datetime, timedelta
-from glob import glob
-from zoneinfo import ZoneInfo
-
-import dateutil
-import numpy as np
-import scipy
-
-import pandas as pd
 import os
 
-import influxdb as idb
-
-import matplotlib.pyplot as plt
+import pandas as pd
 import matplotlib as mpl
-import matplotlib.dates as mdates
-import matplotlib.ticker as mticker
-import mplfinance as mpf
 from sqlalchemy import create_engine, text
-
-import finance.utils as utils
-
-import yfinance as yf
-import requests
-
-from finance.swing_pm.earnings_dates import EarningsDates
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
@@ -47,9 +24,10 @@ ticker = 'MSFT'
 db_connection_str = 'mysql+pymysql://root:@localhost:3306/earnings'
 db_connection = create_engine(db_connection_str)
 
-with open('finance/_data/liquid_stocks.pkl', 'rb') as f: liquid_symbols = pickle.load(f)
-# for ticker in utils.underlyings.us_stock_symbols:
+liquid_symbols = pd.read_pickle('finance/_data/liquid_stocks.pkl')
+
 for ticker in liquid_symbols:
+  if os.path.exists(f'finance/_data/earnings_cleaned/{ticker}.csv'): continue
   #%%
   query = """select ec.act_symbol, ec.date, ec.when, eh.period_end_date, eh.reported, eh.estimate from earnings_calendar ec
    left join eps_history eh on ec.act_symbol = eh.act_symbol
@@ -66,11 +44,6 @@ for ticker in liquid_symbols:
   df_edb['when'] = df_edb.when.str.replace('Before market open', 'pre', regex=False)
 
   #%%
-  # Index(['act_symbol', 'date', 'when', 'act_symbol', 'period_end_date',
-  #        'reported', 'estimate'],
-  #       dtype='object')
-  # Index(['symbol', 'date', 'qtr', 'eps_est', 'eps', 'release_time'], dtype='object')
-
   df_escv_ticker = df_ecsv[df_ecsv.symbol_csv == ticker]
 
   df_join = df_edb.merge(df_escv_ticker,left_on='date', right_on='date_csv', how='outer')
@@ -78,6 +51,9 @@ for ticker in liquid_symbols:
   ##%% merge columns
   for key in ['symbol', 'date', 'when', 'eps_est', 'eps']:
     df_join[key] = df_join[key].combine_first(df_join[f'{key}_csv'])
+
+  if df_join.empty:
+    continue
 
   print(df_join.to_string())
   df_join.to_csv(f'finance/_data/earnings_cleaned/{ticker}.csv', index=False)

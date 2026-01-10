@@ -25,5 +25,6 @@ dependencies = [
     "scikit-learn>=1.8.0",
     "scipy-stubs~=1.16.3",
     "seaborn>=0.13.2",
+    "sns>=0.1",
     "sqlalchemy>=2.0.45",
 ]

@@ -12,6 +12,7 @@ DB_FOREX = 'forex'
 DB_STK = 'stk'
 DB_FUTURE = 'future'
 DB_DAILY = 'daily'
+DB_SWING = 'swing'
 MPF_COLUMN_MAPPING = ['o', 'h', 'l', 'c', 'v']
 
 SEC_TYPE_DB_MAPPING = {
@@ -55,6 +56,7 @@ def get_influx_clients():
   stk = influx_client.query('show measurements', database=DB_STK)
   futures = influx_client.query('show measurements', database=DB_FUTURE)
   daily = influx_client.query('show measurements', database=DB_DAILY)
+  swing = influx_client.query('show measurements', database=DB_SWING)
 
   get_values = lambda x: [y[0] for y in x.raw['series'][0]['values']]
   print('Indices: ', get_values(indices))
@@ -63,6 +65,7 @@ def get_influx_clients():
   print('Stoks: ', get_values(stk))
   print('Futures: ', get_values(futures))
   print('Daily: ', get_values(daily))
+  print('Swing: ', get_values(swing))
   return influx_client_df, influx_client
 
 
