@@ -46,7 +46,7 @@ def print_and_notify(option_portfolio_position):
   # Short PUT attention
   if option_portfolio_position.position < 0 and pnl_pct < -100:
     print(utils.colors.Colors.BG_RED + utils.colors.Colors.BRIGHT_WHITE + line + utils.colors.Colors.RESET)
-    utils.ifttt.send_ifttt_webhook(TRIGGER, KEY, [line])
+    # utils.ifttt.send_ifttt_webhook(TRIGGER, KEY, [line])
   else:
     print(color+line+utils.colors.Colors.RESET)
 

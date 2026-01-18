@@ -17,7 +17,7 @@ mpl.use('QtAgg')
 %autoreload 2
 
 # %% [1] DATA LOADING & INITIAL CLEANING
-df_atr2x = pd.read_pickle(f'finance/_data/all_atr2x.pkl')
+df_atr2x = pd.read_pickle(f'finance/_data/all_atr2x_dolt.pkl')
 df_atr2x = df_atr2x.reset_index(drop=True)
 df_atr2x.replace([np.inf, -np.inf], np.nan, inplace=True)
 

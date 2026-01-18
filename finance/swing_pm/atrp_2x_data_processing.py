@@ -25,7 +25,7 @@ df_spy_day = spy_data.df_day
 # %%
 # ticker = df_liquid_symbols[0]
 start_at = 0
-start_at = liquid_symbols.index('PSNY')
+start_at = liquid_symbols.index('PCOR')
 # TO DO AGAIN RGEN
 # start_at = df_liquid_symbols[df_liquid_symbols.Symbol == 'OUT'].index[0] + 1
 end_at = len(liquid_symbols)
@@ -52,7 +52,7 @@ for ticker in liquid_symbols[start_at:end_at]:
     df_atr2x = df_day.iloc[idx, :]
     df_tracking_data = df_day.iloc[idx - PREV_DAYS:idx + 21, :][
       ['c', 'v', 'atrp9', 'atrp14', 'atrp20', 'ac100_lag_1', 'ac100_lag_5', 'ac100_lag_20', 'ac_comp', 'ac_mom', 'ac_mr',
-       'ac_inst', 'pct', 'rvol20', 'rvol50', 'iv', 'hv9', 'hv14', 'hv30', 'hv60', 'ema20_dist', 'ema10_dist', 'ema10_slope', 'ema20_slope']]
+       'ac_inst', 'pct', 'rvol20', 'rvol50', 'iv', 'hv9', 'hv14', 'hv20', 'hv60', 'ema20_dist', 'ema10_dist', 'ema10_slope', 'ema20_slope']]
     df_tracking_data['cpct'] = (df_tracking_data['c'] - df_tracking_data['c'].iloc[PREV_DAYS-1]) / df_tracking_data['c'].iloc[PREV_DAYS-1] * 100
 
     if not any(df_spy_day.index == atr2x[0]):

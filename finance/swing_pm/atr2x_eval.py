@@ -32,7 +32,7 @@ mpl.use('QtAgg')
 
 
 #%%
-df_atr2x = pd.read_pickle(f'finance/_data/all_atr2x.pkl')
+df_atr2x = pd.read_pickle(f'finance/_data/all_atr2x_dolt.pkl')
 
 c_cols = df_atr2x.filter(regex=r"^c-?\d+$").columns
 

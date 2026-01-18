@@ -9,7 +9,7 @@ DATASOURCES = ['dolt', 'barchart', 'ibkr']
 
 
 class SwingTradingData:
-  def __init__(self, symbol: string, datasource='auto', offline=False):
+  def __init__(self, symbol: string, datasource='auto', offline=False, metainfo=True):
     """
     Initialize trading day data with start time and exchange settings
 
@@ -28,7 +28,7 @@ class SwingTradingData:
       case 'auto':
         self.datasource = 'ibkr'
         self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline)
-        if self.df_day is None or self.df_day.empty:
+        if self.df_day is None or self.df_day.empty or 'c' not in self.df_day.columns:
           self.df_day = utils.dolt_data.daily_w_volatility(symbol)
           self.datasource = 'dolt'
       case 'dolt':
@@ -40,7 +40,7 @@ class SwingTradingData:
       case _:
         raise ValueError(f'Invalid datasource: {datasource}')
 
-    if self.df_day is None or self.df_day.empty:
+    if self.df_day is None or self.df_day.empty or 'c' not in self.df_day.columns:
       self.empty = True
       return
     self.empty = False
@@ -55,11 +55,13 @@ class SwingTradingData:
     self.df_day = utils.indicators.swing_indicators(self.df_day)
     self.df_week = utils.indicators.swing_indicators(self.df_week, [50, 100], timeframe=None)
     self.df_month = utils.indicators.swing_indicators(self.df_month, [50], timeframe=None)
+
+    if not metainfo:
+      return
+
     self.info = utils.dolt_data.symbol_info(symbol)
     self.market_cap = None
     self.df_shares_outstanding = None
-
-
     self.df_shares_outstanding = utils.dolt_data.financial_info(symbol)
     if not self.df_shares_outstanding.empty:
       df_market_cap = self.df_shares_outstanding.copy()

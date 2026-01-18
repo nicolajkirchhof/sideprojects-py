@@ -87,13 +87,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\stocks-screener-stocks-liquid-01-07-2026.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\finance\_data\y_finance\EEM.csv">
           <value>
             <Attribute>
@@ -185,13 +178,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\analysis\core\QQQ\NC_Strategy\5feat_metrics.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\finance\analysis\core\QQQ\NP_Strategy\2feat_metrics.csv">
           <value>
             <Attribute>
@@ -220,13 +206,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\analysis\core\QQQ\P_Strategy\5feat_metrics.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\finance\analysis\core\SPY\C_Strategy\1feat_metrics.csv">
           <value>
             <Attribute>
@@ -235,13 +214,6 @@
           </value>
         </entry>
         <entry key="\finance\analysis\core\SPY\C_Strategy\2feat_metrics.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\analysis\core\SPY\P_Strategy\5feat_metrics.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
