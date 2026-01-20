@@ -1,3 +1,4 @@
+import gc
 import os
 import re
 from datetime import timedelta, datetime
@@ -16,6 +17,7 @@ from pyqtgraph import QtCore, QtGui
 from pyqtgraph.Qt import QtWidgets
 import pyqtgraph.exporters
 
+from finance.utils.trading_day_data import TradingDayData
 
 # Reusing your configurations for visual consistency
 EMA_CONFIGS = {'ema10': '#f5deb3', 'ema20': '#e2b46d', 'ema50': '#c68e17', 'vwap3': '#00bfff'} #'ema100': '#8b5a2b', 'ema200': '#4b3621',
@@ -79,7 +81,7 @@ def plot_multi_pane_mpl(df, symbol, ref_df = None, vlines=dict(vlines=[], colors
   plt.tight_layout()
   return fig
 
-def daily_change_plot(day_data: utils.trading_day_data.TradingDayData, alines=None, title_add='', atr_vlines=dict(vlines=[], colors=[]),
+def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', atr_vlines=dict(vlines=[], colors=[]),
                       ad=True, basetime='5m'):
   # |-------------------------|
   # |        5m/10m/15m       |
@@ -594,11 +596,17 @@ class TTMSqueezeItem(pg.GraphicsObject):
     self.picture = QtGui.QPicture()
     p = QtGui.QPainter(self.picture)
 
-    # Determine a dynamic radius based on the momentum range to keep dots visible
+    # We calculate a vertical scale factor based on the momentum range
+    # to make the dots appear circular regardless of the plot's Y-scale.
     mom_values = [d[1] for d in self.data if not np.isnan(d[1])]
     max_abs_mom = max(abs(min(mom_values)), abs(max(mom_values))) if mom_values else 1.0
-    dot_radius_y = max_abs_mom * 0.05  # 5% of the max range
-    dot_radius_x = 0.2                 # Fixed width in x-units (bars)
+
+    # The width of one bar is 1.0. We want the dot to be a fraction of that.
+    dot_w = 0.3
+    # dot_h = 0.3
+    # We scale the vertical radius relative to the max momentum to keep it roughly circular
+    # This is a heuristic; for perfect circles, use pg.ScatterPlotItem instead.
+    dot_h = max_abs_mom * 0.005
 
     for i in range(len(self.data)):
       x, mom, sq_on = self.data[i]
@@ -606,24 +614,24 @@ class TTMSqueezeItem(pg.GraphicsObject):
 
       prev_mom = self.data[i-1][1] if i > 0 else mom
 
-      # 1. Determine Histogram Color
+      # 1. Histogram
       if mom >= 0:
         color = TTM_COLORS['pos_up'] if mom >= prev_mom else TTM_COLORS['pos_down']
+        # For positive mom, top-left is (x-0.4, mom), height is mom (down to 0)
+        rect = QtCore.QRectF(x - 0.4, mom, 0.8, -mom)
       else:
         color = TTM_COLORS['neg_down'] if mom <= prev_mom else TTM_COLORS['neg_up']
+        # For negative mom, top-left is (x-0.4, 0), height is mom (down to mom)
+        rect = QtCore.QRectF(x - 0.4, 0, 0.8, mom)
 
       p.setPen(pg.mkPen(None))
       p.setBrush(pg.mkBrush(color))
-      # drawRect(x, y, w, h) -> y is top-left, so for positive mom, y=0 is bottom
-      # For negative mom, y=0 is top.
-      p.drawRect(QtCore.QRectF(x - 0.4, 0, 0.8, -mom)) # Negating mom handles the y-direction correctly
+      p.drawRect(rect)
 
-      # 2. Draw Squeeze Dot
+      # 2. Squeeze Dot (Centered at y=0)
       dot_color = TTM_COLORS['sq_on'] if sq_on else TTM_COLORS['sq_off']
-      p.setPen(pg.mkPen(None))
       p.setBrush(pg.mkBrush(dot_color))
-      # Use specific X and Y radii to account for axis scaling
-      p.drawEllipse(QtCore.QPointF(x, 0), dot_radius_x, dot_radius_y)
+      p.drawEllipse(QtCore.QPointF(x, 0), dot_w/2, dot_h)
 
     p.end()
 
@@ -633,241 +641,285 @@ class TTMSqueezeItem(pg.GraphicsObject):
   def boundingRect(self):
     return QtCore.QRectF(self.picture.boundingRect())
 
-def plot_pyqtgraph(full_df, initial_max_date=None, export_path=None, vlines=None, display_range=250,
-                   export_width=1920, export_height=1080):
-  app = pg.mkQApp()
+# Global cache for reusing the window and app across multiple plot calls
+_GLOBAL_QT_APP = None
+_GLOBAL_MAIN_WIN = None
+_GLOBAL_LAYOUT_WIDGET = None
+_ACTIVE_PLOTS = []
 
-  # Main Window Setup
-  main_win = QtWidgets.QMainWindow()
-  main_win.setWindowTitle(f"{full_df.symbol[0]} Multi-Pane Analysis")
-  central_widget = QtWidgets.QWidget()
-  main_win.setCentralWidget(central_widget)
-  layout = QtWidgets.QVBoxLayout(central_widget)
+# Persistent context for exports to prevent memory fragmentation
+_EXPORT_WIN = None
+_EXPORT_PLOTS = []
+_EXPORT_TITLE_ITEM = None
 
-  # 1. Date Selector Toolbar
-  toolbar = QtWidgets.QHBoxLayout()
+def _setup_plot_panes(win, x_dates):
+  """Internal helper to create the standard 7-pane layout."""
+  p1 = win.addPlot(row=0, col=0)
+  p7 = win.addPlot(row=1, col=0)
+  p3 = win.addPlot(row=2, col=0)
+  p4 = win.addPlot(row=3, col=0)
+  p5 = win.addPlot(row=4, col=0)
+  p6 = win.addPlot(row=5, col=0)
+  p8 = win.addPlot(row=6, col=0, axisItems={'bottom': DateAxis(dates=x_dates, orientation='bottom')})
 
-  years = [str(y) for y in sorted(full_df.index.year.unique(), reverse=True)]
-  months = [f"{m:02d}" for m in range(1, 13)]
-  days = [f"{d:02d}" for d in range(1, 32)]
+  win.ci.layout.setRowStretchFactor(0, 50)
+  win.ci.layout.setRowStretchFactor(1, 8)
+  win.ci.layout.setRowStretchFactor(2, 2)
+  win.ci.layout.setRowStretchFactor(3, 15)
+  win.ci.layout.setRowStretchFactor(4, 15)
+  win.ci.layout.setRowStretchFactor(5, 2)
+  win.ci.layout.setRowStretchFactor(6, 8)
 
-  year_cb = QtWidgets.QComboBox(); year_cb.addItems(years)
-  month_cb = QtWidgets.QComboBox(); month_cb.addItems(months)
-  day_cb = QtWidgets.QComboBox(); day_cb.addItems(days)
+  plots = [p1, p7, p3, p4, p5, p6, p8]
+  for p in plots:
+    p.showGrid(x=True, y=True, alpha=0.3)
+    p.getAxis('left').setWidth(70)
+    p.getAxis('right').setWidth(70)
+    p.showAxis('right')
+    if p != p8: p.getAxis('bottom').hide()
+    if p != p1:
+      p.setXLink(p1)
+      p.setMaximumHeight(16777215)
 
-  # Set initial values from initial_max_date or last date in df
-  start_date = pd.to_datetime(initial_max_date) if initial_max_date else full_df.index[-1]
-  year_cb.setCurrentText(str(start_date.year))
-  month_cb.setCurrentText(f"{start_date.month:02d}")
-  day_cb.setCurrentText(f"{start_date.day:02d}")
+  p7.setLabels(left='Vol MA')
+  p3.setLabels(left='EMA Dist')
+  p4.setLabels(left='ATR %')
+  p5.setLabels(left='IV/HV')
+  p6.setLabels(left='IVPct')
+  p8.setLabels(left='TTM Squeeze')
+  return plots
 
-  toolbar.addWidget(QtWidgets.QLabel("Max Date Filter:"))
-  toolbar.addWidget(year_cb); toolbar.addWidget(month_cb); toolbar.addWidget(day_cb)
-  toolbar.addStretch()
-  layout.addLayout(toolbar)
+def _get_export_context(width, height):
+  """Singleton-style helper to maintain one hidden export window."""
+  global _EXPORT_WIN, _EXPORT_PLOTS, _GLOBAL_QT_APP, _EXPORT_TITLE_ITEM
+  if _GLOBAL_QT_APP is None: _GLOBAL_QT_APP = pg.mkQApp()
 
-  # 2. Graphics Layout
-  win = pg.GraphicsLayoutWidget()
-  layout.addWidget(win)
+  if _EXPORT_WIN is None:
+    _EXPORT_WIN = pg.GraphicsLayoutWidget()
+    _EXPORT_WIN.setAttribute(QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen)
+    _EXPORT_WIN.setFixedSize(width, height)
+    _EXPORT_WIN.setGeometry(0, 0, width, height) # Force initial geometry
 
-  # Store proxy in a list or as a property to prevent garbage collection
-  state = {'proxy': None, 'df': None, 'x_range': None, 'x_dates': None}
-  p1 = p3 = p4 = p5 = p6 = p7 = p8 = p1_vol = None
+    # Add a label at the very top of the layout
+    _EXPORT_TITLE_ITEM = pg.LabelItem(justify='center', size='14pt')
+    _EXPORT_WIN.addItem(_EXPORT_TITLE_ITEM, row=0, col=0)
 
-  # Resize window to match export proportions initially to help layout calculation
-  main_win.resize(export_width, export_height)
-  main_win.show()
-  if export_path:
-    main_win.hide()
+    # Create plots once. We use dummy dates; DateAxis will be updated per call.
+    _EXPORT_PLOTS = _setup_plot_panes(_EXPORT_WIN, [datetime.now()])
+
+  return _EXPORT_WIN, _EXPORT_PLOTS, _EXPORT_TITLE_ITEM
+
+def _add_plot_content(plots, df, vlines):
+  """Internal helper to populate panes with data series."""
+  p1, p7, p3, p4, p5, p6, p8 = plots
+  x_range = np.arange(len(df))
+
+  p1.addItem(OHLCItem([(i, df.o.iloc[i], df.h.iloc[i], df.l.iloc[i], df.c.iloc[i]) for i in x_range]))
+
+  for col, cfg in EMA_CONFIGS.items():
+    if col in df.columns:
+      p1.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
+
+  # Indicators
+  if 'v' in df.columns:
+    for col, cfg in VOL_CONFIGS.items():
+      if col in df.columns:
+        val = df[col].values / 1000 if col != 'v' else df[col].values / 1000
+        p7.plot(x=x_range, y=val, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
+    p7.addLine(y=0, pen=pg.mkPen('#666', width=1))
+
+  for col, cfg in DIST_CONFIGS.items():
+    if col in df.columns:
+      p3.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
+  p3.addLine(y=1.2, pen=pg.mkPen('#666', width=1))
+
+  for col, cfg in ATR_CONFIGS.items():
+    if col in df.columns:
+      p4.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
+  p4.addLine(y=0, pen=pg.mkPen('#666', width=1))
+
+  for col, cfg in HV_CONFIGS.items():
+    if col in df.columns:
+      p5.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
+  p5.addLine(y=0, pen=pg.mkPen('#666', width=1))
+
+  for col, cfg in IVPCT_CONFIGS.items():
+    if col in df.columns:
+      p6.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
+  p6.addLine(y=0.5, pen=pg.mkPen('#666', style=QtCore.Qt.PenStyle.DashLine))
+
+  if 'ttm_mom' in df.columns and 'squeeze_on' in df.columns:
+    p8.addItem(TTMSqueezeItem([(i, df.ttm_mom.iloc[i], df.squeeze_on.iloc[i]) for i in x_range]))
+  p8.addLine(y=0, pen=pg.mkPen('#666', width=1))
+
+  if vlines:
+    for v_date in vlines:
+      v_dt = pd.to_datetime(v_date)
+      if v_dt in df.index:
+        idx = df.index.get_loc(v_dt)
+        for p in plots:
+          p.addItem(pg.InfiniteLine(pos=idx, angle=90, pen=pg.mkPen('darkviolet', width=0.8, style=QtCore.Qt.PenStyle.DashLine)))
+
+def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, height=1080, title=None):
+  """High-speed version using a persistent hidden window context."""
+  global _GLOBAL_QT_APP
+  win, plots, title_item = _get_export_context(width, height)
+
+  # 1. Update Date Axis (Critical for correct labels)
+  title_item.setText(title if title else "")
+  plots[-1].getAxis('bottom').dates = df.index
+
+  # Ensure geometry is strictly enforced for every export
+  win.setFixedSize(width, height)
+
+  # 2. Fast Clear: Remove data items, but keep the PlotItems/Layout alive
+  for p in plots:
+    p.clear()
+
+  # 3. Fill with new data
+  _add_plot_content(plots, df, vlines)
+
+  # 4. Set view range and Scale Y
+  p1 = plots[0]
+  p1.setXRange(max(0, len(df) - display_range), len(df))
+
+  vr = p1.viewRange()[0]
+  s, e = max(0, int(vr[0])), min(len(df), int(vr[1]))
+  if s < e:
+    chunk = df.iloc[s:e]
+    p1.setYRange(chunk.l.min()*0.99, chunk.h.max()*1.01, padding=0)
+
+  # --- FIX: Force Layout Recalculation ---
+  win.ci.layout.activate()
+  _GLOBAL_QT_APP.processEvents()
+  win.repaint()
+
+  # 5. Export
+  exporter = pg.exporters.ImageExporter(win.scene())
+  exporter.parameters()['width'] = width
+  exporter.parameters()['height'] = height
+  exporter.export(path)
+
+  # Minimal event processing to keep queue clean without full GUI overhead
+  _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+
+
+def interactive_swing_plot(full_df, display_range=250):
+  """Full-featured interactive version with Toolbar, Crosshairs, and dynamic scaling."""
+  global _GLOBAL_QT_APP, _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET, _ACTIVE_PLOTS
+
+  if _GLOBAL_QT_APP is None:
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+    _GLOBAL_QT_APP = pg.mkQApp()
+
+  if _GLOBAL_MAIN_WIN is None:
+    _GLOBAL_MAIN_WIN = QtWidgets.QMainWindow()
+    central_widget = QtWidgets.QWidget()
+    _GLOBAL_MAIN_WIN.setCentralWidget(central_widget)
+    main_layout = QtWidgets.QVBoxLayout(central_widget)
+
+    toolbar = QtWidgets.QHBoxLayout()
+    year_cb, month_cb, day_cb = QtWidgets.QComboBox(), QtWidgets.QComboBox(), QtWidgets.QComboBox()
+    toolbar.addWidget(QtWidgets.QLabel("Max Date Filter:"))
+    for cb in [year_cb, month_cb, day_cb]: toolbar.addWidget(cb)
+    toolbar.addStretch()
+    main_layout.addLayout(toolbar)
+
+    _GLOBAL_LAYOUT_WIDGET = pg.GraphicsLayoutWidget()
+    main_layout.addWidget(_GLOBAL_LAYOUT_WIDGET)
+
+    _GLOBAL_MAIN_WIN._year_cb, _GLOBAL_MAIN_WIN._month_cb, _GLOBAL_MAIN_WIN._day_cb = year_cb, month_cb, day_cb
+
+  main_win, win = _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET
+  year_cb, month_cb, day_cb = main_win._year_cb, main_win._month_cb, main_win._day_cb
+  state = {'proxy': None, 'df': None, 'x_dates': None}
+  plots = []
 
   def update_y_views():
-    if state['df'] is None or p1 is None: return
-
+    if state['df'] is None or not plots: return
+    p1 = plots[0]
     vr = p1.viewRange()[0]
     s, e = max(0, int(vr[0])), min(len(state['df']), int(vr[1]))
     if s < e:
       chunk = state['df'].iloc[s:e]
-      p1.setYRange(chunk.l.min()*0.99, chunk.h.max()*1.01, padding=0)
+      p1.setYRange(chunk.l.min() * 0.99, chunk.h.max() * 1.01, padding=0)
 
-      # Scale Indicator Panes
-      scale_map = [
-        (p7, list(VOL_CONFIGS.keys())), (p3, list(DIST_CONFIGS.keys())),
-        (p4, list(ATR_CONFIGS.keys())), (p5, list(HV_CONFIGS.keys())),
-        (p6, list(IVPCT_CONFIGS.keys())), (p8, ['ttm_mom'])]
-
-      for p, cols in scale_map:
+      # Re-scale indicator panes based on view
+      scale_map = [(plots[1], VOL_CONFIGS), (plots[2], DIST_CONFIGS), (plots[3], ATR_CONFIGS),
+                   (plots[4], HV_CONFIGS), (plots[5], IVPCT_CONFIGS), (plots[6], ['ttm_mom'])]
+      for p, cfg in scale_map:
+        cols = list(cfg.keys()) if isinstance(cfg, dict) else cfg
         valid_cols = [c for c in cols if c in state['df'].columns]
         if valid_cols:
-          chunk_data = chunk[valid_cols]
-          if p == p7: # Scale Volume MAs to thousands
-            chunk_data = chunk_data / 1000
-          p.setYRange(chunk_data.min().min()*1.1, chunk_data.max().max()*1.1, padding=0)
+          c_data = chunk[valid_cols]
+          if p == plots[1]: c_data = c_data / 1000
+          p.setYRange(c_data.min().min() * 0.9, c_data.max().max() * 1.1, padding=0)
 
   def update_plot():
-    nonlocal p1, p3, p4, p5, p6, p7, p8
+    global _ACTIVE_PLOTS
+    nonlocal plots
+
+    # Cleanup
+    if _ACTIVE_PLOTS:
+      try: plots[0].sigXRangeChanged.disconnect()
+      except: pass
+      if state['proxy']: state['proxy'].disconnect()
+    for p in _ACTIVE_PLOTS: p.deleteLater()
     win.clear()
+
     target_str = f"{year_cb.currentText()}-{month_cb.currentText()}-{day_cb.currentText()}"
     df = full_df[full_df.index <= target_str]
     if df.empty: return
 
-    state['df'] = df
-    state['x_dates'] = df.index
-    state['x_range'] = np.arange(len(df))
-    x_range = state['x_range']
+    state['df'], state['x_dates'] = df, df.index
+    plots = _setup_plot_panes(win, state['x_dates'])
+    _ACTIVE_PLOTS = plots
+    _add_plot_content(plots, df, vlines=None)
 
-    # --- Plot Setup ---
-    p1 = win.addPlot(row=0, col=0)
-
-    # Indicator Panes - Reordered: Vol MA is now first (row 1)
-    p7 = win.addPlot(row=1, col=0)
-    p3 = win.addPlot(row=2, col=0)
-    p4 = win.addPlot(row=3, col=0)
-    p5 = win.addPlot(row=4, col=0)
-    p6 = win.addPlot(row=5, col=0)
-    # Bottom pane gets the DateAxis
-    p8 = win.addPlot(row=6, col=0, axisItems={'bottom': DateAxis(dates=state['x_dates'], orientation='bottom')})
-
-    # Apply proportional heights
-    win.ci.layout.setRowStretchFactor(0, 50) # Main Chart
-    win.ci.layout.setRowStretchFactor(1, 8)  # p7 (Vol MA)
-    win.ci.layout.setRowStretchFactor(2, 2)  # p3 (EMA Dist)
-    win.ci.layout.setRowStretchFactor(3, 15) # p4 (ATR)
-    win.ci.layout.setRowStretchFactor(4, 15) # p5 (IV/HV)
-    win.ci.layout.setRowStretchFactor(5, 2)  # p6 (IVPct)
-    win.ci.layout.setRowStretchFactor(6, 8)  # p8 (TTM Squeeze)
-
-    plots = [p1, p7, p3, p4, p5, p6, p8]
+    # Crosshair Logic
+    v_lines, h_lines = [], []
     for p in plots:
-      p.showGrid(x=True, y=True, alpha=0.3)
-      p.getAxis('left').setWidth(70)
-      p.getAxis('right').setWidth(70)
-      p.showAxis('right')
-      if p != p8:
-        p.getAxis('bottom').hide() # Hide x-axis for all but bottom pane
-      if p != p1:
-        p.setXLink(p1)
-        p.setMaximumHeight(16777215)
-
-    p7.setLabels(left='Vol MA')
-    p3.setLabels(left='EMA Dist')
-    p4.setLabels(left='ATR %')
-    p5.setLabels(left='IV/HV')
-    p6.setLabels(left='IVPct')
-    p8.setLabels(left='TTM Squeeze')
+      v, h = pg.InfiniteLine(angle=90, movable=False), pg.InfiniteLine(angle=0, movable=False)
+      p.addItem(v, ignoreBounds=True); p.addItem(h, ignoreBounds=True)
+      v_lines.append(v); h_lines.append(h); h.hide()
 
     hover_label = pg.TextItem(anchor=(0, 0), color='#ccc', fill='#000e')
-    p1.addItem(hover_label, ignoreBounds=True)
-
-    # --- Plotting Content ---
-    p1.addItem(OHLCItem([(i, df.o.iloc[i], df.h.iloc[i], df.l.iloc[i], df.c.iloc[i]) for i in x_range]))
-    for col, cfg in EMA_CONFIGS.items():
-      if col in df.columns:
-        p1.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg.get('style', QtCore.Qt.PenStyle.SolidLine)), connect='finite')
-
-    # Indicators
-    for col, cfg in VOL_CONFIGS.items():
-      if col in df.columns:
-        p7.plot(x=x_range, y=df[col].values / 1000, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg.get('style', QtCore.Qt.PenStyle.SolidLine)), connect='finite')
-    p7.addLine(y=0, pen=pg.mkPen('#666', width=1))
-
-    for col, cfg in DIST_CONFIGS.items():
-      if col in df.columns:
-        p3.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg.get('style', QtCore.Qt.PenStyle.SolidLine)), connect='finite')
-    p3.addLine(y=1.2, pen=pg.mkPen('#666', width=1))
-
-    for col, cfg in ATR_CONFIGS.items():
-      if col in df.columns:
-        p4.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg.get('style', QtCore.Qt.PenStyle.SolidLine)), connect='finite')
-    p4.addLine(y=0, pen=pg.mkPen('#666', width=1))
-
-    for col, cfg in HV_CONFIGS.items():
-      if col in df.columns:
-        p5.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg.get('style', QtCore.Qt.PenStyle.SolidLine)), connect='finite')
-    p5.addLine(y=0, pen=pg.mkPen('#666', width=1))
-
-    for col, cfg in IVPCT_CONFIGS.items():
-      if col in df.columns:
-        p6.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg.get('style', QtCore.Qt.PenStyle.SolidLine)), connect='finite')
-    p6.addLine(y=0.5, pen=pg.mkPen('#666', style=QtCore.Qt.PenStyle.DashLine))
-
-    if 'ttm_mom' in df.columns and 'squeeze_on' in df.columns:
-      p8.addItem(TTMSqueezeItem([(i, df.ttm_mom.iloc[i], df.squeeze_on.iloc[i]) for i in x_range]))
-    p8.addLine(y=0, pen=pg.mkPen('#666', width=1))
-
-    # --- Vertical Marker Lines ---
-    if vlines:
-      for v_date in vlines:
-        v_dt = pd.to_datetime(v_date)
-        if v_dt in df.index:
-          idx = df.index.get_loc(v_dt)
-          for p in plots:
-            marker_line = pg.InfiniteLine(pos=idx, angle=90, pen=pg.mkPen('darkviolet', width=0.8, style=QtCore.Qt.PenStyle.DashLine))
-            p.addItem(marker_line)
-
-    # 9. CROSSHAIRS & Interaction Logic
-    v_lines = []
-    h_lines = []
-    for p in plots:
-      v_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('#666', style=QtCore.Qt.PenStyle.DashLine))
-      h_line = pg.InfiniteLine(angle=0, movable=False, pen=pg.mkPen('#666', style=QtCore.Qt.PenStyle.DashLine))
-      p.addItem(v_line, ignoreBounds=True)
-      p.addItem(h_line, ignoreBounds=True)
-      v_lines.append(v_line)
-      h_lines.append(h_line)
-      h_line.hide()
+    plots[0].addItem(hover_label, ignoreBounds=True)
 
     def update_hover(evt):
       pos = evt[0]
-      for hl in h_lines: hl.hide()
-      for i, active_p in enumerate(plots):
-        if active_p.sceneBoundingRect().contains(pos):
-          mousePoint = active_p.vb.mapSceneToView(pos)
+      for i, p in enumerate(plots):
+        if p.sceneBoundingRect().contains(pos):
+          mousePoint = p.vb.mapSceneToView(pos)
           idx = int(mousePoint.x() + 0.5)
-
           if 0 <= idx < len(df):
-            row = df.iloc[idx]
-            for line in v_lines: line.setPos(idx)
-            h_lines[i].setPos(mousePoint.y())
-            h_lines[i].show()
+            for v in v_lines: v.setPos(idx)
+            for h in h_lines: h.hide()
+            h_lines[i].setPos(mousePoint.y()); h_lines[i].show()
+            vb_range = plots[0].vb.viewRange()
+            hover_label.setPos(vb_range[0][0], vb_range[1][1])
+            hover_label.setText(f"Index: {idx} Date: {state['x_dates'][idx].date()}")
 
-            # Formatted Hover Text
-            txt = f"<span style='font-size: 11pt; color: white; font-weight: bold;'>{state['x_dates'][idx].strftime('%a %Y-%m-%d')}</span><br>"
-            txt += f"O:{row.o:.2f} H:{row.h:.2f} L:{row.l:.2f} C:{row.c:.2f} V:{row.v/1000:,.0f}k<br>"
-            dists = " | ".join([f"<span style='color:{DIST_CONFIGS[c]['color']};'>{c.split('_')[0]}:{row[c]:.2f}</span>" for c in DIST_CONFIGS if c in df.columns])
-            emas = " | ".join([f"<span style='color:{EMA_CONFIGS[c]['color']};'>{c.upper()}:{row[c]:.2f}</span>" for c in EMA_CONFIGS if c in df.columns])
-            atrs = " | ".join([f"<span style='color:{ATR_CONFIGS[c]['color']};'>{c.upper()}:{row[c]:.2f}%</span>" for c in ATR_CONFIGS if c in df.columns])
-            hvs = " | ".join([f"<span style='color:{HV_CONFIGS[c]['color']};'>{c.upper()}:{row[c]:.2f}</span>" for c in HV_CONFIGS if c in df.columns])
-            ivpct = " | ".join([f"<span style='color:{IVPCT_CONFIGS[c]['color']};'>{c}:{row[c]:.2f}</span>" for c in IVPCT_CONFIGS if c in df.columns])
-            vols = " | ".join([f"<span style='color:{VOL_CONFIGS[c]['color']};'>{c.upper()}:{row[c]/1000:.2f}k</span>" for c in VOL_CONFIGS if c in df.columns])
-
-            hover_label.setHtml(txt + dists + "<br>" + atrs + "<br>" + hvs + "<br>" + ivpct + "<br>" + vols )
-            vb_range = p1.vb.viewRange()
-            hover_label.setPos(vb_range[0][0] + (vb_range[0][1]-vb_range[0][0])*0.01,
-                               vb_range[1][1] - (vb_range[1][1]-vb_range[1][0])*0.01)
-
-    state['proxy'] = pg.SignalProxy(p1.scene().sigMouseMoved, rateLimit=60, slot=update_hover)
-    p1.sigXRangeChanged.connect(update_y_views)
-
-    # Use the display_range parameter to set the initial view
-    p1.setXRange(max(0, len(df) - display_range), len(df))
+    state['proxy'] = pg.SignalProxy(plots[0].scene().sigMouseMoved, rateLimit=60, slot=update_hover)
+    plots[0].sigXRangeChanged.connect(update_y_views)
+    plots[0].setXRange(max(0, len(df) - display_range), len(df))
     update_y_views()
 
-  # Connect signals and run initial draw
-  for cb in [year_cb, month_cb, day_cb]:
-    cb.currentIndexChanged.connect(update_plot)
+  # Initial UI Setup
+  year_cb.blockSignals(True); month_cb.blockSignals(True); day_cb.blockSignals(True)
+  year_cb.clear(); month_cb.clear(); day_cb.clear()
+  year_cb.addItems([str(y) for y in sorted(full_df.index.year.unique(), reverse=True)])
+  month_cb.addItems([f"{m:02d}" for m in range(1, 13)])
+  day_cb.addItems([f"{d:02d}" for d in range(1, 32)])
+
+  last_date = full_df.index[-1]
+  year_cb.setCurrentText(str(last_date.year))
+  month_cb.setCurrentText(f"{last_date.month:02d}")
+  day_cb.setCurrentText(f"{last_date.day:02d}")
+
+  for cb in [year_cb, month_cb, day_cb]: cb.currentIndexChanged.connect(update_plot)
+  year_cb.blockSignals(False); month_cb.blockSignals(False); day_cb.blockSignals(False)
 
   update_plot()
-
-  if export_path:
-    win.ci.layout.activate()
-    app.processEvents()
-    update_y_views()
-    app.processEvents()
-
-    exporter = pg.exporters.ImageExporter(win.scene())
-    exporter.parameters()['width'] = export_width
-    exporter.parameters()['height'] = export_height
-    exporter.export(export_path)
-    main_win.close()
-  else:
-    pg.exec()
+  main_win.showNormal()
+  if not QtWidgets.QApplication.instance(): pg.exec()

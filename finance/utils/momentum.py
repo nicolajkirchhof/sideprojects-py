@@ -80,7 +80,7 @@ def evaluate_liquid_symbols(name, fn_flt, spy_data, liquid_symbols, offline=True
         continue
       df_tracking_data['cpct'] = (df_tracking_data['c'] - df_tracking_data['c'].iloc[offset_days-1]) / df_tracking_data['c'].iloc[offset_days-1] * 100
 
-      idx_week = df_week.index.get_indexer([df_momentum.name], method='nearest')[0]
+      idx_week = df_week.index.get_indexer([df_momentum.name], method='ffill')[0]
       idx_week_offset = offset_weeks if idx_week >= offset_weeks else idx_week
       idx_start_week = idx_week - offset_weeks if idx_week - offset_weeks >= 0 else 0
       idx_end_week = idx_week + offset_weeks if idx_week + offset_weeks <= len(df_week) - 1 else len(df_week) - 1
