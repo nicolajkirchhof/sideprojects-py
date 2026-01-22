@@ -58,10 +58,10 @@ def calculate_performance(df_ticker, df_day, length_days):
 # df_atr2xs.to_pickle(f'finance/_data/all_atr2x.pkl')
 
 # %% Create plots
-tickers = {'atr_x': 'LIN', 'std_x': 'KL', 'peads': 'BCS'}
+tickers = {'atr_x': 'LIN', 'std_x': 'MFSI', 'peads': 'BCS'}
 start_at = 0
-start_at = liquid_symbols.index(tickers[name])
-# ticker = liquid_symbols[42]
+ticker = tickers[name]
+start_at = liquid_symbols.index(ticker)
 # atr2x_data = []
 for ticker in liquid_symbols[start_at:]:
   # %%
@@ -83,8 +83,9 @@ for ticker in liquid_symbols[start_at:]:
 
   if 'market_cap' not in df_ticker.columns:
     swing_data = utils.swing_trading_data.SwingTradingData(ticker, offline=True)
-    mkp_idx = swing_data.market_cap.index.get_indexer(df_ticker.date, method="nearest")
-    df_ticker['market_cap'] = swing_data.market_cap.iloc[mkp_idx]['market_cap'].values
+    if swing_data.market_cap is not None:
+      mkp_idx = swing_data.market_cap.index.get_indexer(df_ticker.date, method="nearest")
+      df_ticker['market_cap'] = swing_data.market_cap.iloc[mkp_idx]['market_cap'].values
 
   # --- New Logic: Classify and Save Market Cap ---
   if 'market_cap' in df_ticker.columns:
@@ -95,12 +96,13 @@ for ticker in liquid_symbols[start_at:]:
     df_ticker.to_pickle(filename)
   #%%
   # i, row = next(df_ticker.iterrows())
-  os.makedirs(f'finance/_data/{name}/plots/{ticker}', exist_ok=True)
+  plot_path = f'finance/_data/{name}/plots/{ticker}'
+  os.makedirs(plot_path, exist_ok=True)
   num_rows = len(df_ticker)
   for idx_row, (i, row) in enumerate(df_ticker.iterrows(), 1):
     start_time = datetime.now()
     max_date = df_day.index.get_indexer([row.date], method='nearest')[0] + 25
-    file_basename = f'finance/_data/{name}/plots/{ticker}/{row.date.date()}'
+    file_basename = f'{plot_path}/{row.date.date()}'
 
     # Build dynamic title with classification and performance
     mcap_cat = row.get('mcap_class', 'Unknown')
@@ -110,6 +112,7 @@ for ticker in liquid_symbols[start_at:]:
     # Daily Plot Timing
     t0_d = datetime.now()
     utils.plots.export_swing_plot(df_day.iloc[max_date-25:max_date], path=f'{file_basename}_D.png', vlines=[row.date], display_range=51, width=1920, height=1080, title=full_title)
+    # utils.plots.interactive_swing_plot(df_day.iloc[:max_date], display_range=51)
     dur_d = (datetime.now() - t0_d).total_seconds()
 
     # Weekly Plot Timing
@@ -118,10 +121,10 @@ for ticker in liquid_symbols[start_at:]:
     t0_w = datetime.now()
     utils.plots.export_swing_plot(df_week.iloc[max_date_w_idx-8:max_date_w_idx + 8], path=f'{file_basename}_W.png',
                                   vlines=[max_date_w], display_range=17, width=1920, height=1080, title=full_title)
+
     dur_w = (datetime.now() - t0_w).total_seconds()
 
     print(f'  - [{idx_row}/{num_rows}] {row.date.date()}: Daily {dur_d:.2f}s, Weekly {dur_w:.2f}s (Total: {(datetime.now() - start_time).total_seconds():.2f}s)')
-    # utils.plots.plot_pyqtgraph(df_day.iloc[:max_date], vlines=[row.date], display_range=51)
 
   # Heavy cleanup after each ticker to reset memory fragmentation
   import gc

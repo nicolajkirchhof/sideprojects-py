@@ -589,49 +589,31 @@ class OHLCItem(pg.GraphicsObject):
 class TTMSqueezeItem(pg.GraphicsObject):
   def __init__(self, data):
     pg.GraphicsObject.__init__(self)
-    self.data = data # list of (x, mom, squeeze_on)
+    self.data = data  # list of (x, mom, squeeze_on)
     self.generatePicture()
 
   def generatePicture(self):
     self.picture = QtGui.QPicture()
     p = QtGui.QPainter(self.picture)
 
-    # We calculate a vertical scale factor based on the momentum range
-    # to make the dots appear circular regardless of the plot's Y-scale.
-    mom_values = [d[1] for d in self.data if not np.isnan(d[1])]
-    max_abs_mom = max(abs(min(mom_values)), abs(max(mom_values))) if mom_values else 1.0
-
-    # The width of one bar is 1.0. We want the dot to be a fraction of that.
-    dot_w = 0.3
-    # dot_h = 0.3
-    # We scale the vertical radius relative to the max momentum to keep it roughly circular
-    # This is a heuristic; for perfect circles, use pg.ScatterPlotItem instead.
-    dot_h = max_abs_mom * 0.005
-
     for i in range(len(self.data)):
       x, mom, sq_on = self.data[i]
-      if np.isnan(mom): continue
+      if np.isnan(mom):
+        continue
 
       prev_mom = self.data[i-1][1] if i > 0 else mom
 
       # 1. Histogram
       if mom >= 0:
         color = TTM_COLORS['pos_up'] if mom >= prev_mom else TTM_COLORS['pos_down']
-        # For positive mom, top-left is (x-0.4, mom), height is mom (down to 0)
         rect = QtCore.QRectF(x - 0.4, mom, 0.8, -mom)
       else:
         color = TTM_COLORS['neg_down'] if mom <= prev_mom else TTM_COLORS['neg_up']
-        # For negative mom, top-left is (x-0.4, 0), height is mom (down to mom)
         rect = QtCore.QRectF(x - 0.4, 0, 0.8, mom)
 
       p.setPen(pg.mkPen(None))
       p.setBrush(pg.mkBrush(color))
       p.drawRect(rect)
-
-      # 2. Squeeze Dot (Centered at y=0)
-      dot_color = TTM_COLORS['sq_on'] if sq_on else TTM_COLORS['sq_off']
-      p.setBrush(pg.mkBrush(dot_color))
-      p.drawEllipse(QtCore.QPointF(x, 0), dot_w/2, dot_h)
 
     p.end()
 
@@ -651,24 +633,25 @@ _ACTIVE_PLOTS = []
 _EXPORT_WIN = None
 _EXPORT_PLOTS = []
 _EXPORT_TITLE_ITEM = None
+_EXPORT_LAYOUT_VERSION = 2  # bump this when you change export layout structure
 
-def _setup_plot_panes(win, x_dates):
+def _setup_plot_panes(win, x_dates, row_offset=0):
   """Internal helper to create the standard 7-pane layout."""
-  p1 = win.addPlot(row=0, col=0)
-  p7 = win.addPlot(row=1, col=0)
-  p3 = win.addPlot(row=2, col=0)
-  p4 = win.addPlot(row=3, col=0)
-  p5 = win.addPlot(row=4, col=0)
-  p6 = win.addPlot(row=5, col=0)
-  p8 = win.addPlot(row=6, col=0, axisItems={'bottom': DateAxis(dates=x_dates, orientation='bottom')})
+  p1 = win.addPlot(row=row_offset + 0, col=0)
+  p7 = win.addPlot(row=row_offset + 1, col=0)
+  p3 = win.addPlot(row=row_offset + 2, col=0)
+  p4 = win.addPlot(row=row_offset + 3, col=0)
+  p5 = win.addPlot(row=row_offset + 4, col=0)
+  p6 = win.addPlot(row=row_offset + 5, col=0)
+  p8 = win.addPlot(row=row_offset + 6, col=0, axisItems={'bottom': DateAxis(dates=x_dates, orientation='bottom')})
 
-  win.ci.layout.setRowStretchFactor(0, 50)
-  win.ci.layout.setRowStretchFactor(1, 8)
-  win.ci.layout.setRowStretchFactor(2, 2)
-  win.ci.layout.setRowStretchFactor(3, 15)
-  win.ci.layout.setRowStretchFactor(4, 15)
-  win.ci.layout.setRowStretchFactor(5, 2)
-  win.ci.layout.setRowStretchFactor(6, 8)
+  win.ci.layout.setRowStretchFactor(row_offset + 0, 50)
+  win.ci.layout.setRowStretchFactor(row_offset + 1, 8)
+  win.ci.layout.setRowStretchFactor(row_offset + 2, 2)
+  win.ci.layout.setRowStretchFactor(row_offset + 3, 15)
+  win.ci.layout.setRowStretchFactor(row_offset + 4, 15)
+  win.ci.layout.setRowStretchFactor(row_offset + 5, 2)
+  win.ci.layout.setRowStretchFactor(row_offset + 6, 8)
 
   plots = [p1, p7, p3, p4, p5, p6, p8]
   for p in plots:
@@ -689,23 +672,66 @@ def _setup_plot_panes(win, x_dates):
   p8.setLabels(left='TTM Squeeze')
   return plots
 
+def _force_layout_and_scene_sync(glw: pg.GraphicsLayoutWidget, width: int | None = None, height: int | None = None):
+  """
+  Force GraphicsLayoutWidget to honor a target size and update its QGraphicsScene/viewport geometry.
+  This fixes the 'tiny plot in top-left' issue caused by missing resize/layout passes.
+  """
+  if width is not None and height is not None:
+    glw.setMinimumSize(width, height)
+    glw.setMaximumSize(width, height)
+    glw.resize(width, height)
+    glw.setGeometry(0, 0, width, height)
+
+  # Ensure layout is recalculated
+  glw.ci.layout.activate()
+
+  # Ensure a viewport exists with the correct rect (resize events happen via show/paint)
+  glw.show()
+  QtWidgets.QApplication.processEvents()
+
+  # Sync scene rect to the viewport; exporter depends on correct scene geometry
+  vp_rect = glw.viewport().rect()
+  glw.scene().setSceneRect(QtCore.QRectF(vp_rect))
+  glw.update()
+  glw.repaint()
+  QtWidgets.QApplication.processEvents()
+
 def _get_export_context(width, height):
   """Singleton-style helper to maintain one hidden export window."""
-  global _EXPORT_WIN, _EXPORT_PLOTS, _GLOBAL_QT_APP, _EXPORT_TITLE_ITEM
-  if _GLOBAL_QT_APP is None: _GLOBAL_QT_APP = pg.mkQApp()
+  global _EXPORT_WIN, _EXPORT_PLOTS, _GLOBAL_QT_APP, _EXPORT_TITLE_ITEM, _EXPORT_LAYOUT_VERSION
+  if _GLOBAL_QT_APP is None:
+    _GLOBAL_QT_APP = pg.mkQApp()
+
+  # If the export widget was created under an older layout, rebuild it.
+  if _EXPORT_WIN is not None:
+    current_ver = getattr(_EXPORT_WIN, "_layout_version", None)
+    if current_ver != _EXPORT_LAYOUT_VERSION:
+      try:
+        _EXPORT_WIN.close()
+      except:
+        pass
+      _EXPORT_WIN = None
+      _EXPORT_PLOTS = []
+      _EXPORT_TITLE_ITEM = None
 
   if _EXPORT_WIN is None:
     _EXPORT_WIN = pg.GraphicsLayoutWidget()
+    _EXPORT_WIN._layout_version = _EXPORT_LAYOUT_VERSION
     _EXPORT_WIN.setAttribute(QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen)
-    _EXPORT_WIN.setFixedSize(width, height)
-    _EXPORT_WIN.setGeometry(0, 0, width, height) # Force initial geometry
 
-    # Add a label at the very top of the layout
+    _EXPORT_WIN.setFixedSize(width, height)
+    _EXPORT_WIN.setGeometry(0, 0, width, height)  # Force initial geometry
+
+    # Title row (row 0)
     _EXPORT_TITLE_ITEM = pg.LabelItem(justify='center', size='14pt')
     _EXPORT_WIN.addItem(_EXPORT_TITLE_ITEM, row=0, col=0)
+    _EXPORT_WIN.ci.layout.setRowStretchFactor(0, 3)
 
-    # Create plots once. We use dummy dates; DateAxis will be updated per call.
-    _EXPORT_PLOTS = _setup_plot_panes(_EXPORT_WIN, [datetime.now()])
+    # Plots start at row 1 (critical)
+    _EXPORT_PLOTS = _setup_plot_panes(_EXPORT_WIN, [datetime.now()], row_offset=1)
+
+    _force_layout_and_scene_sync(_EXPORT_WIN, width, height)
 
   return _EXPORT_WIN, _EXPORT_PLOTS, _EXPORT_TITLE_ITEM
 
@@ -750,6 +776,26 @@ def _add_plot_content(plots, df, vlines):
 
   if 'ttm_mom' in df.columns and 'squeeze_on' in df.columns:
     p8.addItem(TTMSqueezeItem([(i, df.ttm_mom.iloc[i], df.squeeze_on.iloc[i]) for i in x_range]))
+
+    # Add visible squeeze dots (pixel-sized)
+    mom = df['ttm_mom'].to_numpy(dtype=float)
+    sq = df['squeeze_on'].astype(bool).to_numpy()
+
+    spots = []
+    for i in x_range:
+      if not np.isfinite(mom[i]):
+        continue
+      spots.append({
+        'pos': (float(i), 0.0),
+        'brush': pg.mkBrush(TTM_COLORS['sq_on'] if sq[i] else TTM_COLORS['sq_off']),
+        'pen': pg.mkPen(None),
+        'size': 7,
+      })
+
+    dots = pg.ScatterPlotItem(pxMode=True)
+    dots.addPoints(spots)
+    p8.addItem(dots)
+
   p8.addLine(y=0, pen=pg.mkPen('#666', width=1))
 
   if vlines:
@@ -789,10 +835,8 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
     chunk = df.iloc[s:e]
     p1.setYRange(chunk.l.min()*0.99, chunk.h.max()*1.01, padding=0)
 
-  # --- FIX: Force Layout Recalculation ---
-  win.ci.layout.activate()
-  _GLOBAL_QT_APP.processEvents()
-  win.repaint()
+  # Critical: force a real layout/scene update at the final size BEFORE exporting
+  _force_layout_and_scene_sync(win, width, height)
 
   # 5. Export
   exporter = pg.exporters.ImageExporter(win.scene())
@@ -804,7 +848,7 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
   _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
 
-def interactive_swing_plot(full_df, display_range=250):
+def interactive_swing_plot(full_df, display_range=250, title: str | None = None):
   """Full-featured interactive version with Toolbar, Crosshairs, and dynamic scaling."""
   global _GLOBAL_QT_APP, _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET, _ACTIVE_PLOTS
 
@@ -828,32 +872,84 @@ def interactive_swing_plot(full_df, display_range=250):
     _GLOBAL_LAYOUT_WIDGET = pg.GraphicsLayoutWidget()
     main_layout.addWidget(_GLOBAL_LAYOUT_WIDGET)
 
+    # Prevent "min-size" starts
+    _GLOBAL_MAIN_WIN.setMinimumSize(1200, 700)
+    _GLOBAL_MAIN_WIN.resize(1600, 900)
+
     _GLOBAL_MAIN_WIN._year_cb, _GLOBAL_MAIN_WIN._month_cb, _GLOBAL_MAIN_WIN._day_cb = year_cb, month_cb, day_cb
 
   main_win, win = _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET
   year_cb, month_cb, day_cb = main_win._year_cb, main_win._month_cb, main_win._day_cb
-  state = {'proxy': None, 'df': None, 'x_dates': None}
+  state = {
+    'proxy': None,
+    'df': None,
+    'x_dates': None,
+    'hover_label': None,
+    'v_lines': None,
+    'h_lines': None,
+  }
   plots = []
 
+  def _finite_min_max(values):
+    """Return (mn, mx) from finite values or (None, None) if none exist."""
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+      return None, None
+    mn = float(np.min(arr))
+    mx = float(np.max(arr))
+    if mn == mx:
+      # Avoid zero-height range; expand a tiny bit (relative if possible)
+      eps = abs(mn) * 1e-6 + 1e-12
+      mn -= eps
+      mx += eps
+    return mn, mx
+
   def update_y_views():
-    if state['df'] is None or not plots: return
+    if state['df'] is None or not plots:
+      return
     p1 = plots[0]
     vr = p1.viewRange()[0]
     s, e = max(0, int(vr[0])), min(len(state['df']), int(vr[1]))
-    if s < e:
-      chunk = state['df'].iloc[s:e]
-      p1.setYRange(chunk.l.min() * 0.99, chunk.h.max() * 1.01, padding=0)
+    if s >= e:
+      return
 
-      # Re-scale indicator panes based on view
-      scale_map = [(plots[1], VOL_CONFIGS), (plots[2], DIST_CONFIGS), (plots[3], ATR_CONFIGS),
-                   (plots[4], HV_CONFIGS), (plots[5], IVPCT_CONFIGS), (plots[6], ['ttm_mom'])]
-      for p, cfg in scale_map:
-        cols = list(cfg.keys()) if isinstance(cfg, dict) else cfg
-        valid_cols = [c for c in cols if c in state['df'].columns]
-        if valid_cols:
-          c_data = chunk[valid_cols]
-          if p == plots[1]: c_data = c_data / 1000
-          p.setYRange(c_data.min().min() * 0.9, c_data.max().max() * 1.1, padding=0)
+    chunk = state['df'].iloc[s:e]
+
+    # --- Main OHLC pane scaling (guard against all-NaN) ---
+    mn, mx = _finite_min_max(np.r_[chunk.get('l', pd.Series(dtype=float)).to_numpy(),
+                                  chunk.get('h', pd.Series(dtype=float)).to_numpy()])
+    if mn is not None:
+      p1.setYRange(mn * 0.99, mx * 1.01, padding=0)
+
+    # --- Re-scale indicator panes based on view (guard against all-NaN) ---
+    scale_map = [
+      (plots[1], VOL_CONFIGS),
+      (plots[2], DIST_CONFIGS),
+      (plots[3], ATR_CONFIGS),
+      (plots[4], HV_CONFIGS),
+      (plots[5], IVPCT_CONFIGS),
+      (plots[6], ['ttm_mom'])
+    ]
+
+    for p, cfg in scale_map:
+      cols = list(cfg.keys()) if isinstance(cfg, dict) else cfg
+      valid_cols = [c for c in cols if c in state['df'].columns]
+      if not valid_cols:
+        continue
+
+      c_data = chunk[valid_cols]
+
+      # For volume pane, keep the same units you plot (thousands)
+      if p == plots[1]:
+        c_data = c_data / 1000.0
+
+      mn2, mx2 = _finite_min_max(c_data.to_numpy().ravel())
+      if mn2 is None:
+        continue
+
+      # Give a little breathing room
+      p.setYRange(mn2 * 0.9, mx2 * 1.1, padding=0)
 
   def update_plot():
     global _ACTIVE_PLOTS
@@ -867,24 +963,37 @@ def interactive_swing_plot(full_df, display_range=250):
     for p in _ACTIVE_PLOTS: p.deleteLater()
     win.clear()
 
+    # Title in row 0, plots start at row 1
+    title_item = pg.LabelItem(justify='center', size='14pt')
+    title_item.setText(title if title else "")
+    win.addItem(title_item, row=0, col=0)
+    win.ci.layout.setRowStretchFactor(0, 3)
+
     target_str = f"{year_cb.currentText()}-{month_cb.currentText()}-{day_cb.currentText()}"
     df = full_df[full_df.index <= target_str]
     if df.empty: return
 
     state['df'], state['x_dates'] = df, df.index
-    plots = _setup_plot_panes(win, state['x_dates'])
+    plots = _setup_plot_panes(win, state['x_dates'], row_offset=1)
     _ACTIVE_PLOTS = plots
     _add_plot_content(plots, df, vlines=None)
 
-    # Crosshair Logic
+    # Crosshair Logic (keep strong references!)
     v_lines, h_lines = [], []
     for p in plots:
       v, h = pg.InfiniteLine(angle=90, movable=False), pg.InfiniteLine(angle=0, movable=False)
-      p.addItem(v, ignoreBounds=True); p.addItem(h, ignoreBounds=True)
-      v_lines.append(v); h_lines.append(h); h.hide()
+      p.addItem(v, ignoreBounds=True)
+      p.addItem(h, ignoreBounds=True)
+      v_lines.append(v)
+      h_lines.append(h)
+      h.hide()
+
+    state['v_lines'] = v_lines
+    state['h_lines'] = h_lines
 
     hover_label = pg.TextItem(anchor=(0, 0), color='#ccc', fill='#000e')
     plots[0].addItem(hover_label, ignoreBounds=True)
+    state['hover_label'] = hover_label
 
     def update_hover(evt):
       pos = evt[0]
@@ -893,12 +1002,103 @@ def interactive_swing_plot(full_df, display_range=250):
           mousePoint = p.vb.mapSceneToView(pos)
           idx = int(mousePoint.x() + 0.5)
           if 0 <= idx < len(df):
-            for v in v_lines: v.setPos(idx)
-            for h in h_lines: h.hide()
-            h_lines[i].setPos(mousePoint.y()); h_lines[i].show()
+            row = df.iloc[idx]
+
+            for v in state['v_lines']:
+              v.setPos(idx)
+            for h in state['h_lines']:
+              h.hide()
+            state['h_lines'][i].setPos(mousePoint.y())
+            state['h_lines'][i].show()
+
+            date_str = state['x_dates'][idx].strftime('%a %Y-%m-%d') if state.get('x_dates') is not None else str(df.index[idx])
+
+            txt = (
+              f"<span style='font-size: 11pt; color: white; font-weight: bold;'>{date_str}</span><br>"
+              f"O:{row.o:.2f} H:{row.h:.2f} L:{row.l:.2f} C:{row.c:.2f}"
+            )
+            if 'v' in df.columns and pd.notna(row.get('v', np.nan)):
+              txt += f" V:{row.v/1000:,.0f}k"
+            txt += "<br>"
+
+            def _fmt_group(config_dict, value_fmt, col_label_fn=None, transform_fn=None):
+              parts = []
+              for col, cfg in config_dict.items():
+                if col not in df.columns:
+                  continue
+                val = row.get(col, np.nan)
+                if not np.isfinite(val):
+                  continue
+                if transform_fn is not None:
+                  val = transform_fn(val)
+                color = cfg['color'] if isinstance(cfg, dict) and 'color' in cfg else str(cfg)
+                label = col_label_fn(col) if col_label_fn else col
+                parts.append(f"<span style='color:{color};'>{label}:{value_fmt(val)}</span>")
+              return " | ".join(parts)
+
+            emas = _fmt_group(
+              EMA_CONFIGS,
+              value_fmt=lambda v: f"{v:.2f}",
+              col_label_fn=lambda c: c.upper()
+            )
+            dists = _fmt_group(
+              DIST_CONFIGS,
+              value_fmt=lambda v: f"{v:.2f}",
+              col_label_fn=lambda c: c.replace('_dist', '').upper()
+            )
+            atrs = _fmt_group(
+              ATR_CONFIGS,
+              value_fmt=lambda v: f"{v:.2f}%",
+              col_label_fn=lambda c: c.upper()
+            )
+            hvs = _fmt_group(
+              HV_CONFIGS,
+              value_fmt=lambda v: f"{v:.2f}",
+              col_label_fn=lambda c: c.upper()
+            )
+            ivpct = _fmt_group(
+              IVPCT_CONFIGS,
+              value_fmt=lambda v: f"{v:.2f}",
+              col_label_fn=lambda c: c
+            )
+            vols = _fmt_group(
+              VOL_CONFIGS,
+              value_fmt=lambda v: f"{v:.2f}k",
+              col_label_fn=lambda c: c.upper(),
+              transform_fn=lambda v: v / 1000.0
+            )
+
+            if emas:
+              txt += emas + "<br>"
+            if dists:
+              txt += dists + "<br>"
+            if atrs:
+              txt += atrs + "<br>"
+            if hvs:
+              txt += hvs + "<br>"
+            if ivpct:
+              txt += ivpct + "<br>"
+            if vols:
+              txt += vols + "<br>"
+
+            ttm_extra = ""
+            if 'ttm_mom' in df.columns and np.isfinite(row.get('ttm_mom', np.nan)):
+              ttm_extra += f"TTM_MOM:{row.ttm_mom:.2f}"
+            if 'squeeze_on' in df.columns and pd.notna(row.get('squeeze_on', np.nan)):
+              sq = bool(row.squeeze_on)
+              ttm_extra += (" | " if ttm_extra else "") + f"SQUEEZE:{'ON' if sq else 'OFF'}"
+            if ttm_extra:
+              txt += ttm_extra
+
+            state['hover_label'].setHtml(txt)
+
+            # Place near top-left of pane 1 view
             vb_range = plots[0].vb.viewRange()
-            hover_label.setPos(vb_range[0][0], vb_range[1][1])
-            hover_label.setText(f"Index: {idx} Date: {state['x_dates'][idx].date()}")
+            state['hover_label'].setPos(
+              vb_range[0][0] + (vb_range[0][1] - vb_range[0][0]) * 0.01,
+              vb_range[1][1] - (vb_range[1][1] - vb_range[1][0]) * 0.01
+            )
+
 
     state['proxy'] = pg.SignalProxy(plots[0].scene().sigMouseMoved, rateLimit=60, slot=update_hover)
     plots[0].sigXRangeChanged.connect(update_y_views)
@@ -922,4 +1122,13 @@ def interactive_swing_plot(full_df, display_range=250):
 
   update_plot()
   main_win.showNormal()
+
+  # Force layout AFTER the window is actually shown
+  def _after_show():
+    main_win.resize(1600, 900)
+    _force_layout_and_scene_sync(win)
+
+  QtCore.QTimer.singleShot(0, _after_show)
+
   if not QtWidgets.QApplication.instance(): pg.exec()
+
