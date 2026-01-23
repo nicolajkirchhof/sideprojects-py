@@ -572,13 +572,25 @@ class OHLCItem(pg.GraphicsObject):
     p = QtGui.QPainter(self.picture)
     p.setPen(pg.mkPen('w'))
     for t, open, high, low, close in self.data:
-      color = pg.mkPen('g') if close >= open else pg.mkPen('r')
+      if close > open:
+        color = pg.mkPen('g')
+      elif close < open:
+        color = pg.mkPen('r')
+      else:
+        color = pg.mkPen('#b')  # neutral/doji
       p.setPen(color)
-      p.drawLine(QtCore.QPointF(t, low), QtCore.QPointF(t, high))
+      if low != high:
+        p.drawLine(QtCore.QPointF(t, low), QtCore.QPointF(t, high))
       # Open tick (left) and Close tick (right)
       p.drawLine(QtCore.QPointF(t-0.3, open), QtCore.QPointF(t, open))
       p.drawLine(QtCore.QPointF(t, close), QtCore.QPointF(t+0.3, close))
     p.end()
+
+  def paint(self, p, *args):
+    p.drawPicture(0, 0, self.picture)
+
+  def boundingRect(self):
+    return QtCore.QRectF(self.picture.boundingRect())
 
   def paint(self, p, *args):
     p.drawPicture(0, 0, self.picture)
@@ -671,6 +683,25 @@ def _setup_plot_panes(win, x_dates, row_offset=0):
   p6.setLabels(left='IVPct')
   p8.setLabels(left='TTM Squeeze')
   return plots
+
+def _force_export_layout_sync(glw: pg.GraphicsLayoutWidget, width: int, height: int):
+  """
+  Faster export-only layout sync.
+  Assumes widget is off-screen; avoids show() and minimizes event processing.
+  """
+  last_size = getattr(glw, "_last_export_size", None)
+  if last_size != (width, height):
+    glw.setFixedSize(width, height)
+    glw.setGeometry(0, 0, width, height)
+    glw._last_export_size = (width, height)
+
+  glw.ci.layout.activate()
+  _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
+
+  # Make scene rect match viewport for the exporter
+  vp_rect = glw.viewport().rect()
+  glw.scene().setSceneRect(QtCore.QRectF(vp_rect))
+  glw.update()
 
 def _force_layout_and_scene_sync(glw: pg.GraphicsLayoutWidget, width: int | None = None, height: int | None = None):
   """
@@ -806,26 +837,38 @@ def _add_plot_content(plots, df, vlines):
         for p in plots:
           p.addItem(pg.InfiniteLine(pos=idx, angle=90, pen=pg.mkPen('darkviolet', width=0.8, style=QtCore.Qt.PenStyle.DashLine)))
 
+# 4. Set view range and scale Y
+def _finite_min_max(values):
+  """Return (mn, mx) from finite values or (None, None) if none exist."""
+  arr = np.asarray(values, dtype=float)
+  arr = arr[np.isfinite(arr)]
+  if arr.size == 0:
+    return None, None
+  mn = float(np.min(arr))
+  mx = float(np.max(arr))
+  if mn == mx:
+    eps = abs(mn) * 1e-6 + 1e-12
+    mn -= eps
+    mx += eps
+  return mn, mx
+
 def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, height=1080, title=None):
   """High-speed version using a persistent hidden window context."""
   global _GLOBAL_QT_APP
   win, plots, title_item = _get_export_context(width, height)
 
-  # 1. Update Date Axis (Critical for correct labels)
+  # 1. Update title + axis
   title_item.setText(title if title else "")
   plots[-1].getAxis('bottom').dates = df.index
 
-  # Ensure geometry is strictly enforced for every export
-  win.setFixedSize(width, height)
-
-  # 2. Fast Clear: Remove data items, but keep the PlotItems/Layout alive
+  # 2. Fast Clear
   for p in plots:
     p.clear()
 
   # 3. Fill with new data
   _add_plot_content(plots, df, vlines)
 
-  # 4. Set view range and Scale Y
+  # 4. Set view range and scale Y
   p1 = plots[0]
   p1.setXRange(max(0, len(df) - display_range), len(df))
 
@@ -833,20 +876,24 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
   s, e = max(0, int(vr[0])), min(len(df), int(vr[1]))
   if s < e:
     chunk = df.iloc[s:e]
-    p1.setYRange(chunk.l.min()*0.99, chunk.h.max()*1.01, padding=0)
 
-  # Critical: force a real layout/scene update at the final size BEFORE exporting
-  _force_layout_and_scene_sync(win, width, height)
+    l = chunk['l'].to_numpy(dtype=float) if 'l' in chunk.columns else np.array([], dtype=float)
+    h = chunk['h'].to_numpy(dtype=float) if 'h' in chunk.columns else np.array([], dtype=float)
 
-  # 5. Export
+    mn, mx = _finite_min_max(np.r_[l, h])
+    if mn is not None:
+      p1.setYRange(mn * 0.99, mx * 1.01, padding=0)
+
+  # 5. Fast export-only sync (skip heavy show()/repaint())
+  _force_export_layout_sync(win, width, height)
+
+  # 6. Export
   exporter = pg.exporters.ImageExporter(win.scene())
   exporter.parameters()['width'] = width
   exporter.parameters()['height'] = height
   exporter.export(path)
 
-  # Minimal event processing to keep queue clean without full GUI overhead
   _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
-
 
 def interactive_swing_plot(full_df, display_range=250, title: str | None = None):
   """Full-featured interactive version with Toolbar, Crosshairs, and dynamic scaling."""

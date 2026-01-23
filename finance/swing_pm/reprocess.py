@@ -25,8 +25,8 @@ liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
 df_market_cap = pd.read_csv('finance/_data/MarketCapThresholds.csv')
 
 # name = 'atr_x'
-name = 'std_x'
-# name = 'peads'
+# name = 'std_x'
+name = 'peads'
 
 ##%%
 def classify_market_cap(mcap_value, year, df_thresholds):
@@ -58,7 +58,7 @@ def calculate_performance(df_ticker, df_day, length_days):
 # df_atr2xs.to_pickle(f'finance/_data/all_atr2x.pkl')
 
 # %% Create plots
-tickers = {'atr_x': 'LIN', 'std_x': 'MFSI', 'peads': 'BCS'}
+tickers = {'atr_x': 'POCT', 'std_x': 'CMRC', 'peads': 'XPEL'}
 start_at = 0
 ticker = tickers[name]
 start_at = liquid_symbols.index(ticker)
