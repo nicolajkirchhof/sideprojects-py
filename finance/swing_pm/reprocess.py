@@ -1,6 +1,7 @@
 # %%
 import os
 import pickle
+import re
 from datetime import timedelta, datetime
 
 import numpy as np
@@ -147,8 +148,18 @@ for name in ['std_x']:
   df_name.to_pickle(f'finance/_data/all_{name}.pkl')
 
 #%% Remove obsolete columns in order to handle sizes
+cols_to_remove_pattern =  re.compile(r'^(?:w_)?(?:ac100_lag_1|ac100_lag_5|ac_comp|ac_mom|ac_mr|ac_inst)-?\d+$')
+
 for name in ['atr_x', 'std_x', 'peads']:
   df = pd.read_pickle(f'finance/_data/all_{name}.pkl')
+
+  # Clean up obsolete columns
+  drop_cols = [c for c in df.columns if cols_to_remove_pattern.match(c)]
+  if drop_cols:
+    # print(f"  Dropping {len(drop_cols)} obsolete columns")
+    df.drop(columns=drop_cols, inplace=True)
+
+  df.to_pickle(f'finance/_data/all_clean_{name}.pkl')
 
 
 
