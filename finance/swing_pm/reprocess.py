@@ -24,9 +24,9 @@ liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
 # utils.plots.plot_pyqtgraph(spy_data.df_day, display_range=51)
 df_market_cap = pd.read_csv('finance/_data/MarketCapThresholds.csv')
 
-# name = 'atr_x'
+name = 'atr_x'
 # name = 'std_x'
-name = 'peads'
+# name = 'peads'
 
 ##%%
 def classify_market_cap(mcap_value, year, df_thresholds):
@@ -58,7 +58,7 @@ def calculate_performance(df_ticker, df_day, length_days):
 # df_atr2xs.to_pickle(f'finance/_data/all_atr2x.pkl')
 
 # %% Create plots
-tickers = {'atr_x': 'POCT', 'std_x': 'CMRC', 'peads': 'XPEL'}
+tickers = {'atr_x': 'LNN', 'std_x': 'BCH', 'peads': 'NA'}
 start_at = 0
 ticker = tickers[name]
 start_at = liquid_symbols.index(ticker)
@@ -83,7 +83,7 @@ for ticker in liquid_symbols[start_at:]:
 
   if 'market_cap' not in df_ticker.columns:
     swing_data = utils.swing_trading_data.SwingTradingData(ticker, offline=True)
-    if swing_data.market_cap is not None:
+    if swing_data.market_cap is not None and not swing_data.market_cap.empty:
       mkp_idx = swing_data.market_cap.index.get_indexer(df_ticker.date, method="nearest")
       df_ticker['market_cap'] = swing_data.market_cap.iloc[mkp_idx]['market_cap'].values
 
@@ -107,6 +107,8 @@ for ticker in liquid_symbols[start_at:]:
     # Build dynamic title with classification and performance
     mcap_cat = row.get('mcap_class', 'Unknown')
     perf_str = f"1M: {row['1M_chg']:.1f}% | 3M: {row['3M_chg']:.1f}% | 6M: {row['6M_chg']:.1f}%"
+    if 'eps' in row.index and row['eps'] is not None and not pd.isna(row['eps']): perf_str += f" | EPS: {row['eps']:.2f}"
+    if 'eps_est' in row.index and row['eps_est'] is not None and not pd.isna(row['eps_est']): perf_str += f" | EPS EST: {row['eps_est']:.2f}"
     full_title = f"{ticker} ({mcap_cat}) - {row.date.date()} | {perf_str}"
 
     # Daily Plot Timing
@@ -131,6 +133,24 @@ for ticker in liquid_symbols[start_at:]:
   gc.collect()
   utils.plots._GLOBAL_QT_APP.processEvents()
 
-## %%
+#%% Create the combined files to analyze
+# for name in ['atr_x', 'std_x', 'peads']:
+for name in ['std_x']:
+  data = []
+  for ticker in liquid_symbols:
+    print(f'[{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] Processing {ticker} - {liquid_symbols.index(ticker)} of {len(liquid_symbols)} ...')
+    filename = f'finance/_data/{name}/{ticker}.pkl'
+    if not os.path.exists(filename): continue
+    df_ticker = pd.read_pickle(filename)
+    data.append(df_ticker)
+  df_name = pd.concat(data)
+  df_name.to_pickle(f'finance/_data/all_{name}.pkl')
+
+#%% Remove obsolete columns in order to handle sizes
+for name in ['atr_x', 'std_x', 'peads']:
+  df = pd.read_pickle(f'finance/_data/all_{name}.pkl')
+
+
+
 # df_atr2xs = pd.concat(atr2x_data)
 # df_atr2xs.to_pickle(f'finance/_data/all_atr2x.pkl')

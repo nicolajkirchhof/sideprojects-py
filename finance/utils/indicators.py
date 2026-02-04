@@ -327,12 +327,7 @@ def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
   df_stk['std'] = df_stk['c'].rolling(window=20).std(ddof=0)
   df_stk['std_mv'] = df_stk['chg'].abs() / df_stk['std']
 
-  for ema in [10, 20, 50, 100, 200]:
-    df_stk[f'ema{ema}'] = df_stk['vwap3'].ewm(span=ema, adjust=False).mean()
-    df_stk[f'ema{ema}_slope'] = df_stk[f'ema{ema}'].diff()
-    df_stk[f'ema{ema}_dist'] = ((df_stk['c'] - df_stk[f'ema{ema}']) / df_stk[f'ema{ema}']) * 100
-
-  # ATR Calculation
+    # ATR Calculation
   df_stk['hl'] = df_stk['h'] - df_stk['l']
   df_stk['hpc'] = np.abs(df_stk['h'] - df_stk['c'].shift())
   df_stk['lpc'] = np.abs(df_stk['l'] - df_stk['c'].shift())
@@ -342,7 +337,13 @@ def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
     df_stk[f'atr{atr}'] = tr.ewm(alpha=1/atr, adjust=False).mean()
     df_stk[f'atrp{atr}'] = (df_stk[f'atr{atr}'] / df_stk['c']) * 100
 
-  # Hurst Exponent (Trend vs Mean Reversion)
+  for ema in [10, 20, 50, 100, 200]:
+    df_stk[f'ema{ema}'] = df_stk['vwap3'].ewm(span=ema, adjust=False).mean()
+    df_stk[f'ema{ema}_slope'] = df_stk[f'ema{ema}'].diff()
+    df_stk[f'ema{ema}_dist'] = ((df_stk['c'] - df_stk[f'ema{ema}']) / df_stk[f'ema{ema}']) * 100
+    df_stk[f'ema{ema}_dist_atr'] = (df_stk['c'] - df_stk[f'ema{ema}']) / df_stk[f'atr{atr}']
+
+    # Hurst Exponent (Trend vs Mean Reversion)
   # Calculated over a rolling 100-day window
   # H < 0.5: Mean Reverting | H > 0.5: Trending
   df_stk['hurst50'] = df_stk['c'].rolling(window=50).apply(hurst, raw=True)

@@ -567,6 +567,13 @@ class OHLCItem(pg.GraphicsObject):
     self.data = data # [time, open, high, low, close]
     self.generatePicture()
 
+  def setData(self, data):
+    """Update OHLC data without reallocating the GraphicsObject."""
+    self.prepareGeometryChange()
+    self.data = data
+    self.generatePicture()
+    self.update()
+
   def generatePicture(self):
     self.picture = QtGui.QPicture()
     p = QtGui.QPainter(self.picture)
@@ -581,16 +588,9 @@ class OHLCItem(pg.GraphicsObject):
       p.setPen(color)
       if low != high:
         p.drawLine(QtCore.QPointF(t, low), QtCore.QPointF(t, high))
-      # Open tick (left) and Close tick (right)
       p.drawLine(QtCore.QPointF(t-0.3, open), QtCore.QPointF(t, open))
       p.drawLine(QtCore.QPointF(t, close), QtCore.QPointF(t+0.3, close))
     p.end()
-
-  def paint(self, p, *args):
-    p.drawPicture(0, 0, self.picture)
-
-  def boundingRect(self):
-    return QtCore.QRectF(self.picture.boundingRect())
 
   def paint(self, p, *args):
     p.drawPicture(0, 0, self.picture)
@@ -604,6 +604,13 @@ class TTMSqueezeItem(pg.GraphicsObject):
     self.data = data  # list of (x, mom, squeeze_on)
     self.generatePicture()
 
+  def setData(self, data):
+    """Update TTM squeeze histogram without reallocating the GraphicsObject."""
+    self.prepareGeometryChange()
+    self.data = data
+    self.generatePicture()
+    self.update()
+
   def generatePicture(self):
     self.picture = QtGui.QPicture()
     p = QtGui.QPainter(self.picture)
@@ -615,13 +622,12 @@ class TTMSqueezeItem(pg.GraphicsObject):
 
       prev_mom = self.data[i-1][1] if i > 0 else mom
 
-      # 1. Histogram
       if mom >= 0:
         color = TTM_COLORS['pos_up'] if mom >= prev_mom else TTM_COLORS['pos_down']
-        rect = QtCore.QRectF(x - 0.4, mom, 0.8, -mom)
+        rect = QtCore.QRectF(x - 0.4, 0, 0.8, -mom)
       else:
         color = TTM_COLORS['neg_down'] if mom <= prev_mom else TTM_COLORS['neg_up']
-        rect = QtCore.QRectF(x - 0.4, 0, 0.8, mom)
+        rect = QtCore.QRectF(x - 0.4, 0, 0.8, -mom)
 
       p.setPen(pg.mkPen(None))
       p.setBrush(pg.mkBrush(color))
@@ -754,17 +760,153 @@ def _get_export_context(width, height):
     _EXPORT_WIN.setFixedSize(width, height)
     _EXPORT_WIN.setGeometry(0, 0, width, height)  # Force initial geometry
 
-    # Title row (row 0)
     _EXPORT_TITLE_ITEM = pg.LabelItem(justify='center', size='14pt')
     _EXPORT_WIN.addItem(_EXPORT_TITLE_ITEM, row=0, col=0)
     _EXPORT_WIN.ci.layout.setRowStretchFactor(0, 3)
 
-    # Plots start at row 1 (critical)
     _EXPORT_PLOTS = _setup_plot_panes(_EXPORT_WIN, [datetime.now()], row_offset=1)
+
+    p1, p7, p3, p4, p5, p6, p8 = _EXPORT_PLOTS
+
+    ohlc_item = OHLCItem([])
+    p1.addItem(ohlc_item)
+
+    # Persistent TTM items
+    ttm_item = TTMSqueezeItem([])
+    p8.addItem(ttm_item)
+
+    ttm_dots = pg.ScatterPlotItem(pxMode=True)
+    p8.addItem(ttm_dots)
+
+    def _mk_series_items(plot, cfg_dict):
+      items = {}
+      for col, cfg in cfg_dict.items():
+        items[col] = plot.plot(
+          x=[],
+          y=[],
+          pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']),
+          connect='finite'
+        )
+      return items
+
+    export_state = {
+      'ohlc': ohlc_item,
+      'ema': _mk_series_items(p1, EMA_CONFIGS),
+      'vol': _mk_series_items(p7, VOL_CONFIGS),
+      'dist': _mk_series_items(p3, DIST_CONFIGS),
+      'atr': _mk_series_items(p4, ATR_CONFIGS),
+      'hv': _mk_series_items(p5, HV_CONFIGS),
+      'ivpct': _mk_series_items(p6, IVPCT_CONFIGS),
+      'ttm': ttm_item,
+      'ttm_dots': ttm_dots,
+      'vlines': [],
+    }
+
+    p7.addLine(y=0, pen=pg.mkPen('#666', width=1))
+    p3.addLine(y=1.2, pen=pg.mkPen('#666', width=1))
+    p4.addLine(y=0, pen=pg.mkPen('#666', width=1))
+    p5.addLine(y=0, pen=pg.mkPen('#666', width=1))
+    p6.addLine(y=0.5, pen=pg.mkPen('#666', style=QtCore.Qt.PenStyle.DashLine))
+    p8.addLine(y=0, pen=pg.mkPen('#666', width=1))
+
+    _EXPORT_WIN._export_state = export_state
 
     _force_layout_and_scene_sync(_EXPORT_WIN, width, height)
 
   return _EXPORT_WIN, _EXPORT_PLOTS, _EXPORT_TITLE_ITEM
+
+def _update_export_content(plots, df, vlines):
+  """Update persistent export plot items in-place (no clears, no reallocation)."""
+  export_state = getattr(_EXPORT_WIN, "_export_state", None)
+  if export_state is None:
+    return
+
+  x = np.arange(len(df), dtype=float)
+
+  # OHLC
+  if len(df) > 0 and all(c in df.columns for c in ('o', 'h', 'l', 'c')):
+    o = df['o'].to_numpy(dtype=float, copy=False)
+    h = df['h'].to_numpy(dtype=float, copy=False)
+    l = df['l'].to_numpy(dtype=float, copy=False)
+    c = df['c'].to_numpy(dtype=float, copy=False)
+    export_state['ohlc'].setData([(float(i), float(o[i]), float(h[i]), float(l[i]), float(c[i])) for i in range(len(df))])
+  else:
+    export_state['ohlc'].setData([])
+
+  def _set_group(group_items, transform=None):
+    for col, item in group_items.items():
+      if col in df.columns and len(df) > 0:
+        y = df[col].to_numpy(dtype=float, copy=False)
+        if transform is not None:
+          y = transform(y)
+        item.setData(x=x, y=y, connect='finite')
+        item.show()
+      else:
+        item.setData(x=[], y=[])
+        item.hide()
+
+  _set_group(export_state['ema'])
+  _set_group(export_state['vol'], transform=lambda y: y / 1000.0)
+  _set_group(export_state['dist'])
+  _set_group(export_state['atr'])
+  _set_group(export_state['hv'])
+  _set_group(export_state['ivpct'])
+
+  # TTM squeeze (histogram + dots)
+  if 'ttm_mom' in df.columns and 'squeeze_on' in df.columns and len(df) > 0:
+    mom = df['ttm_mom'].to_numpy(dtype=float, copy=False)
+    sq = df['squeeze_on'].astype(bool).to_numpy(copy=False)
+
+    export_state['ttm'].setData([(float(i), float(mom[i]), bool(sq[i])) for i in range(len(df))])
+
+    spots = []
+    for i in range(len(df)):
+      if not np.isfinite(mom[i]):
+        continue
+      spots.append({
+        'pos': (float(i), 0.0),
+        'brush': pg.mkBrush(TTM_COLORS['sq_on'] if sq[i] else TTM_COLORS['sq_off']),
+        'pen': pg.mkPen(None),
+        'size': 7,
+      })
+
+    export_state['ttm'].show()
+    export_state['ttm_dots'].setData(spots=spots)
+    export_state['ttm_dots'].show()
+  else:
+    export_state['ttm'].setData([])
+    export_state['ttm'].hide()
+    export_state['ttm_dots'].setData(spots=[])
+    export_state['ttm_dots'].hide()
+
+  # Vertical marker lines: reuse existing InfiniteLines, hide extras
+  idxs = []
+  if vlines:
+    for v_date in vlines:
+      v_dt = pd.to_datetime(v_date)
+      if v_dt in df.index:
+        idxs.append(int(df.index.get_loc(v_dt)))
+
+  needed = len(idxs)
+  existing = export_state['vlines']
+
+  while len(existing) < needed:
+    bundle = []
+    for p in plots:
+      line = pg.InfiniteLine(pos=0, angle=90, pen=pg.mkPen('darkviolet', width=0.8, style=QtCore.Qt.PenStyle.DashLine))
+      p.addItem(line)
+      bundle.append(line)
+    existing.append(bundle)
+
+  for i, idx in enumerate(idxs):
+    for line in existing[i]:
+      line.setPos(idx)
+      line.show()
+
+  for j in range(needed, len(existing)):
+    for line in existing[j]:
+      line.hide()
+
 
 def _add_plot_content(plots, df, vlines):
   """Internal helper to populate panes with data series."""
@@ -861,14 +1003,10 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
   title_item.setText(title if title else "")
   plots[-1].getAxis('bottom').dates = df.index
 
-  # 2. Fast Clear
-  for p in plots:
-    p.clear()
+  # 2. Update persistent items (avoid clear/recreate churn)
+  _update_export_content(plots, df, vlines)
 
-  # 3. Fill with new data
-  _add_plot_content(plots, df, vlines)
-
-  # 4. Set view range and scale Y
+  # 3. Set view range and scale Y
   p1 = plots[0]
   p1.setXRange(max(0, len(df) - display_range), len(df))
 
@@ -884,10 +1022,10 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
     if mn is not None:
       p1.setYRange(mn * 0.99, mx * 1.01, padding=0)
 
-  # 5. Fast export-only sync (skip heavy show()/repaint())
+  # 4. Fast export-only sync
   _force_export_layout_sync(win, width, height)
 
-  # 6. Export
+  # 5. Export
   exporter = pg.exporters.ImageExporter(win.scene())
   exporter.parameters()['width'] = width
   exporter.parameters()['height'] = height
