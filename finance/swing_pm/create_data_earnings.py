@@ -17,10 +17,6 @@ df_ecsv = df_ecsv.rename(columns={'symbol':'symbol_csv', 'eps_est':'eps_est_csv'
 
 
 #%%
-ticker = 'MSFT'
-# MySQL connection setup (localhost:3306)
-# Note: This requires a driver like 'pymysql'. Install it via: pip install pymysql
-# Format: mysql+driver://user:password@host:port/database
 db_connection_str = 'mysql+pymysql://root:@localhost:3306/earnings'
 db_connection = create_engine(db_connection_str)
 

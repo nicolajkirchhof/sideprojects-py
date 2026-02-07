@@ -66,6 +66,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\finance\_data\hist_earnings\earnings_latest.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\_data\ibkr\stk\QQQ_contract.csv">
           <value>
             <Attribute>

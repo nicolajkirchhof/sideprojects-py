@@ -2,7 +2,6 @@ from . import influx
 from . import pct
 from . import greeks
 from . import time
-# from . import finplot
 from . import ibkr
 from . import exchanges
 from . import options
@@ -23,4 +22,3 @@ from . import swing_trading_data
 from . import barchart_data
 from . import definitions
 from . import fundamentals
-from . import momentum

@@ -224,7 +224,7 @@ class AtrDashboard:
             rv_min, rv_max = df['rvol500'].min(), df['rvol500'].max()
             if pd.isna(rv_min): rv_min = 0
             if pd.isna(rv_max): rv_max = 5
-            self.slider_rvol = RangeSlider(self.ax_slider_rvol, '', rv_min, rv_max, valinit=(rv_min, rv_max))
+            self.slider_rvol = RangeSlider(self.ax_slider_rvol, '', rv_min, rv_max, valinit=(rv_min, 0.2 * rv_max))
         else:
             self.slider_rvol = RangeSlider(self.ax_slider_rvol, '', 0, 1, valinit=(0, 1))
 
@@ -234,7 +234,7 @@ class AtrDashboard:
             if not years.empty:
                 y_min, y_max = int(years.min()), int(years.max())
                 if y_min == y_max: y_max += 1 # Ensure range exists
-                self.slider_year = RangeSlider(self.ax_slider_year, '', y_min, y_max, valinit=(y_min, y_max), valstep=1, color='cyan')
+                self.slider_year = RangeSlider(self.ax_slider_year, '', y_min, y_max, valinit=(2010, y_max), valstep=1, color='cyan')
             else:
                 self.slider_year = RangeSlider(self.ax_slider_year, '', 2020, 2025, valinit=(2020, 2025), valstep=1, color='cyan')
         else:
@@ -370,28 +370,43 @@ class AtrDashboard:
             self.ax_violin.grid(True, alpha=0.2)
 
         # --- 3. Probability Analysis (Bottom) ---
-        def get_prob(cols):
-            valid = [c for c in cols if c in sub_df.columns]
-            if not valid: return 0
-            return (sub_df[valid] > 0).all(axis=1).mean() * 100
+        # Replaced Bar Chart with Line Chart for Survival Probability
+        def get_survival_curve(col_gen_func):
+            curve = []
+            # Start with all selected rows as "surviving"
+            current_mask = pd.Series(True, index=sub_df.index)
+            
+            for i in periods:
+                col = col_gen_func(i)
+                if col in sub_df.columns:
+                    # Update survivors: Must have survived previous AND current condition
+                    current_mask &= (sub_df[col] > 0)
+                    curve.append(current_mask.mean() * 100)
+                else:
+                    curve.append(float('nan')) # Break line if data missing
+            return curve
 
-        prob_bk = get_prob([f'{prefix}{i}' for i in periods])
-        prob_ema10 = get_prob([ema_cols_gen('ema10', i) for i in periods])
-        prob_ema20 = get_prob([ema_cols_gen('ema20', i) for i in periods])
+        # Lambda generators for column names
+        gen_bk = lambda i: f'{prefix}{i}'
+        gen_ema10 = lambda i: ema_cols_gen('ema10', i)
+        gen_ema20 = lambda i: ema_cols_gen('ema20', i)
 
-        # REORDERED: > EMA10, > EMA20, > Breakout
-        bars = ['> EMA10', '> EMA20', '> Breakout']
-        values = [prob_ema10, prob_ema20, prob_bk]
-        colors = ['#feca57', '#48dbfb', '#ff6b6b']
+        y_bk = get_survival_curve(gen_bk)
+        y_ema10 = get_survival_curve(gen_ema10)
+        y_ema20 = get_survival_curve(gen_ema20)
 
-        self.ax_probs.bar(bars, values, color=colors, alpha=0.8)
-        self.ax_probs.set_ylim(0, 100)
-        self.ax_probs.set_ylabel("Prob (%)")
-        self.ax_probs.set_title(f"Prob. of Holding Support (Next {max_dur} {tf.replace('ly','s')})")
+        # Plot Lines
+        self.ax_probs.plot(periods, y_ema10, color='#feca57', label='> EMA10', linewidth=2, marker='o', markersize=4)
+        self.ax_probs.plot(periods, y_ema20, color='#48dbfb', label='> EMA20', linewidth=2, marker='o', markersize=4)
+        self.ax_probs.plot(periods, y_bk, color='#ff6b6b', label='> Breakout', linewidth=2, marker='o', markersize=4)
+
+        self.ax_probs.set_ylim(0, 105)
+        self.ax_probs.set_ylabel("Prob. (%)")
+        self.ax_probs.set_title(f"Probability of Holding Support Over Time ({tf})")
         self.ax_probs.set_xlabel(xlabel)
-
-        for i, v in enumerate(values):
-            self.ax_probs.text(i, v + 2, f"{v:.1f}%", ha='center', color='white', fontweight='bold')
+        self.ax_probs.legend(loc='lower left')
+        self.ax_probs.grid(True, alpha=0.2)
+        self.ax_probs.set_xticks(periods)
 
         self.fig.canvas.draw_idle()
 
