@@ -84,7 +84,7 @@ df_spy_week = spy_data.df_week
 # SKIP = 100
 SKIP = 1
 start_at = 0
-# start_at = liquid_symbols.index('TSLA') # Debugging start point
+start_at = liquid_symbols.index('FSEC') # Debugging start point
 # ticker = liquid_symbols[start_at]
 
 symbols_to_process = liquid_symbols[start_at::SKIP]

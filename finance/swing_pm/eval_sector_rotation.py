@@ -50,25 +50,32 @@ for label, window in lookbacks.items():
     # 2. Rank sectors (1 = Leader, 12 = Laggard)
     ranks = lookback_returns.rank(axis=1, ascending=False)
     
-    # 3. Create Position Matrix (1 for Long, -1 for Short, 0 for Neutral)
+    # 3. Create Position Matrix (1 for Long, 0 for Neutral)
     positions = pd.DataFrame(0, index=sector_prices.index, columns=sector_prices.columns)
     positions[ranks <= n_pos] = 1
-    positions[ranks > (len(xs) - n_pos)] = -1
-    
+    # positions[ranks > (len(xs) - n_pos)] = -1
+
     # 4. Calculate realized returns
     # We shift(1) positions because we buy at the END of month T based on signals
     # and realize the return of month T+1
-    strategy_returns = (positions.shift(1) * monthly_actual_returns).mean(axis=1)
-    
+    strategy_returns = (positions.shift(1) * monthly_actual_returns).sum(axis=1) / n_pos
+
     # 5. Plot the equity curve for this specific lookback
     equity_curve = (1 + strategy_returns.fillna(0)).cumprod()
     equity_curve.plot(label=f'{label} Momentum', lw=2)
+
+    # Print Performance Metrics
+    total_ret = equity_curve.iloc[-1] - 1
+    ann_ret = equity_curve.iloc[-1] ** (12 / len(equity_curve)) - 1
+    vol = strategy_returns.std() * np.sqrt(12)
+    sharpe = ann_ret / vol if vol != 0 else 0
+    print(f"Strategy {label}: Total Return={total_ret:.2%}, CAGR={ann_ret:.2%}, Vol={vol:.2%}, Sharpe={sharpe:.2f}")
 
 # 6. Add Benchmark (Equal weight all sectors)
 benchmark = (1 + monthly_actual_returns.mean(axis=1).fillna(0)).cumprod()
 benchmark.plot(label='Equal Weighted (Bench)', color='black', ls='--', alpha=0.6)
 
-plt.title(f'Sector Rotation Comparison: Long Top {n_pos} / Short Bottom {n_pos} by Period')
+plt.title(f'Sector Rotation Comparison: Long Top {n_pos} Sectors by Period')
 plt.ylabel('Cumulative Performance')
 plt.legend(loc='upper left')
 plt.grid(alpha=0.3)
