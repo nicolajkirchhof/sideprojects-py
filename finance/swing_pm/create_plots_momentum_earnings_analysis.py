@@ -6,7 +6,7 @@ from datetime import datetime
 
 import finance.utils as utils
 
-def create_plots():
+def create_plots(override=False):
     # Setup Paths
     output_name = 'momentum_earnings'
     base_path = f'finance/_data/{output_name}'
@@ -65,13 +65,17 @@ def create_plots():
         # Plotting Loop
         for idx_row, (i_evt, row) in enumerate(df_ticker_events.iterrows()):
             try:
+                file_basename = f'{ticker_plot_path}/{row.date.date()}'
+                
+                # Check if plots exist
+                if not override and os.path.exists(f'{file_basename}_D.png') and os.path.exists(f'{file_basename}_W.png'):
+                    continue
+
                 # Event index in daily data
                 idx_day_arr = df_day.index.get_indexer([row.date], method='nearest')
                 if len(idx_day_arr) == 0:
                     continue
                 idx_day = idx_day_arr[0]
-
-                file_basename = f'{ticker_plot_path}/{row.date.date()}'
 
                 # Dynamic Title
                 mcap_cat = row.get('mcap_class', 'Unknown')
