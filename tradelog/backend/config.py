@@ -1,9 +1,0 @@
-import os
-
-basedir = os.path.abspath(os.path.dirname(__file__))
-
-class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'a-hard-to-guess-string'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-                              'postgresql://nico:F70247356A6CE05946B379BB8435C015@localhost/tradelog'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False

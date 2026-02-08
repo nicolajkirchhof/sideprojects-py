@@ -83,8 +83,8 @@ df_spy_week = spy_data.df_week
 # SKIP = 100
 SKIP = -1
 # start_at = 0
-start_at = len(liquid_symbols)
-# start_at = liquid_symbols.index('FSEC') # Debugging start point
+# start_at = len(liquid_symbols)
+start_at = liquid_symbols.index('EPM') # Debugging start point
 # ticker = liquid_symbols[start_at]
 
 symbols_to_process = liquid_symbols[start_at::SKIP]
@@ -105,23 +105,14 @@ for i, ticker in enumerate(symbols_to_process):
     df_earnings['date'] = pd.to_datetime(df_earnings['date'], format='%Y-%m-%d')
     t_earnings = time.time() - t0
 
-    # Time: Swing Data Load (Basic)
-    t0 = time.time()
-    swing_data = utils.swing_trading_data.SwingTradingData(ticker, offline=True, metainfo=False)
-    if swing_data.empty: 
-        print(f"  Swing data empty for {ticker}, skipping.")
-        continue
-
-    df_day = swing_data.df_day
-    df_week = swing_data.df_week
-    t_swing = time.time() - t0
-
     # Time: Market Cap Load
     t0 = time.time()
     # Load Market Cap History for Lookups
     # Note: Creating SwingTradingData again without metainfo=False triggers full DB load if not cached/offline
     swing_data_full = utils.swing_trading_data.SwingTradingData(ticker, offline=True)
     ts_market_cap = swing_data_full.market_cap
+    df_day = swing_data_full.df_day
+    df_week = swing_data_full.df_week
     t_mcap = time.time() - t0
 
     events_map = {}
@@ -332,7 +323,7 @@ for i, ticker in enumerate(symbols_to_process):
     t_process = time.time() - t0
 
     total_time = time.time() - ticker_start
-    print(f"  [Time] Earnings: {t_earnings:.3f}s, Swing: {t_swing:.3f}s, MCap: {t_mcap:.3f}s, Detect: {t_detection:.3f}s, Process: {t_process:.3f}s | Total: {total_time:.3f}s")
+    print(f"  [Time] Earnings: {t_earnings:.3f}s, MCap: {t_mcap:.3f}s, Detect: {t_detection:.3f}s, Process: {t_process:.3f}s | Total: {total_time:.3f}s")
 #%%
 # --- 4. Final Aggregation ---
 print("Aggregating all files...")
