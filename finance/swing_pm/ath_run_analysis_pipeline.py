@@ -55,12 +55,13 @@ df_market_cap_thresholds = pd.read_csv('finance/_data/MarketCapThresholds.csv')
 
 #%%
 # Iteration Settings
-SKIP = 1
-start_at = 0
+SKIP = -1
+# start_at = 0
+start_at = len(liquid_symbols)
 
 symbols_to_process = liquid_symbols[start_at::SKIP]
 total_symbols = len(symbols_to_process)
-
+#%%
 for i, ticker in enumerate(symbols_to_process):
     ticker_start = time.time()
     

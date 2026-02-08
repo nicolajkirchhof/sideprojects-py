@@ -67,7 +67,6 @@ output_name = 'momentum_earnings'
 base_path = f'finance/_data/{output_name}'
 plot_path = f'{base_path}/plots'
 data_path = f'{base_path}/data'
-os.makedirs(plot_path, exist_ok=True)
 os.makedirs(data_path, exist_ok=True)
 
 # Load Core Data
@@ -82,19 +81,21 @@ df_spy_week = spy_data.df_week
 #%%
 # Iteration Settings
 # SKIP = 100
-SKIP = 1
-start_at = 0
-start_at = liquid_symbols.index('FSEC') # Debugging start point
+SKIP = -1
+# start_at = 0
+start_at = len(liquid_symbols)
+# start_at = liquid_symbols.index('FSEC') # Debugging start point
 # ticker = liquid_symbols[start_at]
 
 symbols_to_process = liquid_symbols[start_at::SKIP]
 total_symbols = len(symbols_to_process)
-
+#%%
 for i, ticker in enumerate(symbols_to_process):
     ticker_start = time.time()
     print(f'[{datetime.now().strftime("%H:%M:%S")}] Processing {i+1}/{total_symbols}: {ticker}...')
 
-    # Load Ticker Specifics
+    # Time: Earnings Load
+    t0 = time.time()
     earnings_path = f'finance/_data/earnings_cleaned/{ticker}.csv'
     if not os.path.exists(earnings_path):
         print(f"  No earnings data for {ticker}, skipping.")
@@ -102,7 +103,10 @@ for i, ticker in enumerate(symbols_to_process):
 
     df_earnings = pd.read_csv(earnings_path)
     df_earnings['date'] = pd.to_datetime(df_earnings['date'], format='%Y-%m-%d')
+    t_earnings = time.time() - t0
 
+    # Time: Swing Data Load (Basic)
+    t0 = time.time()
     swing_data = utils.swing_trading_data.SwingTradingData(ticker, offline=True, metainfo=False)
     if swing_data.empty: 
         print(f"  Swing data empty for {ticker}, skipping.")
@@ -110,19 +114,26 @@ for i, ticker in enumerate(symbols_to_process):
 
     df_day = swing_data.df_day
     df_week = swing_data.df_week
+    t_swing = time.time() - t0
 
+    # Time: Market Cap Load
+    t0 = time.time()
     # Load Market Cap History for Lookups
+    # Note: Creating SwingTradingData again without metainfo=False triggers full DB load if not cached/offline
     swing_data_full = utils.swing_trading_data.SwingTradingData(ticker, offline=True)
     ts_market_cap = swing_data_full.market_cap
+    t_mcap = time.time() - t0
 
     events_map = {}
 
+    # Time: Event Detection
+    t0 = time.time()
     # --- 1. Identify Earnings Events ---
-    for i, earnings_event in df_earnings.iterrows():
+    for i_earn, earnings_event in df_earnings.iterrows():
         # Range Check against announcement date
         if df_day.index.min() > earnings_event.date - timedelta(days=OFFSET_DAYS) or \
            df_day.index.max() < earnings_event.date + timedelta(days=OFFSET_DAYS):
-            print(f"  Date {earnings_event.date.date()} out of range for {ticker}, skipping.")
+            # print(f"  Date {earnings_event.date.date()} out of range for {ticker}, skipping.")
             continue
 
         # Determine Reaction Date
@@ -132,16 +143,16 @@ for i, ticker in enumerate(symbols_to_process):
             print(f"  Could not find nearest date for earnings on {earnings_event.date.date()}, skipping.")
             continue
         idx = idx_arr[0]
-        
+    
         reaction_idx = idx + 1 if earnings_event.when == 'post' else idx
 
         # Boundary Check
         if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
-            print(f"  Earnings reaction index {reaction_idx} out of bounds for {ticker}, skipping.")
+            # print(f"  Earnings reaction index {reaction_idx} out of bounds for {ticker}, skipping.")
             continue
 
         reaction_date = df_day.iloc[reaction_idx].name
-        
+    
         # Store in map (Earnings take priority)
         events_map[reaction_date] = {
             'reaction_idx': reaction_idx,
@@ -157,20 +168,17 @@ for i, ticker in enumerate(symbols_to_process):
     if 'atrp20' in df_day.columns and 'pct' in df_day.columns:
         # Create a mask for the condition
         atrp_condition = (1.5 * df_day['atrp20'] < df_day['pct'].abs())
-        
+    
         # Iterate through breakout dates
         for reaction_date in df_day.index[atrp_condition]:
             # If date already exists as an earnings event, skip (Earnings priority)
             if reaction_date in events_map:
-                # Optional: Log duplicate skip if detailed debugging is needed
-                # print(f"  Skipping ATRP event on {reaction_date.date()} as it overlaps with Earnings.")
                 continue
 
             reaction_idx = df_day.index.get_loc(reaction_date)
 
             # Boundary Check
             if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
-                print(f"  ATRP reaction index {reaction_idx} out of bounds for {ticker}, skipping.")
                 continue
 
             events_map[reaction_date] = {
@@ -183,11 +191,14 @@ for i, ticker in enumerate(symbols_to_process):
             }
 
     if not events_map:
-        print(f"  No valid events found for {ticker}, skipping.")
+        # print(f"  No valid events found for {ticker}, skipping.")
         continue
 
     events_data = []
+    t_detection = time.time() - t0
 
+    # Time: Processing Loop
+    t0 = time.time()
     # --- 3. Unified Processing Loop ---
     # Process events in chronological order
     for reaction_date in sorted(events_map.keys()):
@@ -197,9 +208,9 @@ for i, ticker in enumerate(symbols_to_process):
         # Slice DataFrames
         df_slice_day = df_day.iloc[reaction_idx - OFFSET_DAYS : reaction_idx + OFFSET_DAYS]
         df_tracking_day = df_slice_day[INDICATORS].copy()
-        
+    
         if len(df_tracking_day) < 2 * OFFSET_DAYS or df_slice_day.c.isna().all():
-            print(f"  Insufficient tracking data ({len(df_tracking_day)} rows) for {ticker} at {reaction_date.date()}, skipping.")
+            # print(f"  Insufficient tracking data ({len(df_tracking_day)} rows) for {ticker} at {reaction_date.date()}, skipping.")
             continue
 
         # Normalized close percentage
@@ -211,13 +222,13 @@ for i, ticker in enumerate(symbols_to_process):
         idx_week_offset = OFFSET_WEEKS if idx_week >= OFFSET_WEEKS else idx_week
         idx_start_week = max(0, idx_week - OFFSET_WEEKS)
         idx_end_week = min(len(df_week) - 1, idx_week + OFFSET_WEEKS)
-        
+    
         # Adjust offset if near start/end of data
         effective_week_offset = idx_week - idx_start_week
 
         df_slice_week = df_week.iloc[idx_start_week : idx_end_week]
         df_tracking_week = df_slice_week[INDICATORS].copy()
-        
+    
         if not df_tracking_week.empty:
             ref_c_week = df_tracking_week['c'].iloc[effective_week_offset-1] if effective_week_offset > 0 else df_tracking_week['c'].iloc[0]
             df_tracking_week['cpct'] = (df_tracking_week['c'] - ref_c_week) / ref_c_week * 100
@@ -225,9 +236,9 @@ for i, ticker in enumerate(symbols_to_process):
 
         # SPY Comparison Logic
         if not any(df_spy_day.index == reaction_date):
-            print(f"  No SPY data for {ticker} at {reaction_date.date()}, skipping.")
+            # print(f"  No SPY data for {ticker} at {reaction_date.date()}, skipping.")
             continue
-        
+    
         idx_spy = df_spy_day.index.get_loc(reaction_date)
         spy_ref_val = df_spy_day['c'].iloc[idx_spy - OFFSET_DAYS]
         spy_slice = (df_spy_day['c'].iloc[idx_spy - OFFSET_DAYS : idx_spy + OFFSET_DAYS] - spy_ref_val) / spy_ref_val * 100
@@ -245,10 +256,10 @@ for i, ticker in enumerate(symbols_to_process):
         idx_spy_week = df_spy_week.index.get_indexer([df_week.index[idx_week]], method='nearest')[0]
         spy_week_start = max(0, idx_spy_week - effective_week_offset)
         spy_week_end = min(len(df_spy_week), spy_week_start + len(df_tracking_week))
-        
+    
         spy_ref_week = df_spy_week['c'].iloc[idx_spy_week]
         spy_slice_week = (df_spy_week['c'].iloc[spy_week_start:spy_week_end] - spy_ref_week) / spy_ref_week * 100
-        
+    
         # Handle slight length mismatches in weekly data
         if len(spy_slice_week) == len(df_tracking_week):
              df_tracking_week['w_spy'] = spy_slice_week.values
@@ -263,7 +274,7 @@ for i, ticker in enumerate(symbols_to_process):
         # 2. Unstack to dictionary
         flat_day = {f"{col}{idx}": val for (col, idx), val in df_tracking_day.unstack().items()}
         flat_week = {f"{col}{idx}": val for (col, idx), val in df_tracking_week.unstack().items()}
-        
+    
         # Base Event Data
         event_row = {
             'symbol': ticker,
@@ -290,7 +301,7 @@ for i, ticker in enumerate(symbols_to_process):
         events_data.append(full_row)
 
     if not events_data:
-        print(f"  No valid events processed for {ticker}, skipping.")
+        # print(f"  No valid events processed for {ticker}, skipping.")
         continue
 
     df_ticker_events = pd.DataFrame(events_data)
@@ -318,60 +329,10 @@ for i, ticker in enumerate(symbols_to_process):
     # Save Pickled Data
     ticker_file = f'{data_path}/{ticker}.pkl'
     df_ticker_events.to_pickle(ticker_file)
+    t_process = time.time() - t0
 
-    # --- 3. Plotting (from reprocess.py) ---
-    ticker_plot_path = f'{plot_path}/{ticker}'
-    os.makedirs(ticker_plot_path, exist_ok=True)
-
-    # Plotting offsets
-    PLOT_DAYS = 100
-    PLOT_WEEKS = 50
-
-    for idx_row, (i, row) in enumerate(df_ticker_events.iterrows()):
-        # Event index in daily data
-        idx_day = df_day.index.get_indexer([row.date], method='nearest')[0]
-
-        file_basename = f'{ticker_plot_path}/{row.date.date()}'
-
-        # Dynamic Title
-        mcap_cat = row.get('mcap_class', 'Unknown')
-        perf_str = f"1M: {row['1M_chg']:.1f}% | 3M: {row['3M_chg']:.1f}% | 6M: {row['6M_chg']:.1f}%"
-        if not pd.isna(row['eps']): perf_str += f" | EPS: {row['eps']:.2f}"
-        if not pd.isna(row['eps_est']): perf_str += f" | Est: {row['eps_est']:.2f}"
-
-        full_title = f"{ticker} ({mcap_cat}) - {row.date.date()} | {perf_str}"
-
-        # Daily Plot (Last 100 days, Next 100 days)
-        d_start = max(0, idx_day - PLOT_DAYS)
-        d_end = min(len(df_day), idx_day + PLOT_DAYS + 1)
-        slice_day = df_day.iloc[d_start:d_end]
-
-        utils.plots.export_swing_plot(
-            slice_day,
-            path=f'{file_basename}_D.png',
-            vlines=[row.date],
-            display_range=len(slice_day),
-            width=1920, height=1080,
-            title=full_title
-        )
-
-        # Weekly Plot (Last 50 weeks, Next 50 weeks)
-        idx_week = df_week.index.get_indexer([row.date], method='ffill')[0]
-        w_start = max(0, idx_week - PLOT_WEEKS)
-        w_end = min(len(df_week), idx_week + PLOT_WEEKS + 1)
-        slice_week = df_week.iloc[w_start:w_end]
-
-        # The vline needs to be on the weekly index
-        week_vline_date = df_week.index[idx_week]
-
-        utils.plots.export_swing_plot(
-            slice_week,
-            path=f'{file_basename}_W.png',
-            vlines=[week_vline_date],
-            display_range=len(slice_week),
-            width=1920, height=1080,
-            title=full_title
-        )
+    total_time = time.time() - ticker_start
+    print(f"  [Time] Earnings: {t_earnings:.3f}s, Swing: {t_swing:.3f}s, MCap: {t_mcap:.3f}s, Detect: {t_detection:.3f}s, Process: {t_process:.3f}s | Total: {total_time:.3f}s")
 #%%
 # --- 4. Final Aggregation ---
 print("Aggregating all files...")

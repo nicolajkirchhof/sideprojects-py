@@ -1,4 +1,6 @@
 import os.path
+import time
+import functools
 
 import numpy as np
 import pandas as pd
@@ -13,6 +15,20 @@ db_stocks_connection = create_engine(DB_URL + 'stocks')
 db_options_connection = create_engine(DB_URL + 'options')
 db_earnings_connection = create_engine(DB_URL + 'earnings')
 
+def time_db_call(func):
+    """Decorator to time database function calls."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        duration = time.time() - start_time
+        # Filter out very fast calls to reduce noise if needed, or print all
+        if duration > 0.05: 
+            print(f"  [DB] {func.__name__} took {duration:.4f}s")
+        return result
+    return wrapper
+
+@time_db_call
 def daily_time_range(symbol, start_date=None, end_date=None):
   ohclv_query = """select * from ohlcv where act_symbol = :symbol and date >= :start_date and date <= :end_date"""
   # Example usage with pandas:
@@ -22,6 +38,7 @@ def daily_time_range(symbol, start_date=None, end_date=None):
   df_stk['date'] = pd.to_datetime(df_stk.date)
   df_stk.set_index('date', inplace=True)
 
+@time_db_call
 def symbol_info(symbol):
   query = """select * from symbol where act_symbol = :symbol"""
   df = pd.read_sql(text(query), db_stocks_connection, params={'symbol': symbol})
@@ -30,6 +47,7 @@ def symbol_info(symbol):
   return df.iloc[0]
 
 
+@time_db_call
 def financial_info(symbol):
   if os.path.exists(f'finance/_data/financials/{symbol}.csv'):
     df_financial = pd.read_csv(f'finance/_data/financials/{symbol}.csv', index_col='date', parse_dates=True)
@@ -42,6 +60,7 @@ def financial_info(symbol):
 
 
 #%%
+@time_db_call
 def daily_w_volatility(symbol):
   #%%
   ohclv_query = """select * from ohlcv where act_symbol = :symbol"""
