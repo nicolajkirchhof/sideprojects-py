@@ -84,7 +84,7 @@ df_spy_week = spy_data.df_week
 SKIP = 1
 start_at = 0
 # start_at = len(liquid_symbols)
-start_at = liquid_symbols.index('QID') # Debugging start point
+start_at = liquid_symbols.index('FEED') # Debugging start point
 # ticker = liquid_symbols[start_at]
 
 symbols_to_process = liquid_symbols[start_at::SKIP]
@@ -110,6 +110,10 @@ for i, ticker in enumerate(symbols_to_process):
     # Load Market Cap History for Lookups
     # Note: Creating SwingTradingData again without metainfo=False triggers full DB load if not cached/offline
     swing_data_full = utils.swing_trading_data.SwingTradingData(ticker, offline=True)
+    if swing_data_full.empty:
+        print(f"  No data for {ticker}, skipping.")
+        continue
+
     ts_market_cap = swing_data_full.market_cap
     df_day = swing_data_full.df_day
     df_week = swing_data_full.df_week
