@@ -11,6 +11,7 @@ except ImportError:
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RadioButtons, RangeSlider, Slider, Button
 import matplotlib.gridspec as gridspec
+from matplotlib.ticker import MultipleLocator
 import seaborn as sns
 
 # Configure plot style
@@ -113,6 +114,9 @@ class MomentumEarningsDashboard:
         self.active_ema_col = 'ema20_dist0' # Default Underlying EMA Metric
         self.active_spy_ema_col = 'spy_ema20_dist0' # Default SPY EMA Metric
 
+        # State for tab durations (view limits)
+        self.dur_view = {'Daily': 24, 'Weekly': 8}
+
         # --- Layout Setup ---
         self.fig = plt.figure(figsize=(28, 22))
         self.fig.canvas.manager.set_window_title('Momentum & Earnings Analysis Dashboard')
@@ -134,49 +138,52 @@ class MomentumEarningsDashboard:
         # 19. Mcap
         # 20. Y-Lim
     
-        gs_controls = gridspec.GridSpecFromSubplotSpec(20, 1, subplot_spec=self.gs[0], 
-                                                       height_ratios=[1, 1.2, 1.2, 1.2, 
+        gs_controls = gridspec.GridSpecFromSubplotSpec(21, 1, subplot_spec=self.gs[0], 
+                                                       height_ratios=[0.8, 1, 1.2, 1.2, 1.2, 
                                                                       0.6, 0.6, 0.6, # Momentum (Compact)
                                                                       0.6, 0.6, 0.6, 0.6, 0.6, # EMAs (Compact)
                                                                       0.6, 0.6, 0.6, 0.6, 0.6, # SPY EMAs (Compact)
                                                                       1.2, 1.2, 1],
                                                        hspace=0.4) # Reduced spacing
 
+        # 0. View Tab Switch (Top)
+        gs_tabs = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[0])
+        self.ax_rad_tf = self.fig.add_subplot(gs_tabs[0])
+        self.ax_rad_tf.set_title("View Tab", fontsize=9)
+        self.radio_tf = RadioButtons(self.ax_rad_tf, ('Daily', 'Weekly'), active=0, activecolor='cyan')
+        self.radio_tf.on_clicked(self.toggle_tab)
+
         # 1. Update Button
-        self.ax_btn = self.fig.add_subplot(gs_controls[0])
+        self.ax_btn = self.fig.add_subplot(gs_controls[1])
         self.btn_update = Button(self.ax_btn, 'Update Charts', color='#00a8ff', hovercolor='#0097e6')
         self.btn_update.on_clicked(self.update)
 
         # 2. Abs Move Slider
-        self.ax_slider_move = self.fig.add_subplot(gs_controls[1])
+        self.ax_slider_move = self.fig.add_subplot(gs_controls[2])
         min_m, max_m = 0, 30 # Default cap
         if not self.df.empty:
-            max_m = self.df['event_move_abs'].max()
+            max_m = min(self.df['event_move_abs'].quantile(0.95), 50)
 
-        self.ax_slider_move.set_title(f"Event Move x times ATR20: [{0:.1f}, {max_m:.1f}]", fontsize=9)
-        self.slider_move = RangeSlider(self.ax_slider_move, '', 0, max_m, valinit=(0, max_m*0.5))
+        self.ax_slider_move.set_title(f"Event Move % (Abs): [{0:.1f}, {max_m:.1f}]", fontsize=9)
+        self.slider_move = RangeSlider(self.ax_slider_move, '', 0, max_m, valinit=(0, max_m))
         self.slider_move.on_changed(lambda v: self.ax_slider_move.set_title(f"Event Move % (Abs): [{v[0]:.1f}, {v[1]:.1f}]", fontsize=9))
 
-        # 3. Direction & Timeframe (Shared Row Split)
-        gs_row3 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[2])
+        # 3. Direction (Row Split)
+        gs_row3 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[3])
         self.ax_rad_dir = self.fig.add_subplot(gs_row3[0])
         self.ax_rad_dir.set_title("Direction", fontsize=9)
         self.radio_dir = RadioButtons(self.ax_rad_dir, ('Both', 'Positive', 'Negative'), active=0, activecolor='cyan')
 
-        self.ax_rad_tf = self.fig.add_subplot(gs_row3[1])
-        self.ax_rad_tf.set_title("Chart TF", fontsize=9)
-        self.radio_tf = RadioButtons(self.ax_rad_tf, ('Daily', 'Weekly'), active=0, activecolor='cyan')
-        self.radio_tf.on_clicked(self.change_timeframe)
-
         # 4. Duration Slider
-        self.ax_slider_dur = self.fig.add_subplot(gs_controls[3])
-        self.ax_slider_dur.set_title("Chart Duration", fontsize=9)
+        self.ax_slider_dur = self.fig.add_subplot(gs_controls[4])
+        self.ax_slider_dur.set_title("View Duration", fontsize=9)
         self.slider_dur = Slider(self.ax_slider_dur, '', 1, 24, valinit=24, valstep=1, color='cyan')
+        self.slider_dur.on_changed(self.on_duration_change)
 
         # 5-7. Momentum Filters (All ranges)
         self.mom_sliders = {}
         for i, mom_col in enumerate(['1M_chg', '3M_chg', '6M_chg']):
-            ax = self.fig.add_subplot(gs_controls[4+i])
+            ax = self.fig.add_subplot(gs_controls[5+i])
             self.mom_sliders[mom_col] = self._create_range_slider(ax, mom_col, mom_col, -50, 50, cap_at_quantile=True)
 
         # 8-12. Underlying EMA Filters (All ranges)
@@ -184,18 +191,18 @@ class MomentumEarningsDashboard:
         ema_dists = ['ema10', 'ema20', 'ema50', 'ema100', 'ema200']
         for i, ema_name in enumerate(ema_dists):
             col = f"{ema_name}_dist0"
-            ax = self.fig.add_subplot(gs_controls[7+i])
+            ax = self.fig.add_subplot(gs_controls[8+i])
             self.ema_sliders[col] = self._create_range_slider(ax, col, f"{ema_name} Dist", -20, 20, cap_at_quantile=True)
 
         # 13-17. SPY EMA Filters (All ranges)
         self.spy_ema_sliders = {}
         for i, ema_name in enumerate(ema_dists):
             col = f"spy_{ema_name}_dist0"
-            ax = self.fig.add_subplot(gs_controls[12+i])
+            ax = self.fig.add_subplot(gs_controls[13+i])
             self.spy_ema_sliders[col] = self._create_range_slider(ax, col, f"SPY {ema_name} Dist", -10, 10, cap_at_quantile=True)
 
         # 18. Misc Filters (Earnings / SPY Context)
-        gs_misc = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[17])
+        gs_misc = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[18])
         self.ax_rad_earn = self.fig.add_subplot(gs_misc[0])
         self.ax_rad_earn.set_title("Event Type", fontsize=9)
         self.radio_earn = RadioButtons(self.ax_rad_earn, ('All', 'Earnings Only', 'Non-Earnings'), active=0, activecolor='cyan')
@@ -206,7 +213,7 @@ class MomentumEarningsDashboard:
 
         # 19. Market Cap (Horizontal Selection)
         # We create a nested grid: Title row + Button row
-        gs_mcap_container = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_controls[18], height_ratios=[0.3, 1], hspace=0.1)
+        gs_mcap_container = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_controls[19], height_ratios=[0.3, 1], hspace=0.1)
         
         # Title
         ax_mcap_title = self.fig.add_subplot(gs_mcap_container[0])
@@ -232,7 +239,7 @@ class MomentumEarningsDashboard:
             self.mcap_buttons[mcap] = btn
 
         # 20. Y-Limit Slider for Charts
-        self.ax_slider_ylim = self.fig.add_subplot(gs_controls[19])
+        self.ax_slider_ylim = self.fig.add_subplot(gs_controls[20])
         self.ax_slider_ylim.set_title("Y-Axis Limit %", fontsize=9)
         self.slider_ylim = Slider(self.ax_slider_ylim, '', 10, 200, valinit=50, valstep=5, color='cyan')
 
@@ -240,7 +247,18 @@ class MomentumEarningsDashboard:
         gs_charts = gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=self.gs[1], height_ratios=[2, 2, 1], hspace=0.3)
         self.ax_path = self.fig.add_subplot(gs_charts[0])
         self.ax_violin = self.fig.add_subplot(gs_charts[1])
-        self.ax_probs = self.fig.add_subplot(gs_charts[2])
+        # --- Charts (Right Column) ---
+        gs_charts = gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=self.gs[1], height_ratios=[2, 2, 1], hspace=0.3)
+        
+        # Daily Axes
+        self.ax_d_path = self.fig.add_subplot(gs_charts[0], label='daily_path')
+        self.ax_d_violin = self.fig.add_subplot(gs_charts[1], label='daily_violin')
+        self.ax_d_probs = self.fig.add_subplot(gs_charts[2], label='daily_probs')
+
+        # Weekly Axes (Stacked on same slots)
+        self.ax_w_path = self.fig.add_subplot(gs_charts[0], label='weekly_path', frameon=False)
+        self.ax_w_violin = self.fig.add_subplot(gs_charts[1], label='weekly_violin', frameon=False)
+        self.ax_w_probs = self.fig.add_subplot(gs_charts[2], label='weekly_probs', frameon=False)
 
         # Initial Draw
         self.update(None)
@@ -282,14 +300,44 @@ class MomentumEarningsDashboard:
         slider.on_changed(update_label)
         return slider
 
-    def change_timeframe(self, val):
-        if val == 'Weekly':
-            self.slider_dur.valmax = 8
-            self.slider_dur.set_val(min(self.slider_dur.val, 8))
-            self.slider_dur.ax.set_xlim(1, 8)
-        else:
+    def toggle_tab(self, val):
+        """Switches visibility between Daily and Weekly axes without recalculating."""
+        is_daily = (val == 'Daily')
+        
+        # Toggle Visibility
+        for ax in [self.ax_d_path, self.ax_d_violin, self.ax_d_probs]:
+            ax.set_visible(is_daily)
+        for ax in [self.ax_w_path, self.ax_w_violin, self.ax_w_probs]:
+            ax.set_visible(not is_daily)
+
+        # Update Slider for View
+        if is_daily:
             self.slider_dur.valmax = 24
+            self.slider_dur.set_val(self.dur_view['Daily'])
             self.slider_dur.ax.set_xlim(1, 24)
+        else:
+            self.slider_dur.valmax = 8
+            self.slider_dur.set_val(self.dur_view['Weekly'])
+            self.slider_dur.ax.set_xlim(1, 8)
+        
+        self.fig.canvas.draw_idle()
+
+    def on_duration_change(self, val):
+        """Updates x-limits purely for zoom, no recalc."""
+        tf = self.radio_tf.value_selected
+        self.dur_view[tf] = val # Store state
+        
+        # Apply to active axes
+        if tf == 'Daily':
+            self.ax_d_path.set_xlim(1, val)
+            self.ax_d_violin.set_xlim(1, val)
+            self.ax_d_probs.set_xlim(1, val)
+        else:
+            self.ax_w_path.set_xlim(1, val)
+            self.ax_w_violin.set_xlim(1, val)
+            self.ax_w_probs.set_xlim(1, val)
+        
+        self.fig.canvas.draw_idle()
 
     def get_filtered_data(self):
         mask = pd.Series(True, index=self.df.index)
@@ -339,25 +387,30 @@ class MomentumEarningsDashboard:
     def update(self, val):
         sub_df = self.get_filtered_data()
 
-        self.ax_path.clear()
-        self.ax_violin.clear()
-        self.ax_probs.clear()
+        # Clear all
+        for ax in [self.ax_d_path, self.ax_d_violin, self.ax_d_probs, 
+                   self.ax_w_path, self.ax_w_violin, self.ax_w_probs]:
+            ax.clear()
 
         if sub_df.empty:
-            self.ax_path.text(0.5, 0.5, "No Data Found", ha='center', transform=self.ax_path.transAxes)
+            self.ax_d_path.text(0.5, 0.5, "No Data Found", ha='center', transform=self.ax_d_path.transAxes)
             self.fig.canvas.draw_idle()
             return
 
-        tf = self.radio_tf.value_selected
-        max_dur = int(self.slider_dur.val)
-        
+        # Plot BOTH Timeframes (Full Range)
+        self._plot_metrics(sub_df, 'Daily', [self.ax_d_path, self.ax_d_violin, self.ax_d_probs], 24)
+        self._plot_metrics(sub_df, 'Weekly', [self.ax_w_path, self.ax_w_violin, self.ax_w_probs], 8)
+
+        # Enforce visibility and zoom state
+        self.toggle_tab(self.radio_tf.value_selected)
+
+    def _plot_metrics(self, sub_df, tf, axes, max_dur):
+        ax_path, ax_violin, ax_probs = axes
+
         # Determine columns to plot
         if tf == 'Daily':
             prefix = 'aligned_cpct'
             xlabel = "Days After Event"
-            # EMA support cols (using close > ema10/20 at future dates)
-            # NOTE: We assume 'emaXX_distY' means distance at time Y. 
-            # If dist > 0, price > EMA.
             ema10_gen = lambda i: f'ema10_dist{i}'
             ema20_gen = lambda i: f'ema20_dist{i}'
             ema50_gen = lambda i: f'ema50_dist{i}'
@@ -382,60 +435,55 @@ class MomentumEarningsDashboard:
             mean_path = path_data.mean()
             std_path = path_data.std()
 
-            self.ax_path.plot(periods, mean_path, color='cyan', linewidth=2, label='Mean Trajectory')
-            self.ax_path.fill_between(periods, mean_path - std_path, mean_path + std_path, color='cyan', alpha=0.15, label='1 Std Dev')
-            self.ax_path.axhline(0, color='white', linestyle='--', alpha=0.5)
+            ax_path.plot(periods, mean_path, color='cyan', linewidth=2, label='Mean Trajectory')
+            ax_path.fill_between(periods, mean_path - std_path, mean_path + std_path, color='cyan', alpha=0.15, label='1 Std Dev')
+            ax_path.axhline(0, color='white', linestyle='--', alpha=0.5)
 
             title_str = f"Aligned Trajectory (N={len(sub_df)}) | Positive = Continuation"
-            self.ax_path.set_title(title_str)
-            self.ax_path.set_ylabel("% Change from Event")
-            self.ax_path.legend(loc='upper left')
-            self.ax_path.grid(True, alpha=0.2)
-            self.ax_path.set_xticks(periods)
-            
+            ax_path.set_title(title_str)
+            ax_path.set_ylabel("% Change from Event")
+            ax_path.legend(loc='upper left')
+            ax_path.grid(True, alpha=0.2)
+            ax_path.set_xticks(periods)
+            ax_path.xaxis.set_major_locator(MultipleLocator(1))
+        
             # Use Y-Limit Slider
             yl = self.slider_ylim.val
-            self.ax_path.set_ylim(-yl, yl)
+            ax_path.set_ylim(-yl, yl)
 
         # --- 2. Violin Chart ---
         if path_cols:
             violin_data = [sub_df[c].dropna().values for c in path_cols]
             # Handle cases where some days might be empty after dropna
             if violin_data and all(len(d) > 0 for d in violin_data):
-                parts = self.ax_violin.violinplot(violin_data, positions=periods, showmeans=False, showmedians=True, showextrema=False)
+                parts = ax_violin.violinplot(violin_data, positions=periods, showmeans=False, showmedians=True, showextrema=False)
                 
                 for pc in parts['bodies']:
                     pc.set_facecolor('#48dbfb')
                     pc.set_edgecolor('white')
                     pc.set_alpha(0.5)
                 parts['cmedians'].set_color('white')
-            
-                self.ax_violin.set_ylim(-self.slider_ylim.val, self.slider_ylim.val)
-                self.ax_violin.axhline(0, color='white', linestyle='--', alpha=0.5)
-                self.ax_violin.set_title(f"Distribution of Changes ({tf})")
-                self.ax_violin.set_xticks(periods)
-                self.ax_violin.grid(True, alpha=0.2)
+        
+                ax_violin.set_ylim(-self.slider_ylim.val, self.slider_ylim.val)
+                ax_violin.axhline(0, color='white', linestyle='--', alpha=0.5)
+                ax_violin.set_title(f"Distribution of Changes ({tf})")
+                ax_violin.set_xticks(periods)
+                ax_violin.xaxis.set_major_locator(MultipleLocator(1))
+                ax_violin.grid(True, alpha=0.2)
             else:
-                 self.ax_violin.text(0.5, 0.5, "Insufficient Data for Violins", ha='center', transform=self.ax_violin.transAxes)
+                 ax_violin.text(0.5, 0.5, "Insufficient Data for Violins", ha='center', transform=ax_violin.transAxes)
 
         # --- 3. Probability Chart (Holding Levels) ---
         def get_survival_prob(col_gen_func, comparison_val=0):
             curve = []
-            # Start assuming all valid
             current_idx = sub_df.index
-            
+        
             for i in periods:
                 col = col_gen_func(i)
-                # Check column existence first
                 if col not in sub_df.columns:
                     curve.append(np.nan)
                     continue
-                
-                # We calculate probability of being > comparison at this specific step
-                # Note: This is "Point-in-time" probability, not "Survival" (cumulative)
-                # If we want cumulative (has NEVER broken), we need to maintain a mask.
-                # Let's do Point-in-time % > 0 (or EMA)
-                
+            
                 valid = sub_df.loc[current_idx, col].dropna()
                 if valid.empty:
                     curve.append(np.nan)
@@ -446,24 +494,25 @@ class MomentumEarningsDashboard:
 
         # For "Breakout Hold", we check if aligned change > 0
         y_bk = get_survival_prob(lambda i: f'{prefix}{i}', 0)
-        
+    
         # For EMAs, we check if dist > 0
         y_ema10 = get_survival_prob(ema10_gen, 0)
         y_ema20 = get_survival_prob(ema20_gen, 0)
         y_ema50 = get_survival_prob(ema50_gen, 0)
 
-        self.ax_probs.plot(periods, y_bk, color='#ff6b6b', label='> Entry', linewidth=2, marker='o', markersize=4)
-        self.ax_probs.plot(periods, y_ema10, color='#feca57', label='> EMA10', linewidth=2, marker='o', markersize=4)
-        self.ax_probs.plot(periods, y_ema20, color='#48dbfb', label='> EMA20', linewidth=2, marker='o', markersize=4)
-        self.ax_probs.plot(periods, y_ema50, color='#1dd1a1', label='> EMA50', linewidth=2, marker='o', markersize=4)
+        ax_probs.plot(periods, y_bk, color='#ff6b6b', label='> Entry', linewidth=2, marker='o', markersize=4)
+        ax_probs.plot(periods, y_ema10, color='#feca57', label='> EMA10', linewidth=2, marker='o', markersize=4)
+        ax_probs.plot(periods, y_ema20, color='#48dbfb', label='> EMA20', linewidth=2, marker='o', markersize=4)
+        ax_probs.plot(periods, y_ema50, color='#1dd1a1', label='> EMA50', linewidth=2, marker='o', markersize=4)
 
-        self.ax_probs.set_ylim(0, 105)
-        self.ax_probs.set_ylabel("Prob. (%)")
-        self.ax_probs.set_title(f"Probability of Holding Levels ({tf})")
-        self.ax_probs.set_xlabel(xlabel)
-        self.ax_probs.legend(loc='lower left', fontsize=8, ncol=3)
-        self.ax_probs.grid(True, alpha=0.2)
-        self.ax_probs.set_xticks(periods)
+        ax_probs.set_ylim(0, 105)
+        ax_probs.set_ylabel("Prob. (%)")
+        ax_probs.set_title(f"Probability of Holding Levels ({tf})")
+        ax_probs.set_xlabel(xlabel)
+        ax_probs.legend(loc='lower left', fontsize=8, ncol=4)
+        ax_probs.grid(True, alpha=0.2)
+        ax_probs.set_xticks(periods)
+        ax_probs.xaxis.set_major_locator(MultipleLocator(1))
 
         self.fig.canvas.draw_idle()
 
