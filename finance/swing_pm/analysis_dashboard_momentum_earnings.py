@@ -38,11 +38,9 @@ def load_and_prep_data():
 
     # 2. Define "Strength" of the move
     # We use the Close % Change on the event day (cpct0) relative to day -1
-    # If not available, fallback to gappct
-    if 'cpct0' in df.columns:
-        df['event_move'] = df['cpct0']
-    elif 'gappct' in df.columns:
-        df['event_move'] = df['gappct']
+    # User requested: change the x atr, which is the cpct0 / atrp20
+    if 'cpct0' in df.columns and 'atrp200' in df.columns:
+        df['event_move'] = df['cpct0'] / df['atrp200']
     else:
         df['event_move'] = 0.0
 
@@ -153,10 +151,10 @@ class MomentumEarningsDashboard:
         self.ax_slider_move = self.fig.add_subplot(gs_controls[1])
         min_m, max_m = 0, 30 # Default cap
         if not self.df.empty:
-            max_m = min(self.df['event_move_abs'].quantile(0.95), 50)
+            max_m = self.df['event_move_abs'].max()
 
-        self.ax_slider_move.set_title(f"Event Move % (Abs): [{0:.1f}, {max_m:.1f}]", fontsize=9)
-        self.slider_move = RangeSlider(self.ax_slider_move, '', 0, max_m, valinit=(0, max_m))
+        self.ax_slider_move.set_title(f"Event Move x times ATR20: [{0:.1f}, {max_m:.1f}]", fontsize=9)
+        self.slider_move = RangeSlider(self.ax_slider_move, '', 0, max_m, valinit=(0, max_m*0.5))
         self.slider_move.on_changed(lambda v: self.ax_slider_move.set_title(f"Event Move % (Abs): [{v[0]:.1f}, {v[1]:.1f}]", fontsize=9))
 
         # 3. Direction & Timeframe (Shared Row Split)
@@ -252,6 +250,7 @@ class MomentumEarningsDashboard:
         self.mcap_selected = val
         for m, btn in self.mcap_buttons.items():
             c = '#00a8ff' if m == val else 'black'
+            btn.color = c
             btn.ax.set_facecolor(c)
             # Force redraw of the button area
             btn.ax.figure.canvas.draw_idle()
@@ -361,11 +360,13 @@ class MomentumEarningsDashboard:
             # If dist > 0, price > EMA.
             ema10_gen = lambda i: f'ema10_dist{i}'
             ema20_gen = lambda i: f'ema20_dist{i}'
+            ema50_gen = lambda i: f'ema50_dist{i}'
         else: # Weekly
             prefix = 'aligned_w_cpct'
             xlabel = "Weeks After Event"
             ema10_gen = lambda i: f'w_ema10_dist{i}'
             ema20_gen = lambda i: f'w_ema20_dist{i}'
+            ema50_gen = lambda i: f'w_ema50_dist{i}'
 
         periods = []
         for i in range(1, max_dur + 1):
@@ -449,10 +450,12 @@ class MomentumEarningsDashboard:
         # For EMAs, we check if dist > 0
         y_ema10 = get_survival_prob(ema10_gen, 0)
         y_ema20 = get_survival_prob(ema20_gen, 0)
+        y_ema50 = get_survival_prob(ema50_gen, 0)
 
         self.ax_probs.plot(periods, y_bk, color='#ff6b6b', label='> Entry', linewidth=2, marker='o', markersize=4)
         self.ax_probs.plot(periods, y_ema10, color='#feca57', label='> EMA10', linewidth=2, marker='o', markersize=4)
         self.ax_probs.plot(periods, y_ema20, color='#48dbfb', label='> EMA20', linewidth=2, marker='o', markersize=4)
+        self.ax_probs.plot(periods, y_ema50, color='#1dd1a1', label='> EMA50', linewidth=2, marker='o', markersize=4)
 
         self.ax_probs.set_ylim(0, 105)
         self.ax_probs.set_ylabel("Prob. (%)")
