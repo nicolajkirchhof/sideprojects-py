@@ -781,7 +781,7 @@ def _add_plot_content(plots, df, vlines):
 
 
 # %% Main Functions
-def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, height=1080, title=None):
+def export(df, path, vlines=None, display_range=50, width=1920, height=1080, title=None):
     """High-speed version using a persistent hidden window context."""
     global _GLOBAL_QT_APP
     win, plots, title_item = _get_export_context(width, height)
@@ -813,7 +813,7 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
 
     _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
-def interactive_swing_plot(full_df, display_range=250, title: str | None = None):
+def interactive(full_df, display_range=250, title: str | None = None):
     """Full-featured interactive version with Toolbar, Crosshairs, and dynamic scaling."""
     global _GLOBAL_QT_APP, _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET, _ACTIVE_PLOTS
 

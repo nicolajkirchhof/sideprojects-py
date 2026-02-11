@@ -1,12 +1,10 @@
 import os
 import time
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
 import finance.utils as utils
 
-# def create_plots(override=False):
 override = False
 #%%
 # Setup Paths
@@ -27,7 +25,8 @@ total_files = len(files)
 
 print(f"Found {total_files} data files to process.")
 
-start_at = files.index('BNS.pkl')
+start_at = 0
+# start_at = files.index('BNS.pkl')
 # Plotting offsets
 PLOT_DAYS = 100
 PLOT_WEEKS = 50
@@ -93,7 +92,7 @@ for i, filename in enumerate(files[start_at:]):
             d_end = min(len(df_day), idx_day + PLOT_DAYS + 1)
             slice_day = df_day.iloc[d_start:d_end]
 
-            utils.plots.export_swing_plot(
+            utils.swing_plot.export(
                 slice_day,
                 path=f'{file_basename}_D.png',
                 vlines=[row.date],
@@ -115,7 +114,7 @@ for i, filename in enumerate(files[start_at:]):
             # The vline needs to be on the weekly index
             week_vline_date = df_week.index[idx_week]
 
-            utils.plots.export_swing_plot(
+            utils.swing_plot.export(
                 slice_week,
                 path=f'{file_basename}_W.png',
                 vlines=[week_vline_date],
