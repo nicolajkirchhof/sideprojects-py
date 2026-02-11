@@ -7,6 +7,7 @@ from . import exchanges
 from . import options
 from . import indicators
 from . import plots
+from . import swing_plot
 from . import fitlog
 from . import geometry
 from . import trading_day_data

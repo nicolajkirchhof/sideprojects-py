@@ -81,8 +81,8 @@ df_spy_week = spy_data.df_week
 #%%
 # Iteration Settings
 # SKIP = 100
-SKIP = -1
-# start_at = 0
+SKIP = 1
+start_at = 0
 # start_at = len(liquid_symbols)
 # start_at = liquid_symbols.index('UHA.B') # Debugging start point
 # ticker = liquid_symbols[start_at]

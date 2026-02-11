@@ -20,7 +20,7 @@ import pyqtgraph.exporters
 from finance.utils.trading_day_data import TradingDayData
 
 # Reusing your configurations for visual consistency
-EMA_CONFIGS = {'ema10': '#f5deb3', 'ema20': '#e2b46d', 'ema50': '#c68e17', 'vwap3': '#00bfff'} #'ema100': '#8b5a2b', 'ema200': '#4b3621',
+EMA_CONFIGS = {'ema5': '#f5deb3', 'ema10': '#f5deb3', 'ema20': '#e2b46d', 'ema50': '#c68e17', 'vwap3': '#00bfff'} #'ema100': '#8b5a2b', 'ema200': '#4b3621',
 ATR_CONFIGS = {'atrp9': '#b0c4de', 'atrp14': '#4682b4', 'atrp20': '#000080'}
 AC_CONFIGS = {'ac100_lag_1': '#e0ffff', 'ac100_lag_5': '#00ced1', 'ac100_lag_10': '#00bfff', 'ac100_lag_20': '#008080'}
 AC_REGIME_CONFIGS = {'ac_mom': '#e1bee7', 'ac_mr': '#ba68c8', 'ac_comp': '#4a148c'}
@@ -465,6 +465,7 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
 
 #%% # Global Plot Configurations
 EMA_CONFIGS = {
+  'ema5':  {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}, # Wheat (Lightest)
   'ema10':  {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}, # Wheat (Lightest)
   'ema20':  {'color': '#b26529', 'width': 2.0, 'style': QtCore.Qt.PenStyle.SolidLine},
   'ema50':  {'color': '#7b4326', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
@@ -1041,54 +1042,70 @@ def interactive_swing_plot(full_df, display_range=250, title: str | None = None)
     QtCore.QCoreApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     _GLOBAL_QT_APP = pg.mkQApp()
 
-  if _GLOBAL_MAIN_WIN is None:
-    _GLOBAL_MAIN_WIN = QtWidgets.QMainWindow()
-    central_widget = QtWidgets.QWidget()
-    _GLOBAL_MAIN_WIN.setCentralWidget(central_widget)
-    main_layout = QtWidgets.QVBoxLayout(central_widget)
+    if _GLOBAL_MAIN_WIN is None:
+      _GLOBAL_MAIN_WIN = QtWidgets.QMainWindow()
+      central_widget = QtWidgets.QWidget()
+      _GLOBAL_MAIN_WIN.setCentralWidget(central_widget)
+      main_layout = QtWidgets.QVBoxLayout(central_widget)
 
-    toolbar = QtWidgets.QHBoxLayout()
-    year_cb, month_cb, day_cb = QtWidgets.QComboBox(), QtWidgets.QComboBox(), QtWidgets.QComboBox()
-    toolbar.addWidget(QtWidgets.QLabel("Max Date Filter:"))
-    for cb in [year_cb, month_cb, day_cb]: toolbar.addWidget(cb)
-    toolbar.addStretch()
-    main_layout.addLayout(toolbar)
+      toolbar = QtWidgets.QHBoxLayout()
+      year_cb, month_cb, day_cb = QtWidgets.QComboBox(), QtWidgets.QComboBox(), QtWidgets.QComboBox()
+      toolbar.addWidget(QtWidgets.QLabel("Max Date Filter:"))
+      for cb in [year_cb, month_cb, day_cb]: toolbar.addWidget(cb)
+      toolbar.addStretch()
+      main_layout.addLayout(toolbar)
 
-    _GLOBAL_LAYOUT_WIDGET = pg.GraphicsLayoutWidget()
-    main_layout.addWidget(_GLOBAL_LAYOUT_WIDGET)
+      _GLOBAL_LAYOUT_WIDGET = pg.GraphicsLayoutWidget()
+      main_layout.addWidget(_GLOBAL_LAYOUT_WIDGET)
 
-    # Prevent "min-size" starts
-    _GLOBAL_MAIN_WIN.setMinimumSize(1200, 700)
-    _GLOBAL_MAIN_WIN.resize(1600, 900)
+      # Prevent "min-size" starts
+      _GLOBAL_MAIN_WIN.setMinimumSize(1200, 700)
+      _GLOBAL_MAIN_WIN.resize(1600, 900)
 
-    _GLOBAL_MAIN_WIN._year_cb, _GLOBAL_MAIN_WIN._month_cb, _GLOBAL_MAIN_WIN._day_cb = year_cb, month_cb, day_cb
+      _GLOBAL_MAIN_WIN._year_cb, _GLOBAL_MAIN_WIN._month_cb, _GLOBAL_MAIN_WIN._day_cb = year_cb, month_cb, day_cb
+      _GLOBAL_MAIN_WIN._proxy = None
 
-  main_win, win = _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET
-  year_cb, month_cb, day_cb = main_win._year_cb, main_win._month_cb, main_win._day_cb
-  state = {
-    'proxy': None,
-    'df': None,
-    'x_dates': None,
-    'hover_label': None,
-    'v_lines': None,
-    'h_lines': None,
-  }
-  plots = []
+    main_win, win = _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET
+    year_cb, month_cb, day_cb = main_win._year_cb, main_win._month_cb, main_win._day_cb
 
-  def _finite_min_max(values):
-    """Return (mn, mx) from finite values or (None, None) if none exist."""
-    arr = np.asarray(values, dtype=float)
-    arr = arr[np.isfinite(arr)]
-    if arr.size == 0:
-      return None, None
-    mn = float(np.min(arr))
-    mx = float(np.max(arr))
-    if mn == mx:
-      # Avoid zero-height range; expand a tiny bit (relative if possible)
-      eps = abs(mn) * 1e-6 + 1e-12
-      mn -= eps
-      mx += eps
-    return mn, mx
+    # Prevent signal duplication on re-entry
+    try: year_cb.currentIndexChanged.disconnect()
+    except: pass
+    try: month_cb.currentIndexChanged.disconnect()
+    except: pass
+    try: day_cb.currentIndexChanged.disconnect()
+    except: pass
+
+    # Prevent ghost hover events from previous runs
+    if getattr(main_win, '_proxy', None):
+      try: main_win._proxy.disconnect()
+      except: pass
+      main_win._proxy = None
+
+    state = {
+      'proxy': None,
+      'df': None,
+      'x_dates': None,
+      'hover_label': None,
+      'v_lines': None,
+      'h_lines': None,
+    }
+    plots = []
+
+    def _finite_min_max(values):
+      """Return (mn, mx) from finite values or (None, None) if none exist."""
+      arr = np.asarray(values, dtype=float)
+      arr = arr[np.isfinite(arr)]
+      if arr.size == 0:
+        return None, None
+      mn = float(np.min(arr))
+      mx = float(np.max(arr))
+      if mn == mx:
+        # Avoid zero-height range; expand a tiny bit (relative if possible)
+        eps = abs(mn) * 1e-6 + 1e-12
+        mn -= eps
+        mx += eps
+      return mn, mx
 
   def update_y_views():
     if state['df'] is None or not plots:
@@ -1285,10 +1302,11 @@ def interactive_swing_plot(full_df, display_range=250, title: str | None = None)
             )
 
 
-    state['proxy'] = pg.SignalProxy(plots[0].scene().sigMouseMoved, rateLimit=60, slot=update_hover)
-    plots[0].sigXRangeChanged.connect(update_y_views)
-    plots[0].setXRange(max(0, len(df) - display_range), len(df))
-    update_y_views()
+      state['proxy'] = pg.SignalProxy(plots[0].scene().sigMouseMoved, rateLimit=60, slot=update_hover)
+      main_win._proxy = state['proxy']
+      plots[0].sigXRangeChanged.connect(update_y_views)
+      plots[0].setXRange(max(0, len(df) - display_range), len(df))
+      update_y_views()
 
   # Initial UI Setup
   year_cb.blockSignals(True); month_cb.blockSignals(True); day_cb.blockSignals(True)
