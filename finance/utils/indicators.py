@@ -287,6 +287,11 @@ def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
   df_stk['vwap3'] = (df_stk['c']+df_stk['h']+df_stk['l'])/3
   if 'iv' not in df_stk.columns:
     df_stk['iv'] = np.nan
+  elif not df_stk['iv'].isna().all():
+    df_stk['iv_pct'] = df_stk['iv'].rolling(window=252).apply(
+      lambda x: (x < x[-1]).sum() / len(x) * 100 if len(x) > 0 else np.nan,
+      raw=True
+    )
 
   # RVOL Calculation (Relative Volume)
   # 20-day is standard for swing trading
@@ -294,30 +299,30 @@ def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
     df_stk[f'v{vol}'] = df_stk['v'].rolling(window=vol).mean()
     df_stk[f'rvol{vol}'] = df_stk['v'] / df_stk[f'v{vol}']
 
-  # 2. Multi-Lag Autocorrelations (Legs)
-  # Lag 1: Daily momentum/mean-reversion
-  # Lag 5: Weekly cycle persistence
-  # Lag 21: Monthly cycle (Institutional window)
-  for window in [100]:
-    for lag in [1, 5, 10, 20]:
-      df_stk[f'ac{window}_lag_{lag}'] = rolling_autocorr(df_stk['c'], window=window, lag=lag)
-
-  # --- Implementation on a DataFrame 'df' ---
-  # 1. Standard Momentum (20-day, Lag-1)
-  # Use this to confirm trend persistence.
-  df_stk['ac_mom'] = rolling_autocorr(df_stk['c'], window=20, lag=1)
-
-  # 2. Short-Term Mean Reversion (10-day, Lag-1)
-  # Look for values < -0.2 for "snap-back" opportunities.
-  df_stk['ac_mr'] = rolling_autocorr(df_stk['c'], window=10, lag=1)
-
-  # # 3. Institutional "Hidden" Momentum (60-day, Lag-5)
-  # # If this is higher than Lag-1, institutions are likely accumulating.
-  df_stk['ac_inst'] = rolling_autocorr(df_stk['c'], window=50, lag=5)
-
-  # 4. Composite Swing Signal (20-day, Avg Lags 1-3)
-  # Best for general trend-following filters.
-  df_stk['ac_comp'] = get_composite_autocorr(df_stk['c'], window=20, max_lag=3)
+  # # 2. Multi-Lag Autocorrelations (Legs)
+  # # Lag 1: Daily momentum/mean-reversion
+  # # Lag 5: Weekly cycle persistence
+  # # Lag 21: Monthly cycle (Institutional window)
+  # for window in [100]:
+  #   for lag in [1, 5, 10, 20]:
+  #     df_stk[f'ac{window}_lag_{lag}'] = rolling_autocorr(df_stk['c'], window=window, lag=lag)
+  #
+  # # --- Implementation on a DataFrame 'df' ---
+  # # 1. Standard Momentum (20-day, Lag-1)
+  # # Use this to confirm trend persistence.
+  # df_stk['ac_mom'] = rolling_autocorr(df_stk['c'], window=20, lag=1)
+  #
+  # # 2. Short-Term Mean Reversion (10-day, Lag-1)
+  # # Look for values < -0.2 for "snap-back" opportunities.
+  # df_stk['ac_mr'] = rolling_autocorr(df_stk['c'], window=10, lag=1)
+  #
+  # # # 3. Institutional "Hidden" Momentum (60-day, Lag-5)
+  # # # If this is higher than Lag-1, institutions are likely accumulating.
+  # df_stk['ac_inst'] = rolling_autocorr(df_stk['c'], window=50, lag=5)
+  #
+  # # 4. Composite Swing Signal (20-day, Avg Lags 1-3)
+  # # Best for general trend-following filters.
+  # df_stk['ac_comp'] = get_composite_autocorr(df_stk['c'], window=20, max_lag=3)
 
   # Historic Volatility (Annualized)
   # Standard formula: std(log_returns) * sqrt(252)

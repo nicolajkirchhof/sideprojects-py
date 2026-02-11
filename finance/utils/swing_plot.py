@@ -84,6 +84,12 @@ IVPCT_CONFIGS = {
     'iv_pct': {'color': '#b72494', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Green
 }
 
+BB_CONFIGS = {
+    'bb_upper': {'color': '#9075d6', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DotLine},
+    'bb_lower': {'color': '#00aaab', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DotLine}
+}
+
+
 # TTM Squeeze Colors
 TTM_COLORS = {
     'pos_up': '#00ff00',  # Bright Green (Bullish rising)
@@ -248,6 +254,56 @@ def _finite_min_max(values):
         mx += eps
     return mn, mx
 
+def _auto_scale_panes(plots, df, x_min, x_max):
+    """
+    Auto-scale Y-axes for all plots based on the data visible in [x_min, x_max].
+    Shared logic between interactive and export modes.
+    """
+    if not plots:
+        return
+
+    s, e = max(0, int(x_min)), min(len(df), int(x_max))
+    if s >= e:
+        return
+
+    chunk = df.iloc[s:e]
+    p1 = plots[0]
+
+    # --- Main OHLC pane scaling (guard against all-NaN) ---
+    mn, mx = _finite_min_max(np.r_[chunk.get('l', pd.Series(dtype=float)).to_numpy(),
+    chunk.get('h', pd.Series(dtype=float)).to_numpy()])
+    if mn is not None:
+        p1.setYRange(mn * 0.99, mx * 1.01, padding=0)
+
+    # --- Re-scale indicator panes based on view (guard against all-NaN) ---
+    scale_map = [
+        (plots[1], VOL_CONFIGS),
+        (plots[2], DIST_CONFIGS),
+        (plots[3], ATR_CONFIGS),
+        (plots[4], HV_CONFIGS),
+        (plots[5], IVPCT_CONFIGS),
+        (plots[6], ['ttm_mom'])
+    ]
+
+    for p, cfg in scale_map:
+        cols = list(cfg.keys()) if isinstance(cfg, dict) else cfg
+        valid_cols = [c for c in cols if c in df.columns]
+        if not valid_cols:
+            continue
+
+        c_data = chunk[valid_cols]
+
+        # For volume pane, keep the same units you plot (thousands)
+        if p == plots[1]:
+            c_data = c_data / 1000.0
+
+        mn2, mx2 = _finite_min_max(c_data.to_numpy().ravel())
+        if mn2 is None:
+            continue
+
+        # Give a little breathing room
+        p.setYRange(mn2 * 0.9, mx2 * 1.1, padding=0)
+
 
 def _setup_plot_panes(win, x_dates, row_offset=0):
     """Internal helper to create the standard 7-pane layout."""
@@ -391,6 +447,7 @@ def _get_export_context(width, height):
         export_state = {
             'ohlc': ohlc_item,
             'ema': _mk_series_items(p1, EMA_CONFIGS),
+            'bb': _mk_series_items(p1, BB_CONFIGS),  # Add Bollinger Bands
             'vol': _mk_series_items(p7, VOL_CONFIGS),
             'dist': _mk_series_items(p3, DIST_CONFIGS),
             'atr': _mk_series_items(p4, ATR_CONFIGS),
@@ -447,6 +504,7 @@ def _update_export_content(plots, df, vlines):
                 item.hide()
 
     _set_group(export_state['ema'])
+    _set_group(export_state['bb'])  # Update BB
     _set_group(export_state['vol'], transform=lambda y: y / 1000.0)
     _set_group(export_state['dist'])
     _set_group(export_state['atr'])
@@ -518,6 +576,10 @@ def _add_plot_content(plots, df, vlines):
     p1.addItem(OHLCItem([(i, df.o.iloc[i], df.h.iloc[i], df.l.iloc[i], df.c.iloc[i]) for i in x_range]))
 
     for col, cfg in EMA_CONFIGS.items():
+        if col in df.columns:
+            p1.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
+
+    for col, cfg in BB_CONFIGS.items():
         if col in df.columns:
             p1.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
 
@@ -598,19 +660,12 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
 
     # 3. Set view range and scale Y
     p1 = plots[0]
-    p1.setXRange(max(0, len(df) - display_range), len(df))
+    x_start = max(0, len(df) - display_range)
+    x_end = len(df)
+    p1.setXRange(x_start, x_end)
 
-    vr = p1.viewRange()[0]
-    s, e = max(0, int(vr[0])), min(len(df), int(vr[1]))
-    if s < e:
-        chunk = df.iloc[s:e]
-
-        l = chunk['l'].to_numpy(dtype=float) if 'l' in chunk.columns else np.array([], dtype=float)
-        h = chunk['h'].to_numpy(dtype=float) if 'h' in chunk.columns else np.array([], dtype=float)
-
-        mn, mx = _finite_min_max(np.r_[l, h])
-        if mn is not None:
-            p1.setYRange(mn * 0.99, mx * 1.01, padding=0)
+    # Use shared scaling logic
+    _auto_scale_panes(plots, df, x_start, x_end)
 
     # 4. Fast export-only sync
     _force_export_layout_sync(win, width, height)
@@ -622,7 +677,6 @@ def export_swing_plot(df, path, vlines=None, display_range=50, width=1920, heigh
     exporter.export(path)
 
     _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
-
 
 def interactive_swing_plot(full_df, display_range=250, title: str | None = None):
     """Full-featured interactive version with Toolbar, Crosshairs, and dynamic scaling."""
@@ -695,46 +749,8 @@ def interactive_swing_plot(full_df, display_range=250, title: str | None = None)
             return
         p1 = plots[0]
         vr = p1.viewRange()[0]
-        s, e = max(0, int(vr[0])), min(len(state['df']), int(vr[1]))
-        if s >= e:
-            return
-
-        chunk = state['df'].iloc[s:e]
-
-        # --- Main OHLC pane scaling (guard against all-NaN) ---
-        mn, mx = _finite_min_max(np.r_[chunk.get('l', pd.Series(dtype=float)).to_numpy(),
-        chunk.get('h', pd.Series(dtype=float)).to_numpy()])
-        if mn is not None:
-            p1.setYRange(mn * 0.99, mx * 1.01, padding=0)
-
-        # --- Re-scale indicator panes based on view (guard against all-NaN) ---
-        scale_map = [
-            (plots[1], VOL_CONFIGS),
-            (plots[2], DIST_CONFIGS),
-            (plots[3], ATR_CONFIGS),
-            (plots[4], HV_CONFIGS),
-            (plots[5], IVPCT_CONFIGS),
-            (plots[6], ['ttm_mom'])
-        ]
-
-        for p, cfg in scale_map:
-            cols = list(cfg.keys()) if isinstance(cfg, dict) else cfg
-            valid_cols = [c for c in cols if c in state['df'].columns]
-            if not valid_cols:
-                continue
-
-            c_data = chunk[valid_cols]
-
-            # For volume pane, keep the same units you plot (thousands)
-            if p == plots[1]:
-                c_data = c_data / 1000.0
-
-            mn2, mx2 = _finite_min_max(c_data.to_numpy().ravel())
-            if mn2 is None:
-                continue
-
-            # Give a little breathing room
-            p.setYRange(mn2 * 0.9, mx2 * 1.1, padding=0)
+        # Use shared scaling logic
+        _auto_scale_panes(plots, state['df'], vr[0], vr[1])
 
     def update_plot(*args):
         global _ACTIVE_PLOTS
@@ -769,7 +785,7 @@ def interactive_swing_plot(full_df, display_range=250, title: str | None = None)
         v_lines, h_lines = [], []
         # Discrete grey pen with alpha: #808080 (grey) with alpha 100 (out of 255)
         crosshair_pen = pg.mkPen(color=(128, 128, 128, 100), width=1, style=QtCore.Qt.PenStyle.DashLine)
-        
+
         for p in plots:
             v = pg.InfiniteLine(angle=90, movable=False, pen=crosshair_pen)
             h = pg.InfiniteLine(angle=0, movable=False, pen=crosshair_pen)
