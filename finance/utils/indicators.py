@@ -337,7 +337,7 @@ def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
     df_stk[f'atr{atr}'] = tr.ewm(alpha=1/atr, adjust=False).mean()
     df_stk[f'atrp{atr}'] = (df_stk[f'atr{atr}'] / df_stk['c']) * 100
 
-  for ema in [10, 20, 50, 100, 200]:
+  for ema in [5, 10, 20, 50, 100, 200]:
     df_stk[f'ema{ema}'] = df_stk['vwap3'].ewm(span=ema, adjust=False).mean()
     df_stk[f'ema{ema}_slope'] = df_stk[f'ema{ema}'].diff()
     df_stk[f'ema{ema}_dist'] = ((df_stk['c'] - df_stk[f'ema{ema}']) / df_stk[f'ema{ema}']) * 100

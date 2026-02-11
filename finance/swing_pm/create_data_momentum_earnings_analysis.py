@@ -10,8 +10,8 @@ import finance.utils as utils
 
 # Constants from momentum.py
 INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp14', 'atrp20', 'atrp50', 'pct', 'rvol50', 'std_mv', 'iv', 'hv9', 'hv14', 'hv20',
-              'ema100_dist', 'ema50_dist', 'ema100_dist', 'ema200_dist', 'ema20_dist', 'ema10_dist',
-              'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
+              'ema200_dist', 'ema100_dist', 'ema50_dist', 'ema20_dist', 'ema10_dist', 'ema5_dist',
+              'ema5_slope', 'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
 SPY_INDICATORS = ['hv9', 'hv14', 'hv20', 
                   'ema10_dist', 'ema20_dist', 'ema50_dist', 'ema100_dist', 'ema200_dist',
                   'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
@@ -84,7 +84,7 @@ df_spy_week = spy_data.df_week
 SKIP = 1
 start_at = 0
 # start_at = len(liquid_symbols)
-start_at = liquid_symbols.index('FEED') # Debugging start point
+# start_at = liquid_symbols.index('FEED') # Debugging start point
 # ticker = liquid_symbols[start_at]
 
 symbols_to_process = liquid_symbols[start_at::SKIP]
