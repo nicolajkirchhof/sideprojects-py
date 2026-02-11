@@ -933,114 +933,117 @@ def interactive_swing_plot(full_df, display_range=250, title: str | None = None)
         state['v_lines'] = v_lines
         state['h_lines'] = h_lines
 
-        hover_label = pg.TextItem(anchor=(0, 0), color='#ccc', fill='#000e')
-        plots[0].addItem(hover_label, ignoreBounds=True)
-        state['hover_label'] = hover_label
+        # Create a label for EACH plot pane
+        hover_labels = []
+        for p in plots:
+            lbl = pg.TextItem(anchor=(0, 0), color='#ccc', fill='#000e')
+            p.addItem(lbl, ignoreBounds=True)
+            hover_labels.append(lbl)
+        
+        state['hover_labels'] = hover_labels
 
         def update_hover(evt):
             pos = evt[0]
-            for i, p in enumerate(plots):
-                if p.sceneBoundingRect().contains(pos):
-                    mousePoint = p.vb.mapSceneToView(pos)
-                    idx = int(mousePoint.x() + 0.5)
-                    if 0 <= idx < len(df):
-                        row = df.iloc[idx]
-
-                        for v in state['v_lines']:
-                            v.setPos(idx)
-                        for h in state['h_lines']:
-                            h.hide()
-                        state['h_lines'][i].setPos(mousePoint.y())
+            # Check which plot has the mouse, or just use the first one's X to drive all
+            # Since X-axes are linked, finding the X index from p1 is sufficient.
+            
+            # Map scene pos to p1 view to get index
+            mousePoint = plots[0].vb.mapSceneToView(pos)
+            idx = int(mousePoint.x() + 0.5)
+            
+            if 0 <= idx < len(df):
+                row = df.iloc[idx]
+                
+                # Update crosshairs
+                for v in state['v_lines']:
+                    v.setPos(idx)
+                
+                # We can't easily get Y-pos for all panes from one mouse event without mapping
+                # But typically vertical line is enough. Horizontal line is tricky if mouse is not over that specific pane.
+                # For now, let's keep vertical line synced. Horizontal line only on the active pane.
+                
+                for i, p in enumerate(plots):
+                    if p.sceneBoundingRect().contains(pos):
+                        mp = p.vb.mapSceneToView(pos)
+                        state['h_lines'][i].setPos(mp.y())
                         state['h_lines'][i].show()
+                    else:
+                        state['h_lines'][i].hide()
 
-                        date_str = state['x_dates'][idx].strftime('%a %Y-%m-%d') if state.get(
-                            'x_dates') is not None else str(df.index[idx])
+                date_str = state['x_dates'][idx].strftime('%a %Y-%m-%d') if state.get('x_dates') is not None else str(df.index[idx])
 
-                        txt = (
-                            f"<span style='font-size: 11pt; color: white; font-weight: bold;'>{date_str}</span><br>"
-                            f"O:{row.o:.2f} H:{row.h:.2f} L:{row.l:.2f} C:{row.c:.2f}"
-                        )
-                        if 'v' in df.columns and pd.notna(row.get('v', np.nan)):
-                            txt += f" V:{row.v / 1000:,.0f}k"
-                        txt += "<br>"
+                # Helper to format a specific config group
+                def _fmt_group(config_dict, value_fmt, col_label_fn=None, transform_fn=None):
+                    parts = []
+                    for col, cfg in config_dict.items():
+                        if col not in df.columns:
+                            continue
+                        val = row.get(col, np.nan)
+                        if not np.isfinite(val):
+                            continue
+                        if transform_fn is not None:
+                            val = transform_fn(val)
+                        color = cfg['color'] if isinstance(cfg, dict) and 'color' in cfg else str(cfg)
+                        label = col_label_fn(col) if col_label_fn else col
+                        parts.append(f"<span style='color:{color};'>{label}:{value_fmt(val)}</span>")
+                    return " | ".join(parts)
 
-                        def _fmt_group(config_dict, value_fmt, col_label_fn=None, transform_fn=None):
-                            parts = []
-                            for col, cfg in config_dict.items():
-                                if col not in df.columns:
-                                    continue
-                                val = row.get(col, np.nan)
-                                if not np.isfinite(val):
-                                    continue
-                                if transform_fn is not None:
-                                    val = transform_fn(val)
-                                color = cfg['color'] if isinstance(cfg, dict) and 'color' in cfg else str(cfg)
-                                label = col_label_fn(col) if col_label_fn else col
-                                parts.append(f"<span style='color:{color};'>{label}:{value_fmt(val)}</span>")
-                            return " | ".join(parts)
+                # --- Build Text for Each Pane ---
+                
+                # Pane 1: Main Price (OHLC + EMAs + BB + Vol Text)
+                txt_p1 = (
+                    f"<span style='font-size: 11pt; color: white; font-weight: bold;'>{date_str}</span> "
+                    f"O:{row.o:.2f} H:{row.h:.2f} L:{row.l:.2f} C:{row.c:.2f}"
+                )
+                if 'v' in df.columns and pd.notna(row.get('v', np.nan)):
+                    txt_p1 += f" V:{row.v/1000:,.0f}k"
+                
+                emas = _fmt_group(EMA_CONFIGS, lambda v: f"{v:.2f}", lambda c: c.upper())
+                bbs = _fmt_group(BB_CONFIGS, lambda v: f"{v:.2f}", lambda c: c.upper())
+                
+                if emas: txt_p1 += " | " + emas
+                if bbs: txt_p1 += " | " + bbs
+                
+                state['hover_labels'][0].setHtml(txt_p1)
 
-                        emas = _fmt_group(
-                            EMA_CONFIGS,
-                            value_fmt=lambda v: f"{v:.2f}",
-                            col_label_fn=lambda c: c.upper()
-                        )
-                        dists = _fmt_group(
-                            DIST_CONFIGS,
-                            value_fmt=lambda v: f"{v:.2f}",
-                            col_label_fn=lambda c: c.replace('_dist', '').upper()
-                        )
-                        atrs = _fmt_group(
-                            ATR_CONFIGS,
-                            value_fmt=lambda v: f"{v:.2f}%",
-                            col_label_fn=lambda c: c.upper()
-                        )
-                        hvs = _fmt_group(
-                            HV_CONFIGS,
-                            value_fmt=lambda v: f"{v:.2f}",
-                            col_label_fn=lambda c: c.upper()
-                        )
-                        ivpct = _fmt_group(
-                            IVPCT_CONFIGS,
-                            value_fmt=lambda v: f"{v:.2f}",
-                            col_label_fn=lambda c: c
-                        )
-                        vols = _fmt_group(
-                            VOL_CONFIGS,
-                            value_fmt=lambda v: f"{v:.2f}k",
-                            col_label_fn=lambda c: c.upper(),
-                            transform_fn=lambda v: v / 1000.0
-                        )
+                # Pane 7: Volume MAs
+                # Also show Volume value here if desired, or just the MAs
+                vols = _fmt_group(VOL_CONFIGS, lambda v: f"{v:.2f}k", lambda c: c.upper(), lambda v: v / 1000.0)
+                state['hover_labels'][1].setHtml(vols if vols else "")
 
-                        if emas:
-                            txt += emas + "<br>"
-                        if dists:
-                            txt += dists + "<br>"
-                        if atrs:
-                            txt += atrs + "<br>"
-                        if hvs:
-                            txt += hvs + "<br>"
-                        if ivpct:
-                            txt += ivpct + "<br>"
-                        if vols:
-                            txt += vols + "<br>"
+                # Pane 3: EMA Dist
+                dists = _fmt_group(DIST_CONFIGS, lambda v: f"{v:.2f}", lambda c: c.replace('_dist', '').upper())
+                state['hover_labels'][2].setHtml(dists if dists else "")
 
-                        ttm_extra = ""
-                        if 'ttm_mom' in df.columns and np.isfinite(row.get('ttm_mom', np.nan)):
-                            ttm_extra += f"TTM_MOM:{row.ttm_mom:.2f}"
-                        if 'squeeze_on' in df.columns and pd.notna(row.get('squeeze_on', np.nan)):
-                            sq = bool(row.squeeze_on)
-                            ttm_extra += (" | " if ttm_extra else "") + f"SQUEEZE:{'ON' if sq else 'OFF'}"
-                        if ttm_extra:
-                            txt += ttm_extra
+                # Pane 4: ATR
+                atrs = _fmt_group(ATR_CONFIGS, lambda v: f"{v:.2f}%", lambda c: c.upper())
+                state['hover_labels'][3].setHtml(atrs if atrs else "")
 
-                        state['hover_label'].setHtml(txt)
+                # Pane 5: HV/IV
+                hvs = _fmt_group(HV_CONFIGS, lambda v: f"{v:.2f}", lambda c: c.upper())
+                state['hover_labels'][4].setHtml(hvs if hvs else "")
 
-                        # Place near top-left of pane 1 view
-                        vb_range = plots[0].vb.viewRange()
-                        state['hover_label'].setPos(
-                            vb_range[0][0] + (vb_range[0][1] - vb_range[0][0]) * 0.01,
-                            vb_range[1][1] - (vb_range[1][1] - vb_range[1][0]) * 0.01
-                        )
+                # Pane 6: IV Percentile
+                ivpct = _fmt_group(IVPCT_CONFIGS, lambda v: f"{v:.2f}", lambda c: c)
+                state['hover_labels'][5].setHtml(ivpct if ivpct else "")
+
+                # Pane 8: TTM
+                ttm_extra = ""
+                if 'ttm_mom' in df.columns and np.isfinite(row.get('ttm_mom', np.nan)):
+                    ttm_extra += f"TTM_MOM:{row.ttm_mom:.2f}"
+                if 'squeeze_on' in df.columns and pd.notna(row.get('squeeze_on', np.nan)):
+                    sq = bool(row.squeeze_on)
+                    ttm_extra += (" | " if ttm_extra else "") + f"SQUEEZE:{'ON' if sq else 'OFF'}"
+                state['hover_labels'][6].setHtml(ttm_extra)
+
+                # Position labels at top-left of each view
+                for i, p in enumerate(plots):
+                    vb_range = p.vb.viewRange()
+                    # x: left + 1% width, y: top - 1% height (y is inverted in some coords but here standard cartesian logic applies relative to view)
+                    # Note: specific positioning might need adjustment if Y axis direction varies, but standard plots have Y up.
+                    x_pos = vb_range[0][0] + (vb_range[0][1] - vb_range[0][0]) * 0.01
+                    y_pos = vb_range[1][1] - (vb_range[1][1] - vb_range[1][0]) * 0.01
+                    state['hover_labels'][i].setPos(x_pos, y_pos)
 
         state['proxy'] = pg.SignalProxy(plots[0].scene().sigMouseMoved, rateLimit=60, slot=update_hover)
         main_win._proxy = state['proxy']
