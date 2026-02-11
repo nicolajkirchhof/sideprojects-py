@@ -224,6 +224,101 @@ class TTMSqueezeItem(pg.GraphicsObject):
         return QtCore.QRectF(self.picture.boundingRect())
 
 
+class VolumeProfileItem(pg.GraphicsObject):
+    def __init__(self, df, width_fraction=0.75, bins=100):
+        pg.GraphicsObject.__init__(self)
+        self.df = df
+        self.width_fraction = width_fraction
+        self.bins = bins
+        self.picture = QtGui.QPicture()
+        self._bounds = QtCore.QRectF()
+        # Cache view range to avoid recomputing on every paint if not needed, 
+        # though usually we update via setViewRange explicitly.
+        self.current_range = None 
+
+    def setViewRange(self, x_min, x_max):
+        """Recalculate histogram based on visible data range."""
+        s, e = max(0, int(x_min)), min(len(self.df), int(x_max))
+        if s >= e:
+            self.picture = QtGui.QPicture()
+            self.update()
+            return
+
+        # Check if range changed significantly or if we haven't computed yet
+        if self.current_range == (s, e):
+            return
+        self.current_range = (s, e)
+
+        chunk = self.df.iloc[s:e]
+        if chunk.empty or 'c' not in chunk or 'v' not in chunk:
+            return
+
+        # Compute histogram
+        # Weighted histogram: value=price, weights=volume
+        # We use closing price as the "price level"
+        prices = chunk['c'].values
+        volumes = chunk['v'].values
+        
+        # Avoid errors with empty/NaN
+        mask = np.isfinite(prices) & np.isfinite(volumes)
+        prices = prices[mask]
+        volumes = volumes[mask]
+        
+        if len(prices) == 0:
+            return
+
+        hist, bin_edges = np.histogram(prices, bins=self.bins, weights=volumes)
+        
+        if hist.max() == 0:
+            return
+
+        # Normalize hist to view width (x-axis is time/index)
+        # We want the max bar to take up width_fraction of the view width
+        view_width = x_max - x_min
+        max_bar_width = view_width * self.width_fraction
+        
+        # Draw
+        self.picture = QtGui.QPicture()
+        p = QtGui.QPainter(self.picture)
+        
+        # White with low alpha
+        # 255 is opaque, 30-50 is low alpha
+        color = QtGui.QColor(255, 255, 255, 40)
+        p.setPen(pg.mkPen(None)) # No border
+        p.setBrush(pg.mkBrush(color))
+
+        # Scale factor: max_hist -> max_bar_width
+        scale = max_bar_width / hist.max()
+
+        # The histogram bars are horizontal.
+        # x-axis of chart is Time (index). y-axis is Price.
+        # We draw bars from x_min to x_min + length
+        
+        base_x = x_min
+        
+        for i in range(len(hist)):
+            if hist[i] == 0:
+                continue
+            
+            bar_len = hist[i] * scale
+            y_bottom = bin_edges[i]
+            y_height = bin_edges[i+1] - bin_edges[i]
+            
+            # Draw rect: x, y, w, h
+            p.drawRect(QtCore.QRectF(base_x, y_bottom, bar_len, y_height))
+        
+        p.end()
+        self._bounds = QtCore.QRectF(base_x, bin_edges[0], max_bar_width, bin_edges[-1]-bin_edges[0])
+        self.prepareGeometryChange()
+        self.update()
+
+    def paint(self, p, *args):
+        p.drawPicture(0, 0, self.picture)
+
+    def boundingRect(self):
+        return self._bounds
+
+
 # %% Global/Shared State
 # Global cache for reusing the window and app across multiple plot calls
 _GLOBAL_QT_APP = None
@@ -268,6 +363,26 @@ def _auto_scale_panes(plots, df, x_min, x_max):
 
     chunk = df.iloc[s:e]
     p1 = plots[0]
+
+    # Update Volume Profile for the new range (Export & Interactive)
+    # Check if we are in export mode (persistent window) or interactive
+    # For export, we have 'vp' in _export_state. For interactive, we need to access it differently or recreate.
+    
+    # NOTE: interactive_swing_plot creates new plots every update.
+    # But _auto_scale_panes is called during scroll/zoom in interactive mode.
+    # We need access to the VolumeProfileItem.
+    
+    # In interactive mode, plots[0] items list might contain it.
+    for item in p1.items:
+        if isinstance(item, VolumeProfileItem):
+            # Ensure data frame is set (it should be)
+            if item.df is None or item.df.empty:
+                item.df = df
+            item.setViewRange(x_min, x_max)
+
+    # Also handle export mode if this function is called from there (it is)
+    if hasattr(_EXPORT_WIN, '_export_state') and _EXPORT_WIN._export_state.get('vp'):
+         _EXPORT_WIN._export_state['vp'].setViewRange(x_min, x_max)
 
     # --- Main OHLC pane scaling (guard against all-NaN) ---
     mn, mx = _finite_min_max(np.r_[chunk.get('l', pd.Series(dtype=float)).to_numpy(),
@@ -432,6 +547,12 @@ def _get_export_context(width, height):
 
         ttm_dots = pg.ScatterPlotItem(pxMode=True)
         p8.addItem(ttm_dots)
+            
+        # Volume Profile Item
+        vp_item = VolumeProfileItem(pd.DataFrame(), width_fraction=0.75, bins=100)
+        # Add to background (z-value < 0) so candles draw on top
+        vp_item.setZValue(-10) 
+        p1.addItem(vp_item)
 
         def _mk_series_items(plot, cfg_dict):
             items = {}
@@ -446,6 +567,7 @@ def _get_export_context(width, height):
 
         export_state = {
             'ohlc': ohlc_item,
+            'vp': vp_item, # Store ref
             'ema': _mk_series_items(p1, EMA_CONFIGS),
             'bb': _mk_series_items(p1, BB_CONFIGS),  # Add Bollinger Bands
             'vol': _mk_series_items(p7, VOL_CONFIGS),
@@ -477,6 +599,11 @@ def _update_export_content(plots, df, vlines):
     export_state = getattr(_EXPORT_WIN, "_export_state", None)
     if export_state is None:
         return
+
+    # Update Volume Profile data reference
+    export_state['vp'].df = df
+    # Reset range logic so it recomputes next scaling
+    export_state['vp'].current_range = None 
 
     x = np.arange(len(df), dtype=float)
 
@@ -572,6 +699,14 @@ def _add_plot_content(plots, df, vlines):
     """Internal helper to populate panes with data series."""
     p1, p7, p3, p4, p5, p6, p8 = plots
     x_range = np.arange(len(df))
+
+    # Add Volume Profile (behind candles)
+    vp_item = VolumeProfileItem(df, width_fraction=0.75, bins=100)
+    vp_item.setZValue(-10)
+    p1.addItem(vp_item)
+
+    # Force initial calculation for full range
+    vp_item.setViewRange(0, len(df))
 
     p1.addItem(OHLCItem([(i, df.o.iloc[i], df.h.iloc[i], df.l.iloc[i], df.c.iloc[i]) for i in x_range]))
 
