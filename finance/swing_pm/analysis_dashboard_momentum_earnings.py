@@ -1,3 +1,4 @@
+```python
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
@@ -118,6 +119,7 @@ class MomentumEarningsDashboard:
         self.dur_view = {'Daily': 24, 'Weekly': 8}
         self.view_tab = 'Daily'
         self.direction_val = 'Both'
+        self._cond_timer = None
 
         # --- Layout Setup ---
         self.fig = plt.figure(figsize=(28, 22))
@@ -209,11 +211,11 @@ class MomentumEarningsDashboard:
         # 19. Conditional Survival Filter
         gs_cond = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[19], width_ratios=[1, 2], wspace=0.1)
         
-        self.ax_txt_cond_t = self.fig.add_subplot(gs_cond[0])
-        self.ax_txt_cond_t.set_title("Cond. Day/Wk", fontsize=9)
-        # Use TextBox instead of Slider
-        self.txt_cond_t = TextBox(self.ax_txt_cond_t, '', initial='0', color='black', hovercolor='gray', label_pad=0.05)
-        # We don't trigger update immediately on text change, user hits 'Update Charts'
+        self.ax_slider_cond_t = self.fig.add_subplot(gs_cond[0])
+        self.ax_slider_cond_t.set_title("Cond. Day/Wk", fontsize=9)
+        # Use Slider instead of TextBox
+        self.slider_cond_t = Slider(self.ax_slider_cond_t, '', 0, 24, valinit=0, valstep=1, color='cyan')
+        self.slider_cond_t.on_changed(self._on_cond_t_change)
         
         self.ax_slider_cond_v = self.fig.add_subplot(gs_cond[1])
         self.ax_slider_cond_v.set_title("Cond. Range", fontsize=9)
@@ -291,10 +293,23 @@ class MomentumEarningsDashboard:
             self.slider_dur.valmax = 24
             self.slider_dur.set_val(self.dur_view['Daily'])
             self.slider_dur.ax.set_xlim(1, 24)
+
+            # Update Cond T Slider
+            self.slider_cond_t.valmax = 24
+            self.slider_cond_t.ax.set_xlim(0, 24)
+            if self.slider_cond_t.val > 24: self.slider_cond_t.set_val(24)
         else:
             self.slider_dur.valmax = 8
             self.slider_dur.set_val(self.dur_view['Weekly'])
             self.slider_dur.ax.set_xlim(1, 8)
+
+            # Update Cond T Slider
+            self.slider_cond_t.valmax = 8
+            self.slider_cond_t.ax.set_xlim(0, 8)
+            if self.slider_cond_t.val > 8: self.slider_cond_t.set_val(8)
+
+        # Schedule a debounced refresh of conditional range after tab switch
+        self._schedule_cond_v_update()
 
         self.fig.canvas.draw_idle()
 
@@ -318,6 +333,72 @@ class MomentumEarningsDashboard:
             btn.color = c
             btn.ax.set_facecolor(c)
             btn.ax.figure.canvas.draw_idle()
+
+    def _on_cond_t_change(self, val):
+        """Debounced callback: after 1s of no changes, recompute slider_cond_v bounds."""
+        self._schedule_cond_v_update()
+
+    def _schedule_cond_v_update(self):
+        """(Re)start a 1s debounce timer to update slider_cond_v limits."""
+        if self._cond_timer is not None:
+            try:
+                self._cond_timer.stop()
+            except Exception:
+                pass
+
+        self._cond_timer = self.fig.canvas.new_timer(interval=1000)  # 1s settlement time
+        self._cond_timer.single_shot = True
+        self._cond_timer.add_callback(self._update_cond_v_bounds_from_data)
+        self._cond_timer.start()
+
+    def _update_cond_v_bounds_from_data(self):
+        """Update slider_cond_v allowed min/max based on selected cond_t column distribution."""
+        try:
+            cond_t = int(self.slider_cond_t.val)
+        except Exception:
+            cond_t = 0
+
+        # If disabled, keep a broad default range
+        if cond_t <= 0:
+            vmin, vmax = -20.0, 50.0
+        else:
+            tf = self.view_tab
+            col = f'aligned_cpct{cond_t}' if tf == 'Daily' else f'aligned_w_cpct{cond_t}'
+
+            if col in self.df.columns:
+                vals = self.df[col].dropna()
+                if not vals.empty:
+                    # Robust bounds (avoid outliers dominating)
+                    vmin = float(vals.quantile(0.01))
+                    vmax = float(vals.quantile(0.99))
+                else:
+                    vmin, vmax = -20.0, 50.0
+            else:
+                vmin, vmax = -20.0, 50.0
+
+        if vmin >= vmax:
+            vmax = vmin + 1.0
+
+        # Expand slightly so handles aren't pinned to the edges
+        rng = vmax - vmin
+        vmin_s, vmax_s = vmin - rng * 0.1, vmax + rng * 0.1
+
+        # Update RangeSlider bounds + axis limits
+        self.slider_cond_v.valmin = vmin_s
+        self.slider_cond_v.valmax = vmax_s
+        self.slider_cond_v.ax.set_xlim(vmin_s, vmax_s)
+
+        # Clamp current selection into the new bounds
+        cur_min, cur_max = self.slider_cond_v.val
+        new_min = min(max(cur_min, vmin_s), vmax_s)
+        new_max = min(max(cur_max, vmin_s), vmax_s)
+        if new_min > new_max:
+            new_min, new_max = vmin, vmax
+
+        self.slider_cond_v.set_val((new_min, new_max))
+        self.ax_slider_cond_v.set_title(f"Cond. Range: [{new_min:.1f}, {new_max:.1f}]", fontsize=9)
+
+        self.fig.canvas.draw_idle()
 
     def _create_range_slider(self, ax, col_name, title, default_min, default_max, cap_at_quantile=False):
         """Helper to create consistent range sliders with labels."""
@@ -415,9 +496,8 @@ class MomentumEarningsDashboard:
         # 9. Conditional Survival
         # Filter based on the value of cpctX column
         try:
-            cond_t_str = self.txt_cond_t.text
-            cond_t = int(cond_t_str) if cond_t_str and cond_t_str.strip() else 0
-        except ValueError:
+            cond_t = int(self.slider_cond_t.val)
+        except Exception:
             cond_t = 0
 
         if cond_t > 0:
@@ -494,48 +574,48 @@ class MomentumEarningsDashboard:
             ax_path.grid(True, alpha=0.2)
             ax_path.set_xticks(periods)
             ax_path.xaxis.set_major_locator(MultipleLocator(1))
-        
+
             yl = self.slider_ylim.val
             ax_path.set_ylim(-yl, yl)
 
-        # --- 2. Violin Chart ---
-        if path_cols:
-            violin_data = [sub_df[c].dropna().values for c in path_cols]
-            if violin_data and all(len(d) > 0 for d in violin_data):
-                parts = ax_violin.violinplot(violin_data, positions=periods, showmeans=False, showmedians=True, showextrema=False)
-                
-                for pc in parts['bodies']:
-                    pc.set_facecolor('#48dbfb')
-                    pc.set_edgecolor('white')
-                    pc.set_alpha(0.5)
-                parts['cmedians'].set_color('white')
-            
-                ax_violin.set_ylim(-self.slider_ylim.val, self.slider_ylim.val)
-                ax_violin.axhline(0, color='white', linestyle='--', alpha=0.5)
-                ax_violin.set_title(f"Distribution of Changes ({tf})")
-                ax_violin.set_xticks(periods)
-                ax_violin.xaxis.set_major_locator(MultipleLocator(1))
-                ax_violin.grid(True, alpha=0.2)
-            else:
-                 ax_violin.text(0.5, 0.5, "Insufficient Data for Violins", ha='center', transform=ax_violin.transAxes)
+            # --- 2. Violin Chart ---
+            if path_cols:
+                violin_data = [sub_df[c].dropna().values for c in path_cols]
+                if violin_data and all(len(d) > 0 for d in violin_data):
+                    parts = ax_violin.violinplot(violin_data, positions=periods, showmeans=False, showmedians=True, showextrema=False)
 
-        # --- 3. Probability Chart (Holding Levels) ---
-        def get_survival_prob(col_gen_func, comparison_val=0):
-            curve = []
-            current_idx = sub_df.index
-        
-            for i in periods:
-                col = col_gen_func(i)
-                if col not in sub_df.columns:
-                    curve.append(np.nan)
-                    continue
-                
-                valid = sub_df.loc[current_idx, col].dropna()
-                if valid.empty:
-                    curve.append(np.nan)
+                    for pc in parts['bodies']:
+                        pc.set_facecolor('#48dbfb')
+                        pc.set_edgecolor('white')
+                        pc.set_alpha(0.5)
+                    parts['cmedians'].set_color('white')
+
+                    ax_violin.set_ylim(-self.slider_ylim.val, self.slider_ylim.val)
+                    ax_violin.axhline(0, color='white', linestyle='--', alpha=0.5)
+                    ax_violin.set_title(f"Distribution of Changes ({tf})")
+                    ax_violin.set_xticks(periods)
+                    ax_violin.xaxis.set_major_locator(MultipleLocator(1))
+                    ax_violin.grid(True, alpha=0.2)
                 else:
-                    prob = (valid > comparison_val).mean() * 100
-                    curve.append(prob)
+                    ax_violin.text(0.5, 0.5, "Insufficient Data for Violins", ha='center', transform=ax_violin.transAxes)
+
+                # --- 3. Probability Chart (Holding Levels) ---
+            def get_survival_prob(col_gen_func, comparison_val=0):
+                curve = []
+                current_idx = sub_df.index
+
+                for i in periods:
+                    col = col_gen_func(i)
+                    if col not in sub_df.columns:
+                        curve.append(np.nan)
+                        continue
+
+                    valid = sub_df.loc[current_idx, col].dropna()
+                    if valid.empty:
+                        curve.append(np.nan)
+                    else:
+                        prob = (valid > comparison_val).mean() * 100
+                        curve.append(prob)
                 return curve
 
             y_bk = get_survival_prob(lambda i: f'{prefix}{i}', 0)
@@ -566,3 +646,4 @@ data = load_and_prep_data()
 if not data.empty:
     dash = MomentumEarningsDashboard(data)
     plt.show()
+
