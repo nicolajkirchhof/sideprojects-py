@@ -3,14 +3,11 @@ import os
 from datetime import datetime
 
 import ib_async as ib
-import pandas as pd
-import time
-from zoneinfo import ZoneInfo
 
 import finance.utils as utils
 
-%load_ext autoreload
-%autoreload 2
+# %load_ext autoreload
+# %autoreload 2
 
 ##%%
 tws_instance = 'real'
