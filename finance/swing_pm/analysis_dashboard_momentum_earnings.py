@@ -1,4 +1,3 @@
-```python
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
@@ -53,10 +52,6 @@ def load_and_prep_data():
     # Replace 0 direction with 1 to avoid zeroing out data
     df['direction'] = df['direction'].replace(0, 1)
 
-    # 4. Handle Categorical Data
-    if 'mcap_class' in df.columns:
-        df['mcap_class'] = df['mcap_class'].astype(str)
-    
     if 'is_earnings' in df.columns:
         df['is_earnings'] = df['is_earnings'].fillna(False).infer_objects(copy=False).astype(bool)
 
@@ -241,13 +236,12 @@ class MomentumEarningsDashboard:
         gs_mcap_btns = gridspec.GridSpecFromSubplotSpec(1, 5, subplot_spec=gs_mcap_container[1], wspace=0.05)
         self.mcap_selected = 'All'
         self.mcap_buttons = {}
-        mcaps = ['All', 'Large-Cap', 'Mid-Cap', 'Small-Cap', 'Micro-Cap']
-        labels = ['All', 'Large', 'Mid', 'Small', 'Micro']
-        
-        for i, (mcap, lbl) in enumerate(zip(mcaps, labels)):
+        mcaps = ['All', 'Large', 'Mid', 'Small', 'Micro']
+
+        for i, mcap in enumerate(mcaps):
             ax = self.fig.add_subplot(gs_mcap_btns[i])
             c = '#00a8ff' if mcap == 'All' else 'black'
-            btn = Button(ax, lbl, color=c, hovercolor='gray')
+            btn = Button(ax, mcap, color=c, hovercolor='gray')
             btn.label.set_fontsize(8)
             btn.on_clicked(lambda event, m=mcap: self.set_mcap(m))
             self.mcap_buttons[mcap] = btn
@@ -491,7 +485,7 @@ class MomentumEarningsDashboard:
 
         # 8. Market Cap
         mcap_val = self.mcap_selected
-        if mcap_val != 'All': mask &= (self.df['mcap_class'] == mcap_val)
+        if mcap_val != 'All': mask &= (self.df['market_cap_class'] == mcap_val)
 
         # 9. Conditional Survival
         # Filter based on the value of cpctX column

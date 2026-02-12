@@ -11,7 +11,7 @@ import sys
 EMA_CONFIGS = {
     'ema5': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Wheat (Lightest)
     'ema10': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Wheat (Lightest)
-    'ema20': {'color': '#b26529', 'width': 2.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ema20': {'color': '#b26529', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
     'ema50': {'color': '#7b4326', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
     'ema100': {'color': '#703b24', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
     'ema200': {'color': '#5a2c27', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Darkest
@@ -21,7 +21,7 @@ EMA_CONFIGS = {
 ATR_CONFIGS = {
     'atrp1': {'color': '#f5a1df', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Steel Blue
     'atrp9': {'color': '#f81cfc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Light Steel Blue
-    'atrp20': {'color': '#b72494', 'width': 2.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Navy
+    'atrp20': {'color': '#b72494', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},  # Navy
     'atrp50': {'color': '#6b1255', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}  # Navy
 }
 
@@ -57,7 +57,7 @@ VOL_CONFIGS = {
     'v': {'color': '#49bdd9', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Deep Orange Light
     'v9': {'color': '#fcec98', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},
     'v20': {'color': '#f3cb21', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'v50': {'color': '#dab312', 'width': 1.5, 'style': QtCore.Qt.PenStyle.DashLine}
+    'v50': {'color': '#dab312', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}
 }
 
 DIST_CONFIGS = {
@@ -75,9 +75,9 @@ HURST_CONFIGS = {
 
 HV_CONFIGS = {
     'hv9': {'color': '#b7a3db', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Light Green
-    'hv20': {'color': '#6539b4', 'width': 2.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Medium Green
+    'hv20': {'color': '#6539b4', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},  # Medium Green
     'hv50': {'color': '#583098', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Dark Green
-    'iv': {'color': '#49bcd8', 'width': 2.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Magenta (Standout)
+    'iv': {'color': '#49bcd8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Magenta (Standout)
 }
 
 IVPCT_CONFIGS = {
@@ -92,12 +92,12 @@ BB_CONFIGS = {
 
 # TTM Squeeze Colors
 TTM_COLORS = {
-    'pos_up': '#00ff00',  # Bright Green (Bullish rising)
-    'pos_down': '#006400',  # Dark Green (Bullish falling)
-    'neg_down': '#ff0000',  # Red (Bearish falling)
-    'neg_up': '#8b0000',  # Dark Red (Bearish rising)
-    'sq_on': '#ff0000',  # Red dot (Squeeze ON)
-    'sq_off': '#00ff00'  # Green dot (Squeeze OFF)
+    'pos_up': '#769cc2',  # Bright Green (Bullish rising)
+    'pos_down': '#476cc2',  # Dark Green (Bullish falling)
+    'neg_down': '#9a0d9e',  # Red (Bearish falling)
+    'neg_up': '#be7ac2',  # Dark Red (Bearish rising)
+    'sq_on': '#ec4533',  # Red dot (Squeeze ON)
+    'sq_off': '#24ad54'  # Green dot (Squeeze OFF)
 }
 
 
@@ -150,10 +150,10 @@ class OHLCItem(pg.GraphicsObject):
     def paint(self, p, *args):
         # Direct painting to avoid QPicture issues
         # Explicit widths and colors
-        w_pen = pg.mkPen('#ffffff', width=3) # White
-        g_pen = pg.mkPen('#00ff00', width=3) # Green
-        r_pen = pg.mkPen('#ff0000', width=3) # Red
-        b_pen = pg.mkPen('#0000ff', width=3) # Blue
+        w_pen = pg.mkPen('#ffffff', width=2) # White
+        g_pen = pg.mkPen('#00ff00', width=2) # Green
+        r_pen = pg.mkPen('#ff0000', width=2) # Red
+        b_pen = pg.mkPen('#0000ff', width=2) # Blue
 
         p.setPen(w_pen)
 
@@ -205,10 +205,10 @@ class TTMSqueezeItem(pg.GraphicsObject):
 
             if mom >= 0:
                 color = TTM_COLORS['pos_up'] if mom >= prev_mom else TTM_COLORS['pos_down']
-                rect = QtCore.QRectF(x - 0.4, 0, 0.8, -mom)
+                rect = QtCore.QRectF(x - 0.4, 0, 0.8, mom)
             else:
                 color = TTM_COLORS['neg_down'] if mom <= prev_mom else TTM_COLORS['neg_up']
-                rect = QtCore.QRectF(x - 0.4, 0, 0.8, -mom)
+                rect = QtCore.QRectF(x - 0.4, 0, 0.8, mom)
 
             p.setPen(pg.mkPen(None))
             p.setBrush(pg.mkBrush(color))

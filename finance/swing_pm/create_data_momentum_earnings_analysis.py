@@ -20,7 +20,7 @@ OFFSET_WEEKS = 8
 
 #%%
 # The dataset has the following columns 'symbol', 'date', 'is_earnings', 'event_type', 'eps', 'eps_est',
-#   'earnings_when', 'gappct', 'market_cap', 'market_cap_date', 'mcap_class'
+#   'earnings_when', 'gappct', 'market_cap', 'market_cap_date', 'market_cap_class'
 #   '1M', '1M_chg', '3M', '3M_chg', '6M', '6M_chg', '12M', '12M_chg'
 # In addition, the following columns track changes before and after the event they are tracked
 # as {name}XX and w_{name}XX for daily and weekly values before and after the event.
@@ -46,13 +46,13 @@ def classify_market_cap(mcap_value, year, df_thresholds):
     row = df_thresholds.loc[year_idx]
 
     if mcap_value >= row['Large-Cap Entry (S&P 500)']:
-        return "Large-Cap"
+        return "Large"
     elif mcap_value >= row['Mid-Cap Entry (S&P 400)']:
-        return "Mid-Cap"
+        return "Mid"
     elif mcap_value >= row['Small-Cap Entry (Russell 2000)']:
-        return "Small-Cap"
+        return "Small"
     else:
-        return "Micro-Cap"
+        return "Micro"
 
 def calculate_performance(df_ticker, df_day, length_days):
   df_c = df_day.iloc[df_day.index.get_indexer(df_ticker.date - timedelta(days=length_days), method='ffill')]['c'].copy()
@@ -86,7 +86,8 @@ start_at = 0
 # start_at = len(liquid_symbols)
 # start_at = liquid_symbols.index('UHA.B') # Debugging start point
 # ticker = liquid_symbols[start_at]
-
+# symbols_to_process = ['MSFT']
+# symbols_to_process = ['IWM']
 symbols_to_process = liquid_symbols[start_at::SKIP]
 total_symbols = len(symbols_to_process)
 #%%
@@ -114,6 +115,7 @@ for i, ticker in enumerate(symbols_to_process):
         print(f"  No data for {ticker}, skipping.")
         continue
 
+    is_etf = bool(swing_data_full.info.is_etf)
     ts_market_cap = swing_data_full.market_cap
     df_day = swing_data_full.df_day
     df_week = swing_data_full.df_week
@@ -275,13 +277,15 @@ for i, ticker in enumerate(symbols_to_process):
             'symbol': ticker,
             'date': reaction_date,
             'is_earnings': meta['is_earnings'],
+            'is_etf': is_etf,
             'event_type': meta['event_type'],
             'eps': meta['eps'],
             'eps_est': meta['eps_est'],
             'earnings_when': meta['earnings_when'],
             'gappct': df_day.iloc[reaction_idx].gappct,
             'market_cap': np.nan, # To be filled
-            'market_cap_date': pd.NaT
+            'market_cap_date': pd.NaT,
+            'market_cap_class': 'Unknown'
         }
 
         # Market Cap Lookup
@@ -290,6 +294,7 @@ for i, ticker in enumerate(symbols_to_process):
             mc_row = ts_market_cap.iloc[mkp_idx]
             event_row['market_cap'] = mc_row['market_cap']
             event_row['market_cap_date'] = mc_row.name
+            event_row['market_cap_class'] = classify_market_cap(mc_row['market_cap'], mc_row.name.date().year, df_market_cap_thresholds)
 
         # Merge all data
         full_row = {**event_row, **flat_day, **flat_week}
@@ -314,12 +319,6 @@ for i, ticker in enumerate(symbols_to_process):
         df_ticker_events[tf_name + '_chg'] = utils.pct.percentage_change_array(
             df_ticker_events['c-1'], future_c.values
         )
-
-    # Market Cap Classification
-    df_ticker_events['mcap_class'] = df_ticker_events.apply(
-        lambda row: classify_market_cap(row['market_cap'], row.date.year, df_market_cap_thresholds),
-        axis=1
-    )
 
     # Save Pickled Data
     ticker_file = f'{data_path}/{ticker}.pkl'

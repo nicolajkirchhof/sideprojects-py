@@ -5,7 +5,10 @@ from datetime import datetime
 
 import finance.utils as utils
 
-override = False
+# %load_ext autoreload
+# %autoreload 2
+
+override = True
 #%%
 # Setup Paths
 output_name = 'momentum_earnings'
@@ -21,17 +24,21 @@ if not os.path.exists(data_path):
 
 # Process all pickle files in the data directory
 files = [f for f in os.listdir(data_path) if f.endswith('.pkl')]
-total_files = len(files)
+
+start_at = 0
+files_to_process = files[start_at:]
+
+# files_to_process = ['MSFT.pkl']
+total_files = len(files_to_process)
 
 print(f"Found {total_files} data files to process.")
 
-start_at = 0
 # start_at = files.index('BNS.pkl')
 # Plotting offsets
 PLOT_DAYS = 100
 PLOT_WEEKS = 50
 #%%
-for i, filename in enumerate(files[start_at:]):
+for i, filename in enumerate(files_to_process):
     ticker = filename.replace('.pkl', '')
     print(f'[{datetime.now().strftime("%H:%M:%S")}] Plotting {i+1}/{total_files}: {ticker}...')
 
@@ -65,7 +72,7 @@ for i, filename in enumerate(files[start_at:]):
     os.makedirs(ticker_plot_path, exist_ok=True)
 
     # Plotting Loop
-    for idx_row, (i_evt, row) in enumerate(df_ticker_events.iterrows()):
+    for idx_row, (i_evt, row) in enumerate(df_ticker_events[(df_ticker_events['date'] > '2025-01-01') & (df_ticker_events['date'] < '2025-02-01') ].iterrows()):
         try:
             file_basename = f'{ticker_plot_path}/{row.date.date()}'
 
@@ -80,8 +87,8 @@ for i, filename in enumerate(files[start_at:]):
             idx_day = idx_day_arr[0]
 
             # Dynamic Title
-            mcap_cat = row.get('mcap_class', 'Unknown')
-            perf_str = f"1M: {row['1M_chg']:.1f}% | 3M: {row['3M_chg']:.1f}% | 6M: {row['6M_chg']:.1f}%"
+            mcap_cat = row.get('market_cap_class', 'Unknown')
+            perf_str = f"Engs: {'FT'[row.is_earnings]} | xATRP: {row['cpct0']/row['atrp200']:.2f} | 1M: {row['1M_chg']:.1f}% | 3M: {row['3M_chg']:.1f}% | 6M: {row['6M_chg']:.1f}%"
             if not pd.isna(row['eps']): perf_str += f" | EPS: {row['eps']:.2f}"
             if not pd.isna(row['eps_est']): perf_str += f" | Est: {row['eps_est']:.2f}"
 
