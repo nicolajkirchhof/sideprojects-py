@@ -2,6 +2,7 @@ import os
 import time
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
 
 import finance.utils as utils
 
@@ -12,18 +13,22 @@ override = True
 #%%
 # Setup Paths
 output_name = 'momentum_earnings'
-base_path = f'finance/_data/{output_name}'
-plot_path = f'{base_path}/plots'
-data_path = f'{base_path}/data'
-os.makedirs(plot_path, exist_ok=True)
+base_path = Path(f'finance/_data/{output_name}')
+plot_path = base_path / 'plots'
+data_path = base_path / 'data'
+
+plot_path.mkdir(parents=True, exist_ok=True)
 
 # Check for data directory
-if not os.path.exists(data_path):
-    raise(f"Data directory {data_path} not found. Please run the data creation script first.")
+if not data_path.exists():
+    raise FileNotFoundError(f"Data directory {data_path} not found. Please run the data creation script first.")
 
-
-# Process all pickle files in the data directory
-files = [f for f in os.listdir(data_path) if f.endswith('.pkl')]
+# Process all pickle files in the data directory, sorted by modification time (newest first)
+files = sorted(
+    [f.name for f in data_path.glob('*.pkl')],
+    key=lambda x: (data_path / x).stat().st_mtime,
+    reverse=True
+)
 
 start_at = 0
 files_to_process = files[start_at:]
@@ -33,7 +38,7 @@ total_files = len(files_to_process)
 
 print(f"Found {total_files} data files to process.")
 
-# start_at = files.index('BNS.pkl')
+start_at = files.index('PBF.pkl')
 # Plotting offsets
 PLOT_DAYS = 100
 PLOT_WEEKS = 50
@@ -72,7 +77,7 @@ for i, filename in enumerate(files_to_process):
     os.makedirs(ticker_plot_path, exist_ok=True)
 
     # Plotting Loop
-    for idx_row, (i_evt, row) in enumerate(df_ticker_events[(df_ticker_events['date'] > '2025-01-01') & (df_ticker_events['date'] < '2025-02-01') ].iterrows()):
+    for idx_row, (i_evt, row) in enumerate(df_ticker_events.iterrows()):
         try:
             file_basename = f'{ticker_plot_path}/{row.date.date()}'
 

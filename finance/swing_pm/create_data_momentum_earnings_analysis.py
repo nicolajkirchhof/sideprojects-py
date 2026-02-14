@@ -72,6 +72,7 @@ os.makedirs(data_path, exist_ok=True)
 # Load Core Data
 print("Loading core data...")
 liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
+liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
 df_market_cap_thresholds = pd.read_csv('finance/_data/MarketCapThresholds.csv')
 
 spy_data = utils.swing_trading_data.SwingTradingData('SPY', offline=True)
@@ -82,9 +83,9 @@ df_spy_week = spy_data.df_week
 # Iteration Settings
 # SKIP = 100
 SKIP = 1
-start_at = 0
+# start_at = 0
 # start_at = len(liquid_symbols)
-# start_at = liquid_symbols.index('UHA.B') # Debugging start point
+start_at = liquid_symbols.index('TWAV') # Debugging start point
 # ticker = liquid_symbols[start_at]
 # symbols_to_process = ['MSFT']
 # symbols_to_process = ['IWM']
@@ -115,7 +116,7 @@ for i, ticker in enumerate(symbols_to_process):
         print(f"  No data for {ticker}, skipping.")
         continue
 
-    is_etf = bool(swing_data_full.info.is_etf)
+    is_etf = bool(swing_data_full.info.is_etf) if swing_data_full.info is not None else ticker not in liquid_stocks
     ts_market_cap = swing_data_full.market_cap
     df_day = swing_data_full.df_day
     df_week = swing_data_full.df_week
