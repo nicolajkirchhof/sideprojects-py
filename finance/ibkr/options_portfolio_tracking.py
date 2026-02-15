@@ -38,6 +38,7 @@ def print_and_notify(option_portfolio_position):
   line += f'{SEP} {exp_str}{SEP}{SEP}{option_portfolio_position.position:5}{SEP}'
   line += f'{option_portfolio_position.contract.right:2}{SEP} {option_portfolio_position.contract.strike}'
   line += f'{SEP}{option_portfolio_position.averageCost/int(option_portfolio_position.contract.multiplier):10.5f}'
+  line += f'{SEP}1 {SEP}100'
   # line += f'{SEP}{option_portfolio_position.marketPrice:10.5f}{SEP}{pnl:8.2f}{SEP}{pnl_pct:8.2f}{SEP}'
   color = utils.colors.Colors.BRIGHT_GREEN if pnl > 0 else utils.colors.Colors.BRIGHT_RED
   # Short PUT attention
