@@ -58,7 +58,13 @@ def financial_info(symbol):
   df.set_index('date', inplace=True)
   return df
 
-
+def splits(symbol):
+  query = """select act_symbol, ex_date, to_factor, for_factor from split where act_symbol = :symbol"""
+  df = pd.read_sql(text(query), db_stocks_connection, params={'symbol': symbol})
+  df.rename(columns={'act_symbol':'symbol', 'ex_date': 'date'}, inplace=True)
+  df['date'] = pd.to_datetime(df.date)
+  df.set_index('date', inplace=True)
+  return df
 #%%
 @time_db_call
 def daily_w_volatility(symbol):

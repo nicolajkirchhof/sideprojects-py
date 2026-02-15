@@ -113,7 +113,7 @@ class MomentumEarningsDashboard:
         # State for tab durations (view limits)
         self.dur_view = {'Daily': 24, 'Weekly': 8}
         self.view_tab = 'Daily'
-        self.direction_val = 'Both'
+        self.direction_val = 'Positive'
         self._cond_timer = None
 
         # --- Layout Setup ---
@@ -148,29 +148,38 @@ class MomentumEarningsDashboard:
         self.btn_update = Button(self.ax_btn, 'Update Charts', color='#00a8ff', hovercolor='#0097e6')
         self.btn_update.on_clicked(self.update)
 
-        # 2. Abs Move Slider
+        # 2. Event Move Slider (Signed)
         self.ax_slider_move = self.fig.add_subplot(gs_controls[2])
-        min_m, max_m = 0, 30
-        if not self.df.empty:
-            max_m = min(self.df['event_move_abs'].quantile(0.95), 50)
-        self.ax_slider_move.set_title(f"Event Move % (Abs): [{0:.1f}, {max_m:.1f}]", fontsize=9)
-        self.slider_move = RangeSlider(self.ax_slider_move, '', 0, max_m, valinit=(0, max_m))
-        self.slider_move.on_changed(lambda v: self.ax_slider_move.set_title(f"Event Move % (Abs): [{v[0]:.1f}, {v[1]:.1f}]", fontsize=9))
+        min_m, max_m = -30, 30
+        if not self.df.empty and 'event_move' in self.df.columns:
+             vals = self.df['event_move'].dropna()
+             if not vals.empty:
+                 min_m = vals.quantile(0.01)
+                 max_m = vals.quantile(0.99)
+
+        # Ensure handles don't stick
+        rng = max_m - min_m
+        if rng == 0: rng = 1.0
+        vmin_s, vmax_s = min_m - rng * 0.1, max_m + rng * 0.1
+
+        self.ax_slider_move.set_title(f"Event Move (Signed): [{min_m:.1f}, {max_m:.1f}]", fontsize=9)
+        self.slider_move = RangeSlider(self.ax_slider_move, '', vmin_s, vmax_s, valinit=(min_m, max_m))
+        self.slider_move.on_changed(lambda v: self.ax_slider_move.set_title(f"Event Move (Signed): [{v[0]:.1f}, {v[1]:.1f}]", fontsize=9))
 
         # 3. Price Slider
         self.ax_slider_price = self.fig.add_subplot(gs_controls[3])
         min_p, max_p = 0, 500
         if not self.df.empty and 'c0' in self.df.columns:
              min_p = self.df['c0'].min()
-             max_p = self.df['c0'].quantile(0.95)
+             max_p = self.df['c0'].quantile(0.99)
         self.slider_price = self._create_range_slider(self.ax_slider_price, 'c0', "Breakout Price", min_p, max_p)
 
         # 4. Direction (Horizontal Buttons)
-        gs_dir = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=gs_controls[4], wspace=0.05)
+        gs_dir = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[4], wspace=0.05)
         self.btns_dir = {}
-        for i, (lbl, val) in enumerate([('Both', 'Both'), ('Pos', 'Positive'), ('Neg', 'Negative')]):
+        for i, (lbl, val) in enumerate([('Pos', 'Positive'), ('Neg', 'Negative')]):
             ax = self.fig.add_subplot(gs_dir[i])
-            c = '#00a8ff' if val == 'Both' else 'black'
+            c = '#00a8ff' if val == self.direction_val else 'black'
             btn = Button(ax, lbl, color=c, hovercolor='gray')
             btn.label.set_fontsize(9)
             btn.on_clicked(lambda e, v=val: self.set_direction(v))
@@ -442,9 +451,9 @@ class MomentumEarningsDashboard:
     def get_filtered_data(self):
         mask = pd.Series(True, index=self.df.index)
 
-        # 1. Abs Move
+        # 1. Signed Move
         min_m, max_m = self.slider_move.val
-        mask &= (self.df['event_move_abs'] >= min_m) & (self.df['event_move_abs'] <= max_m)
+        mask &= (self.df['event_move'] >= min_m) & (self.df['event_move'] <= max_m)
 
         # 1b. Breakout Price
         min_p, max_p = self.slider_price.val
@@ -624,8 +633,8 @@ class MomentumEarningsDashboard:
 
             ax_probs.set_ylim(0, 105)
             ax_probs.set_ylabel("Prob. (%)")
-            ax_probs.set_title(f"Probability of Holding Levels ({tf})")
             ax_probs.set_xlabel(xlabel)
+            ax_probs.set_title(f"Probability of Holding Levels ({tf})")
             ax_probs.legend(loc='lower left', fontsize=8, ncol=4)
             ax_probs.grid(True, alpha=0.2)
             ax_probs.set_xticks(periods)

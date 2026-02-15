@@ -8,6 +8,9 @@ import pandas as pd
 
 import finance.utils as utils
 
+# %load_ext autoreload
+# %autoreload 2
+
 # Constants from momentum.py
 INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp14', 'atrp20', 'atrp50', 'pct', 'rvol50', 'std_mv', 'iv', 'hv9', 'hv14', 'hv20',
               'ema200_dist', 'ema100_dist', 'ema50_dist', 'ema20_dist', 'ema10_dist', 'ema5_dist',
@@ -17,6 +20,18 @@ SPY_INDICATORS = ['hv9', 'hv14', 'hv20',
                   'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
 OFFSET_DAYS = 25
 OFFSET_WEEKS = 8
+
+# Setup Paths
+output_name = 'momentum_earnings'
+base_path = f'finance/_data/{output_name}'
+plot_path = f'{base_path}/plots'
+data_path = f'{base_path}/data'
+os.makedirs(data_path, exist_ok=True)
+
+# Load Core Data
+liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
+liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
+
 
 #%%
 # The dataset has the following columns 'symbol', 'date', 'is_earnings', 'event_type', 'eps', 'eps_est',
@@ -61,20 +76,10 @@ def calculate_performance(df_ticker, df_day, length_days):
 
   return df_c
 
+
 #%%
-# Setup Paths
-output_name = 'momentum_earnings'
-base_path = f'finance/_data/{output_name}'
-plot_path = f'{base_path}/plots'
-data_path = f'{base_path}/data'
-os.makedirs(data_path, exist_ok=True)
 
-# Load Core Data
 print("Loading core data...")
-liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
-liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
-df_market_cap_thresholds = pd.read_csv('finance/_data/MarketCapThresholds.csv')
-
 spy_data = utils.swing_trading_data.SwingTradingData('SPY', offline=True)
 df_spy_day = spy_data.df_day
 df_spy_week = spy_data.df_week
@@ -295,7 +300,7 @@ for i, ticker in enumerate(symbols_to_process):
             mc_row = ts_market_cap.iloc[mkp_idx]
             event_row['market_cap'] = mc_row['market_cap']
             event_row['market_cap_date'] = mc_row.name
-            event_row['market_cap_class'] = classify_market_cap(mc_row['market_cap'], mc_row.name.date().year, df_market_cap_thresholds)
+            event_row['market_cap_class'] = utils.fundamentals.classify_market_cap(mc_row['market_cap'], mc_row.name.date().year)
 
         # Merge all data
         full_row = {**event_row, **flat_day, **flat_week}
