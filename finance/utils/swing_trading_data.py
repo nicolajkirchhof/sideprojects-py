@@ -100,6 +100,8 @@ class SwingTradingData:
       df_market_cap.dropna(subset=['c'], inplace=True)
 
       df_market_cap['market_cap'] = df_market_cap['c'] * df_market_cap['shares_outstanding']
+
+      if df_market_cap.empty: return
       
       # Classify Market Cap using fundamentals utility
       df_market_cap['market_cap_class'] = df_market_cap.apply(

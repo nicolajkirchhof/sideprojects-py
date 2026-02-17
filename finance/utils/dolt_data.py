@@ -11,9 +11,17 @@ from finance import utils
 #%%
 # MySQL connection setup (localhost:3306)
 DB_URL = 'mysql+pymysql://root:@localhost:3306/'
-db_stocks_connection = create_engine(DB_URL + 'stocks')
-db_options_connection = create_engine(DB_URL + 'options')
-db_earnings_connection = create_engine(DB_URL + 'earnings')
+db_stocks_connection = None
+db_options_connection = None
+db_earnings_connection = None
+
+def init_engines():
+  global db_stocks_connection, db_options_connection, db_earnings_connection
+  db_options_connection = create_engine(DB_URL + 'options')
+  db_earnings_connection = create_engine(DB_URL + 'earnings')
+  db_stocks_connection = create_engine(DB_URL + 'stocks')
+
+init_engines()
 
 def time_db_call(func):
     """Decorator to time database function calls."""

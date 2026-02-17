@@ -88,9 +88,9 @@ df_spy_week = spy_data.df_week
 # Iteration Settings
 # SKIP = 100
 SKIP = 1
-# start_at = 0
+start_at = 0
 # start_at = len(liquid_symbols)
-start_at = liquid_symbols.index('TWAV') # Debugging start point
+start_at = liquid_symbols.index('RUBI') # Debugging start point
 # ticker = liquid_symbols[start_at]
 # symbols_to_process = ['MSFT']
 # symbols_to_process = ['IWM']
@@ -298,9 +298,16 @@ for i, ticker in enumerate(symbols_to_process):
         if ts_market_cap is not None and not ts_market_cap.empty:
             mkp_idx = ts_market_cap.index.get_indexer([reaction_date], method="nearest")[0]
             mc_row = ts_market_cap.iloc[mkp_idx]
-            event_row['market_cap'] = mc_row['market_cap']
-            event_row['market_cap_date'] = mc_row.name
-            event_row['market_cap_class'] = utils.fundamentals.classify_market_cap(mc_row['market_cap'], mc_row.name.date().year)
+            
+            # Check if market cap data is too stale (e.g. > 24 months)
+            mcap_date = mc_row.name
+            if abs((reaction_date - mcap_date).days) <= 730:
+                event_row['market_cap'] = mc_row['market_cap']
+                event_row['market_cap_date'] = mcap_date
+                event_row['market_cap_class'] = mc_row['market_cap_class']
+            else:
+                # Explicitly set to Unknown if too far away
+                event_row['market_cap_class'] = 'Unknown'
 
         # Merge all data
         full_row = {**event_row, **flat_day, **flat_week}

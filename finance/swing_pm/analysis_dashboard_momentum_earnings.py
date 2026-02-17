@@ -45,8 +45,6 @@ def load_and_prep_data():
     else:
         df['event_move'] = 0.0
 
-    df['event_move_abs'] = df['event_move'].abs()
-
     # 3. Determine Direction
     df['direction'] = np.sign(df['event_move'])
     # Replace 0 direction with 1 to avoid zeroing out data
@@ -75,26 +73,26 @@ def load_and_prep_data():
 
     # 6. Create Aligned Path Columns (Multiplying by direction)
     # This allows us to view "Continuation" regardless of Up/Down start
-    new_cols = {}
+    # new_cols = {}
     
     # Daily Alignment
-    for d in range(1, 26): # 1 to 25
-        col = f'cpct{d}'
-        if col in df.columns:
-            new_cols[f'aligned_cpct{d}'] = df[col] * df['direction']
+    # for d in range(1, 26): # 1 to 25
+    #     col = f'cpct{d}'
+    #     if col in df.columns:
+    #         new_cols[f'aligned_cpct{d}'] = df[col] * df['direction']
         
         # Align EMA distances too? usually less relevant to flip sign, 
         # but if we want "Distance in direction of trade", maybe. 
         # For now, we keep EMA distances raw in the filters.
 
     # Weekly Alignment
-    for w in range(1, 10): # 1 to 9
-        col = f'w_cpct{w}'
-        if col in df.columns:
-            new_cols[f'aligned_w_cpct{w}'] = df[col] * df['direction']
+    # for w in range(1, 10): # 1 to 9
+    #     col = f'w_cpct{w}'
+    #     if col in df.columns:
+    #         new_cols[f'aligned_w_cpct{w}'] = df[col] * df['direction']
 
-    if new_cols:
-        df = pd.concat([df, pd.DataFrame(new_cols)], axis=1)
+    # if new_cols:
+    #     df = pd.concat([df, pd.DataFrame(new_cols)], axis=1)
 
     print(f"Data Loaded: {len(df)} records.")
     return df
@@ -125,9 +123,9 @@ class MomentumEarningsDashboard:
         self.fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05, wspace=0.15)
 
         # --- Controls Panel (Left Column) ---
-        # 23 Rows Total
+        # 23 Rows Total (Removed Duration Slider)
         gs_controls = gridspec.GridSpecFromSubplotSpec(23, 1, subplot_spec=self.gs[0], 
-                                                       height_ratios=[0.8, 1, 1.2, 1.2, 0.8, 1.2, 
+                                                       height_ratios=[0.8, 1, 1.0, 1.2, 1.2, 0.8, 
                                                                       0.6, 0.6, 0.6, 
                                                                       0.6, 0.6, 0.6, 0.6, 0.6, 
                                                                       0.6, 0.6, 0.6, 0.6, 0.6, 
@@ -148,8 +146,25 @@ class MomentumEarningsDashboard:
         self.btn_update = Button(self.ax_btn, 'Update Charts', color='#00a8ff', hovercolor='#0097e6')
         self.btn_update.on_clicked(self.update)
 
-        # 2. Event Move Slider (Signed)
-        self.ax_slider_move = self.fig.add_subplot(gs_controls[2])
+        # 2. Year Range Slider
+        self.ax_slider_year = self.fig.add_subplot(gs_controls[2])
+        
+        min_y, max_y = 2000, pd.Timestamp.now().year
+        if not self.df.empty and 'date' in self.df.columns:
+            min_y = int(self.df['date'].dt.year.min())
+            max_y = int(self.df['date'].dt.year.max())
+
+        # Default: 2010 to Now (or max available)
+        def_start = 2010
+        def_end = max_y 
+        if min_y > def_start: min_y = def_start 
+        
+        self.ax_slider_year.set_title(f"Year Range: [{def_start}, {def_end}]", fontsize=9)
+        self.slider_year = RangeSlider(self.ax_slider_year, '', min_y, max_y, valinit=(def_start, def_end), valstep=1, color='cyan')
+        self.slider_year.on_changed(lambda v: self.ax_slider_year.set_title(f"Year Range: [{int(v[0])}, {int(v[1])}]", fontsize=9))
+
+        # 3. Event Move Slider (Signed)
+        self.ax_slider_move = self.fig.add_subplot(gs_controls[3])
         min_m, max_m = -30, 30
         if not self.df.empty and 'event_move' in self.df.columns:
              vals = self.df['event_move'].dropna()
@@ -166,16 +181,16 @@ class MomentumEarningsDashboard:
         self.slider_move = RangeSlider(self.ax_slider_move, '', vmin_s, vmax_s, valinit=(min_m, max_m))
         self.slider_move.on_changed(lambda v: self.ax_slider_move.set_title(f"Event Move (Signed): [{v[0]:.1f}, {v[1]:.1f}]", fontsize=9))
 
-        # 3. Price Slider
-        self.ax_slider_price = self.fig.add_subplot(gs_controls[3])
+        # 4. Price Slider
+        self.ax_slider_price = self.fig.add_subplot(gs_controls[4])
         min_p, max_p = 0, 500
         if not self.df.empty and 'c0' in self.df.columns:
              min_p = self.df['c0'].min()
              max_p = self.df['c0'].quantile(0.99)
         self.slider_price = self._create_range_slider(self.ax_slider_price, 'c0', "Breakout Price", min_p, max_p)
 
-        # 4. Direction (Horizontal Buttons)
-        gs_dir = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[4], wspace=0.05)
+        # 5. Direction (Horizontal Buttons)
+        gs_dir = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[5], wspace=0.05)
         self.btns_dir = {}
         for i, (lbl, val) in enumerate([('Pos', 'Positive'), ('Neg', 'Negative')]):
             ax = self.fig.add_subplot(gs_dir[i])
@@ -185,34 +200,28 @@ class MomentumEarningsDashboard:
             btn.on_clicked(lambda e, v=val: self.set_direction(v))
             self.btns_dir[val] = {'btn': btn, 'ax': ax}
 
-        # 5. Duration Slider
-        self.ax_slider_dur = self.fig.add_subplot(gs_controls[5])
-        self.ax_slider_dur.set_title("View Duration", fontsize=9)
-        self.slider_dur = Slider(self.ax_slider_dur, '', 1, 24, valinit=24, valstep=1, color='cyan')
-        self.slider_dur.on_changed(self.on_duration_change)
-
-        # 6-8. Momentum Filters
+        # 6-8. Momentum Filters (Shifted up, index 6)
         self.mom_sliders = {}
         for i, mom_col in enumerate(['1M_chg', '3M_chg', '6M_chg']):
             ax = self.fig.add_subplot(gs_controls[6+i])
-            self.mom_sliders[mom_col] = self._create_range_slider(ax, mom_col, mom_col, -50, 50, cap_at_quantile=True)
+            self.mom_sliders[mom_col] = self._create_range_slider(ax, mom_col, mom_col, -50, 50)
 
-        # 9-13. Underlying EMA Filters
+        # 9-13. Underlying EMA Filters (Shifted up, index 9)
         self.ema_sliders = {}
         ema_dists = ['ema10', 'ema20', 'ema50', 'ema100', 'ema200']
         for i, ema_name in enumerate(ema_dists):
             col = f"{ema_name}_dist0"
             ax = self.fig.add_subplot(gs_controls[9+i])
-            self.ema_sliders[col] = self._create_range_slider(ax, col, f"{ema_name} Dist", -20, 20, cap_at_quantile=True)
+            self.ema_sliders[col] = self._create_range_slider(ax, col, f"{ema_name} Dist", -20, 20)
 
-        # 14-18. SPY EMA Filters
+        # 14-18. SPY EMA Filters (Shifted up, index 14)
         self.spy_ema_sliders = {}
         for i, ema_name in enumerate(ema_dists):
             col = f"spy_{ema_name}_dist0"
             ax = self.fig.add_subplot(gs_controls[14+i])
-            self.spy_ema_sliders[col] = self._create_range_slider(ax, col, f"SPY {ema_name} Dist", -10, 10, cap_at_quantile=True)
+            self.spy_ema_sliders[col] = self._create_range_slider(ax, col, f"SPY {ema_name} Dist", -10, 10)
 
-        # 19. Conditional Survival Filter
+        # 19. Conditional Survival Filter (Shifted up, index 19)
         gs_cond = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[19], width_ratios=[1, 2], wspace=0.1)
         
         self.ax_slider_cond_t = self.fig.add_subplot(gs_cond[0])
@@ -226,7 +235,7 @@ class MomentumEarningsDashboard:
         self.slider_cond_v = RangeSlider(self.ax_slider_cond_v, '', -20, 50, valinit=(-20, 50))
         # No auto-update
 
-        # 20. Misc Filters
+        # 20. Misc Filters (Shifted up, index 20)
         gs_misc = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[20], hspace=0.1)
         self.ax_rad_earn = self.fig.add_subplot(gs_misc[0])
         self.ax_rad_earn.set_title("Event Type", fontsize=9)
@@ -236,7 +245,7 @@ class MomentumEarningsDashboard:
         self.ax_rad_spy.set_title("SPY Context", fontsize=9)
         self.radio_spy = RadioButtons(self.ax_rad_spy, ('All', 'Supporting', 'Neutral', 'Non-Supporting'), active=0, activecolor='cyan')
 
-        # 21. Market Cap
+        # 21. Market Cap (Shifted up, index 21)
         gs_mcap_container = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_controls[21], height_ratios=[0.3, 1], hspace=0.1)
         ax_mcap_title = self.fig.add_subplot(gs_mcap_container[0])
         ax_mcap_title.text(0.5, 0, "Market Cap", ha='center', va='bottom', fontsize=9, color='white')
@@ -255,7 +264,7 @@ class MomentumEarningsDashboard:
             btn.on_clicked(lambda event, m=mcap: self.set_mcap(m))
             self.mcap_buttons[mcap] = btn
 
-        # 22. Y-Limit
+        # 22. Y-Limit (Shifted up, index 22)
         self.ax_slider_ylim = self.fig.add_subplot(gs_controls[22])
         self.ax_slider_ylim.set_title("Y-Axis Limit %", fontsize=9)
         self.slider_ylim = Slider(self.ax_slider_ylim, '', 10, 200, valinit=50, valstep=5, color='cyan')
@@ -293,19 +302,11 @@ class MomentumEarningsDashboard:
         for ax in [self.ax_w_path, self.ax_w_violin, self.ax_w_probs]: ax.set_visible(not is_daily)
 
         if is_daily:
-            self.slider_dur.valmax = 24
-            self.slider_dur.set_val(self.dur_view['Daily'])
-            self.slider_dur.ax.set_xlim(1, 24)
-
             # Update Cond T Slider
             self.slider_cond_t.valmax = 24
             self.slider_cond_t.ax.set_xlim(0, 24)
             if self.slider_cond_t.val > 24: self.slider_cond_t.set_val(24)
         else:
-            self.slider_dur.valmax = 8
-            self.slider_dur.set_val(self.dur_view['Weekly'])
-            self.slider_dur.ax.set_xlim(1, 8)
-
             # Update Cond T Slider
             self.slider_cond_t.valmax = 8
             self.slider_cond_t.ax.set_xlim(0, 8)
@@ -366,7 +367,7 @@ class MomentumEarningsDashboard:
             vmin, vmax = -20.0, 50.0
         else:
             tf = self.view_tab
-            col = f'aligned_cpct{cond_t}' if tf == 'Daily' else f'aligned_w_cpct{cond_t}'
+            col = f'cpct{cond_t}' if tf == 'Daily' else f'w_cpct{cond_t}'
 
             if col in self.df.columns:
                 vals = self.df[col].dropna()
@@ -406,22 +407,16 @@ class MomentumEarningsDashboard:
     def _create_range_slider(self, ax, col_name, title, default_min, default_max, cap_at_quantile=False):
         """Helper to create consistent range sliders with labels."""
         vmin, vmax = default_min, default_max
-        if cap_at_quantile and not self.df.empty and col_name in self.df.columns:
+        if not self.df.empty and col_name in self.df.columns:
             vals = self.df[col_name].dropna()
             if not vals.empty:
-                q_min = vals.quantile(0.01)
-                q_max = vals.quantile(0.99)
-                vmin = q_min
-                vmax = q_max
+                vmin = vals.min()
+                vmax = vals.max()
 
         if vmin >= vmax: vmax = vmin + 1.0
 
-        # Pad the slider limits slightly so the handles aren't stuck at the edges
-        rng = vmax - vmin
-        vmin_s, vmax_s = vmin - rng*0.1, vmax + rng*0.1
-
         ax.set_title(f"{title}: [{vmin:.1f}, {vmax:.1f}]", fontsize=9)
-        slider = RangeSlider(ax, '', vmin_s, vmax_s, valinit=(vmin, vmax))
+        slider = RangeSlider(ax, '', vmin, vmax, valinit=(vmin, vmax))
 
         # Callback to update label
         def update_label(val):
@@ -433,23 +428,13 @@ class MomentumEarningsDashboard:
     def change_timeframe(self, val):
         pass # Obsolete with tabs
 
-    def on_duration_change(self, val):
-        """Updates x-limits purely for zoom, no recalc."""
-        tf = self.view_tab
-        self.dur_view[tf] = val
-        
-        if tf == 'Daily':
-            self.ax_d_path.set_xlim(1, val)
-            self.ax_d_violin.set_xlim(1, val)
-            self.ax_d_probs.set_xlim(1, val)
-        else:
-            self.ax_w_path.set_xlim(1, val)
-            self.ax_w_violin.set_xlim(1, val)
-            self.ax_w_probs.set_xlim(1, val)
-        self.fig.canvas.draw_idle()
-
     def get_filtered_data(self):
         mask = pd.Series(True, index=self.df.index)
+
+        # 0. Year Range
+        min_y, max_y = self.slider_year.val
+        if 'date' in self.df.columns:
+             mask &= (self.df['date'].dt.year >= min_y) & (self.df['date'].dt.year <= max_y)
 
         # 1. Signed Move
         min_m, max_m = self.slider_move.val
@@ -510,9 +495,9 @@ class MomentumEarningsDashboard:
             # Construct column name based on timeframe
             # We use aligned columns to match positive/negative logic
             if tf == 'Daily':
-                col = f'aligned_cpct{cond_t}'
+                col = f'cpct{cond_t}'
             else:
-                col = f'aligned_w_cpct{cond_t}'
+                col = f'w_cpct{cond_t}'
             
             if col in self.df.columns:
                  mask &= (self.df[col] >= min_c) & (self.df[col] <= max_c)
@@ -540,13 +525,13 @@ class MomentumEarningsDashboard:
         ax_path, ax_violin, ax_probs = axes
 
         if tf == 'Daily':
-            prefix = 'aligned_cpct'
+            prefix = 'cpct'
             xlabel = "Days After Event"
             ema10_gen = lambda i: f'ema10_dist{i}'
             ema20_gen = lambda i: f'ema20_dist{i}'
             ema50_gen = lambda i: f'ema50_dist{i}'
         else: # Weekly
-            prefix = 'aligned_w_cpct'
+            prefix = 'w_cpct'
             xlabel = "Weeks After Event"
             ema10_gen = lambda i: f'w_ema10_dist{i}'
             ema20_gen = lambda i: f'w_ema20_dist{i}'
@@ -557,9 +542,9 @@ class MomentumEarningsDashboard:
             col = f'{prefix}{i}'
             if col in sub_df.columns:
                 periods.append(i)
-        
+
         path_cols = [f'{prefix}{i}' for i in periods]
-        
+
         # --- 1. Path Chart ---
         if path_cols:
             path_data = sub_df[path_cols]
@@ -570,7 +555,7 @@ class MomentumEarningsDashboard:
             ax_path.fill_between(periods, mean_path - std_path, mean_path + std_path, color='cyan', alpha=0.15, label='1 Std Dev')
             ax_path.axhline(0, color='white', linestyle='--', alpha=0.5)
 
-            title_str = f"Aligned Trajectory (N={len(sub_df)}) | Positive = Continuation"
+            title_str = f"Trajectory (N={len(sub_df)}) | Positive = Continuation"
             ax_path.set_title(title_str)
             ax_path.set_ylabel("% Change from Event")
             ax_path.legend(loc='upper left')
