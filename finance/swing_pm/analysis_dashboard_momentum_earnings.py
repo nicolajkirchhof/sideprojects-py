@@ -19,15 +19,19 @@ plt.style.use('dark_background')
 sns.set_palette("viridis")
 
 #%%
-def load_and_prep_data():
+def load_and_prep_data(years):
     """Loads and standardizes the momentum/earnings dataset for the dashboard."""
     print("Loading momentum earnings data...")
-    try:
-        df = pd.read_pickle('finance/_data/all_momentum_earnings.pkl')
-    except FileNotFoundError:
-        print("Data file 'finance/_data/all_momentum_earnings.pkl' not found.")
-        print("Please run 'finance/swing_pm/create_data_momentum_earnings_analysis.py' first.")
-        return pd.DataFrame()
+    dfs = []
+    for year in years:
+        filename = f'finance/_data/momentum_earnings/all_{year}.pkl'
+        try:
+            dfs.append(pd.read_pickle(filename))
+        except FileNotFoundError:
+            print(f"Data file {filename} not found.")
+            print("Please run 'finance/swing_pm/create_data_momentum_earnings_analysis.py' first.")
+            return pd.DataFrame()
+    df = pd.concat(dfs)
 
     df = df.reset_index(drop=True)
     df = df.replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
@@ -629,7 +633,7 @@ class MomentumEarningsDashboard:
 
 #%%
 # if __name__ == '__main__':
-data = load_and_prep_data()
+data = load_and_prep_data(range(2012, 2026))
 #%%
 if not data.empty:
     dash = MomentumEarningsDashboard(data)

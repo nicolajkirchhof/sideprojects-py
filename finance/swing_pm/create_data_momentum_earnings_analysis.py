@@ -353,3 +353,12 @@ if all_data:
     df_all = pd.concat(all_data)
     df_all.to_pickle(f'finance/_data/all_{output_name}.pkl')
     print(f"Complete. Saved to finance/_data/all_{output_name}.pkl")
+
+#%% Split file into chunks by year starting from < 2010, 2011, ... 2025
+previous_year = 1900
+for year in range(2010, 2026):
+    filename = f'finance/_data/{output_name}/all_{year}.pkl'
+    df_year = df_all[(df_all.date.dt.year > previous_year) & (df_all.date.dt.year <= year)]
+    df_year.to_pickle(filename)
+    print(f"Complete. Saved to {filename}")
+    previous_year = year
