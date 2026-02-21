@@ -33,6 +33,8 @@ def load_and_prep_data(years):
             return pd.DataFrame()
     df = pd.concat(dfs)
 
+    df = df[df['original_price'] < 10e5].copy()
+
     df = df.reset_index(drop=True)
     df = df.replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
 
@@ -40,6 +42,13 @@ def load_and_prep_data(years):
     # We look for 'c0' (event day) and at least 'c24' or similar to ensure we have data
     if 'c0' in df.columns:
         df = df.dropna(subset=['c0'])
+
+    # Prefer original_price when available; fallback to c0
+    # This is the "effective event price" used by the dashboard (filters, stats, etc.)
+    if 'original_price' in df.columns:
+        df['event_price'] = df['original_price'].where(df['original_price'].notna(), df['c0'])
+    else:
+        df['event_price'] = df['c0']
 
     # 2. Define "Strength" of the move
     # We use the Close % Change on the event day (cpct0) relative to day -1
@@ -75,28 +84,6 @@ def load_and_prep_data(years):
     else:
         df['spy_class'] = 'Unknown'
 
-    # 6. Create Aligned Path Columns (Multiplying by direction)
-    # This allows us to view "Continuation" regardless of Up/Down start
-    # new_cols = {}
-    
-    # Daily Alignment
-    # for d in range(1, 26): # 1 to 25
-    #     col = f'cpct{d}'
-    #     if col in df.columns:
-    #         new_cols[f'aligned_cpct{d}'] = df[col] * df['direction']
-        
-        # Align EMA distances too? usually less relevant to flip sign, 
-        # but if we want "Distance in direction of trade", maybe. 
-        # For now, we keep EMA distances raw in the filters.
-
-    # Weekly Alignment
-    # for w in range(1, 10): # 1 to 9
-    #     col = f'w_cpct{w}'
-    #     if col in df.columns:
-    #         new_cols[f'aligned_w_cpct{w}'] = df[col] * df['direction']
-
-    # if new_cols:
-    #     df = pd.concat([df, pd.DataFrame(new_cols)], axis=1)
 
     print(f"Data Loaded: {len(df)} records.")
     return df
@@ -104,7 +91,7 @@ def load_and_prep_data(years):
 class MomentumEarningsDashboard:
     def __init__(self, df):
         self.df = df
-        
+
         # --- Config & State ---
         self.daily_range = list(range(1, 25))
         self.weekly_range = list(range(1, 9))
@@ -121,18 +108,18 @@ class MomentumEarningsDashboard:
         # --- Layout Setup ---
         self.fig = plt.figure(figsize=(28, 22))
         self.fig.canvas.manager.set_window_title('Momentum & Earnings Analysis Dashboard')
-    
+
         # Grid: Left (Controls) | Right (Charts)
         self.gs = gridspec.GridSpec(1, 2, width_ratios=[1, 4])
         self.fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05, wspace=0.15)
 
         # --- Controls Panel (Left Column) ---
         # 23 Rows Total (Removed Duration Slider)
-        gs_controls = gridspec.GridSpecFromSubplotSpec(23, 1, subplot_spec=self.gs[0], 
-                                                       height_ratios=[0.8, 1, 1.0, 1.2, 1.2, 0.8, 
-                                                                      0.6, 0.6, 0.6, 
-                                                                      0.6, 0.6, 0.6, 0.6, 0.6, 
-                                                                      0.6, 0.6, 0.6, 0.6, 0.6, 
+        gs_controls = gridspec.GridSpecFromSubplotSpec(23, 1, subplot_spec=self.gs[0],
+                                                       height_ratios=[0.8, 1, 1.0, 1.2, 1.2, 0.8,
+                                                                      0.6, 0.6, 0.6,
+                                                                      0.6, 0.6, 0.6, 0.6, 0.6,
+                                                                      0.6, 0.6, 0.6, 0.6, 0.6,
                                                                       1.2, 1.5, 1.2, 1.0],
                                                        hspace=0.6)
 
@@ -185,13 +172,13 @@ class MomentumEarningsDashboard:
         self.slider_move = RangeSlider(self.ax_slider_move, '', vmin_s, vmax_s, valinit=(min_m, max_m))
         self.slider_move.on_changed(lambda v: self.ax_slider_move.set_title(f"Event Move (Signed): [{v[0]:.1f}, {v[1]:.1f}]", fontsize=9))
 
-        # 4. Price Slider
+        # 4. Price Slider (use event_price = original_price if present else c0)
         self.ax_slider_price = self.fig.add_subplot(gs_controls[4])
         min_p, max_p = 0, 500
-        if not self.df.empty and 'c0' in self.df.columns:
-             min_p = self.df['c0'].min()
-             max_p = self.df['c0'].quantile(0.99)
-        self.slider_price = self._create_range_slider(self.ax_slider_price, 'c0', "Breakout Price", min_p, max_p)
+        if not self.df.empty and 'event_price' in self.df.columns:
+             min_p = float(self.df['event_price'].min())
+             max_p = float(self.df['event_price'].quantile(0.99))
+        self.slider_price = self._create_range_slider(self.ax_slider_price, 'event_price', "Breakout Price", min_p, max_p)
 
         # 5. Direction (Horizontal Buttons)
         gs_dir = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[5], wspace=0.05)
@@ -444,10 +431,10 @@ class MomentumEarningsDashboard:
         min_m, max_m = self.slider_move.val
         mask &= (self.df['event_move'] >= min_m) & (self.df['event_move'] <= max_m)
 
-        # 1b. Breakout Price
+        # 1b. Breakout Price (use event_price)
         min_p, max_p = self.slider_price.val
-        if 'c0' in self.df.columns:
-             mask &= (self.df['c0'] >= min_p) & (self.df['c0'] <= max_p)
+        if 'event_price' in self.df.columns:
+             mask &= (self.df['event_price'] >= min_p) & (self.df['event_price'] <= max_p)
 
         # 2. Momentum (Multi-Select)
         for mom_col, slider in self.mom_sliders.items():
@@ -531,12 +518,14 @@ class MomentumEarningsDashboard:
         if tf == 'Daily':
             prefix = 'cpct'
             xlabel = "Days After Event"
+            ema5_gen = lambda i: f'ema5_dist{i}'
             ema10_gen = lambda i: f'ema10_dist{i}'
             ema20_gen = lambda i: f'ema20_dist{i}'
             ema50_gen = lambda i: f'ema50_dist{i}'
         else: # Weekly
             prefix = 'w_cpct'
             xlabel = "Weeks After Event"
+            ema5_gen = lambda i: f'w_ema5_dist{i}'
             ema10_gen = lambda i: f'w_ema10_dist{i}'
             ema20_gen = lambda i: f'w_ema20_dist{i}'
             ema50_gen = lambda i: f'w_ema50_dist{i}'
@@ -611,14 +600,22 @@ class MomentumEarningsDashboard:
                 return curve
 
             y_bk = get_survival_prob(lambda i: f'{prefix}{i}', 0)
+            y_ema5 = get_survival_prob(ema5_gen, 0)
             y_ema10 = get_survival_prob(ema10_gen, 0)
-            y_ema20 = get_survival_prob(ema20_gen, 0)
-            y_ema50 = get_survival_prob(ema50_gen, 0)
 
             ax_probs.plot(periods, y_bk, color='#ff6b6b', label='> Entry', linewidth=2, marker='o', markersize=4)
-            ax_probs.plot(periods, y_ema10, color='#feca57', label='> EMA10', linewidth=2, marker='o', markersize=4)
-            ax_probs.plot(periods, y_ema20, color='#48dbfb', label='> EMA20', linewidth=2, marker='o', markersize=4)
-            ax_probs.plot(periods, y_ema50, color='#1dd1a1', label='> EMA50', linewidth=2, marker='o', markersize=4)
+
+            if tf == 'Daily':
+                y_ema20 = get_survival_prob(ema20_gen, 0)
+                ax_probs.plot(periods, y_ema5, color='#c8d6e5', label='> EMA5', linewidth=2, marker='o', markersize=4)
+                ax_probs.plot(periods, y_ema10, color='#feca57', label='> EMA10', linewidth=2, marker='o', markersize=4)
+                ax_probs.plot(periods, y_ema20, color='#48dbfb', label='> EMA20', linewidth=2, marker='o', markersize=4)
+                legend_cols = 4
+            else:
+                # Weekly: only EMA5 and EMA10
+                ax_probs.plot(periods, y_ema5, color='#c8d6e5', label='> EMA5', linewidth=2, marker='o', markersize=4)
+                ax_probs.plot(periods, y_ema10, color='#feca57', label='> EMA10', linewidth=2, marker='o', markersize=4)
+                legend_cols = 3
 
             ax_probs.set_ylim(0, 105)
             ax_probs.set_ylabel("Prob. (%)")

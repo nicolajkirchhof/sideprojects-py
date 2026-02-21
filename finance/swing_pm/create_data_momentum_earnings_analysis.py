@@ -12,11 +12,10 @@ import finance.utils as utils
 # %autoreload 2
 
 # Constants from momentum.py
-INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp14', 'atrp20', 'atrp50', 'pct', 'rvol50', 'std_mv', 'iv', 'hv9', 'hv14', 'hv20',
+INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp20', 'atrp50', 'pct', 'rvol20', 'rvol50', 'std_mv', 'iv', 'hv9', 'hv20',
               'ema200_dist', 'ema100_dist', 'ema50_dist', 'ema20_dist', 'ema10_dist', 'ema5_dist',
               'ema5_slope', 'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
-SPY_INDICATORS = ['hv9', 'hv14', 'hv20', 
-                  'ema10_dist', 'ema20_dist', 'ema50_dist', 'ema100_dist', 'ema200_dist',
+SPY_INDICATORS = ['hv9', 'hv20', 'ema10_dist', 'ema20_dist', 'ema50_dist', 'ema100_dist', 'ema200_dist',
                   'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
 OFFSET_DAYS = 25
 OFFSET_WEEKS = 8
@@ -24,14 +23,12 @@ OFFSET_WEEKS = 8
 # Setup Paths
 output_name = 'momentum_earnings'
 base_path = f'finance/_data/{output_name}'
-plot_path = f'{base_path}/plots'
-data_path = f'{base_path}/data'
+data_path = f'{base_path}/ticker'
 os.makedirs(data_path, exist_ok=True)
 
 # Load Core Data
 liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
 liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
-
 
 #%%
 # The dataset has the following columns 'symbol', 'date', 'is_earnings', 'event_type', 'eps', 'eps_est',
@@ -90,12 +87,14 @@ df_spy_week = spy_data.df_week
 SKIP = 1
 start_at = 0
 # start_at = len(liquid_symbols)
-start_at = liquid_symbols.index('RUBI') # Debugging start point
+# start_at = liquid_symbols.index('RUBI') # Debugging start point
 # ticker = liquid_symbols[start_at]
 # symbols_to_process = ['MSFT']
 # symbols_to_process = ['IWM']
 symbols_to_process = liquid_symbols[start_at::SKIP]
 total_symbols = len(symbols_to_process)
+#%%
+# symbols_to_process = ['PKX']
 #%%
 for i, ticker in enumerate(symbols_to_process):
     ticker_start = time.time()
@@ -291,7 +290,8 @@ for i, ticker in enumerate(symbols_to_process):
             'gappct': df_day.iloc[reaction_idx].gappct,
             'market_cap': np.nan, # To be filled
             'market_cap_date': pd.NaT,
-            'market_cap_class': 'Unknown'
+            'market_cap_class': 'Unknown',
+            'original_price': df_day.iloc[reaction_idx].original_price if 'original_price' in df_day.columns else np.nan
         }
 
         # Market Cap Lookup
@@ -344,6 +344,7 @@ for i, ticker in enumerate(symbols_to_process):
 # --- 4. Final Aggregation ---
 print("Aggregating all files...")
 all_data = []
+all_data_filename = f'finance/_data/{output_name}/all.pkl'
 for ticker in liquid_symbols:
     filename = f'{data_path}/{ticker}.pkl'
     if os.path.exists(filename):
@@ -351,8 +352,8 @@ for ticker in liquid_symbols:
 
 if all_data:
     df_all = pd.concat(all_data)
-    df_all.to_pickle(f'finance/_data/all_{output_name}.pkl')
-    print(f"Complete. Saved to finance/_data/all_{output_name}.pkl")
+    df_all.to_pickle()
+    print(f"Complete. Saved to {all_data_filename}")
 
 #%% Split file into chunks by year starting from < 2010, 2011, ... 2025
 previous_year = 1900
