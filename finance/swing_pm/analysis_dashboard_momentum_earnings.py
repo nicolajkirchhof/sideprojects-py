@@ -88,9 +88,126 @@ def load_and_prep_data(years):
     print(f"Data Loaded: {len(df)} records.")
     return df
 
+class _MinMaxInput:
+    """
+    Range-like input backed by two TextBoxes.
+    - Filtering is decoupled: this widget never triggers filtering by itself.
+    - More responsive: redraw on every keystroke (debounced) so the UI doesn't feel "stuck".
+    """
+    def __init__(self, ax, title, vmin, vmax, fmt=".2f", on_change=None, show_header=False):
+        self._ax = ax
+        self._title = title
+        self._defaults = (float(vmin), float(vmax))
+        self._fmt = fmt
+        self._on_change = on_change  # optional UI-only callback (NO filtering)
+        self._redraw_timer = None
+
+        # Parent axis: label only
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_facecolor("none")
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        # Optional single "min / max" header (shown once above the whole inputs area)
+        if show_header:
+            ax.text(0.52, 0.92, "min", transform=ax.transAxes, ha="left", va="top",
+                    fontsize=8, color="#AAAAAA")
+            ax.text(0.78, 0.92, "max", transform=ax.transAxes, ha="left", va="top",
+                    fontsize=8, color="#AAAAAA")
+
+        # Description on the same line (left)
+        ax.text(
+            0.00, 0.50,
+            f"{title}:",
+            transform=ax.transAxes,
+            ha="left", va="center",
+            fontsize=9,
+            color="#DDDDDD",
+        )
+
+        # Small inputs (no per-input "min/max" label; header above covers it)
+        ax_min = ax.inset_axes([0.52, 0.22, 0.20, 0.56])
+        ax_max = ax.inset_axes([0.78, 0.22, 0.20, 0.56])
+
+        self.box_min = TextBox(ax_min, "", initial=f"{float(vmin):{fmt}}")
+        self.box_max = TextBox(ax_max, "", initial=f"{float(vmax):{fmt}}")
+
+        # Force TRUE black background (TextBox draws its own patch)
+        for tb in (self.box_min, self.box_max):
+            tb.ax.set_facecolor("#000000")
+            tb.ax.patch.set_facecolor("#000000")
+            tb.ax.patch.set_alpha(1.0)
+
+            for sp in tb.ax.spines.values():
+                sp.set_edgecolor("#666666")
+                sp.set_linewidth(0.8)
+
+            tb.label.set_visible(False)
+            tb.text_disp.set_color("#FFFFFF")
+            tb.text_disp.set_fontsize(8)
+
+        # More responsive typing: redraw as user types (debounced),
+        # and still keep on_submit for "enter" finalization.
+        self.box_min.on_text_change(self._text_changed)
+        self.box_max.on_text_change(self._text_changed)
+        self.box_min.on_submit(self._submitted)
+        self.box_max.on_submit(self._submitted)
+
+    @property
+    def val(self):
+        def _to_float(s, fallback):
+            try:
+                x = float(str(s).strip())
+                if np.isfinite(x):
+                    return x
+            except Exception:
+                pass
+            return fallback
+
+        dmin, dmax = self._defaults
+        vmin = _to_float(self.box_min.text, dmin)
+        vmax = _to_float(self.box_max.text, dmax)
+
+        if vmin > vmax:
+            vmin, vmax = vmax, vmin
+        return (vmin, vmax)
+
+    def set_val(self, v):
+        vmin, vmax = float(v[0]), float(v[1])
+        self.box_min.set_val(f"{vmin:{self._fmt}}")
+        self.box_max.set_val(f"{vmax:{self._fmt}}")
+        self._ax.figure.canvas.draw_idle()
+        if self._on_change is not None:
+            self._on_change(self.val)
+
+    def _text_changed(self, _text):
+        # Debounce redraws to keep UI snappy even while typing quickly.
+        if self._redraw_timer is None:
+            self._redraw_timer = self._ax.figure.canvas.new_timer(interval=75)
+            self._redraw_timer.single_shot = True
+            self._redraw_timer.add_callback(lambda: self._ax.figure.canvas.draw_idle())
+        try:
+            self._redraw_timer.stop()
+        except Exception:
+            pass
+        self._redraw_timer.start()
+
+        if self._on_change is not None:
+            self._on_change(self.val)
+
+    def _submitted(self, _text):
+        # Still do a redraw on Enter; do NOT trigger filtering here.
+        self._ax.figure.canvas.draw_idle()
+        if self._on_change is not None:
+            self._on_change(self.val)
+
+
 class MomentumEarningsDashboard:
     def __init__(self, df):
         self.df = df
+        self._pending_update = False
+        self._ui_timer = None
 
         # --- Config & State ---
         self.daily_range = list(range(1, 25))
@@ -106,7 +223,8 @@ class MomentumEarningsDashboard:
         self._cond_timer = None
 
         # --- Layout Setup ---
-        self.fig = plt.figure(figsize=(28, 22))
+        # Optimized for 4K (3840x2160 ~ 16:9): wider, slightly less tall than before
+        self.fig = plt.figure(figsize=(24, 14), dpi=120)
         self.fig.canvas.manager.set_window_title('Momentum & Earnings Analysis Dashboard')
 
         # Grid: Left (Controls) | Right (Charts)
@@ -135,26 +253,26 @@ class MomentumEarningsDashboard:
         # 1. Update Button
         self.ax_btn = self.fig.add_subplot(gs_controls[1])
         self.btn_update = Button(self.ax_btn, 'Update Charts', color='#00a8ff', hovercolor='#0097e6')
-        self.btn_update.on_clicked(self.update)
 
-        # 2. Year Range Slider
+        # 2. Year Range (convert to Min/Max TextBoxes so it matches the other ranges)
         self.ax_slider_year = self.fig.add_subplot(gs_controls[2])
-        
+
         min_y, max_y = 2000, pd.Timestamp.now().year
         if not self.df.empty and 'date' in self.df.columns:
             min_y = int(self.df['date'].dt.year.min())
             max_y = int(self.df['date'].dt.year.max())
 
-        # Default: 2010 to Now (or max available)
         def_start = 2010
-        def_end = max_y 
-        if min_y > def_start: min_y = def_start 
-        
-        self.ax_slider_year.set_title(f"Year Range: [{def_start}, {def_end}]", fontsize=9)
-        self.slider_year = RangeSlider(self.ax_slider_year, '', min_y, max_y, valinit=(def_start, def_end), valstep=1, color='cyan')
-        self.slider_year.on_changed(lambda v: self.ax_slider_year.set_title(f"Year Range: [{int(v[0])}, {int(v[1])}]", fontsize=9))
+        def_end = max_y
+        if min_y > def_start:
+            min_y = def_start
 
-        # 3. Event Move Slider (Signed)
+        # Show min/max header once here (above all the min/max inputs below)
+        self.slider_year = self._create_minmax_inputs(
+            self.ax_slider_year, 'date_year', "Year Range", def_start, def_end, fmt=".0f", show_header=True
+        )
+
+        # 3. Event Move (Min/Max TextBoxes)
         self.ax_slider_move = self.fig.add_subplot(gs_controls[3])
         min_m, max_m = -30, 30
         if not self.df.empty and 'event_move' in self.df.columns:
@@ -163,22 +281,15 @@ class MomentumEarningsDashboard:
                  min_m = vals.quantile(0.01)
                  max_m = vals.quantile(0.99)
 
-        # Ensure handles don't stick
-        rng = max_m - min_m
-        if rng == 0: rng = 1.0
-        vmin_s, vmax_s = min_m - rng * 0.1, max_m + rng * 0.1
+        self.slider_move = self._create_minmax_inputs(self.ax_slider_move, 'event_move', "Event Move (Signed)", min_m, max_m, fmt=".2f")
 
-        self.ax_slider_move.set_title(f"Event Move (Signed): [{min_m:.1f}, {max_m:.1f}]", fontsize=9)
-        self.slider_move = RangeSlider(self.ax_slider_move, '', vmin_s, vmax_s, valinit=(min_m, max_m))
-        self.slider_move.on_changed(lambda v: self.ax_slider_move.set_title(f"Event Move (Signed): [{v[0]:.1f}, {v[1]:.1f}]", fontsize=9))
-
-        # 4. Price Slider (use event_price = original_price if present else c0)
+        # 4. Price (Min/Max TextBoxes)
         self.ax_slider_price = self.fig.add_subplot(gs_controls[4])
         min_p, max_p = 0, 500
         if not self.df.empty and 'event_price' in self.df.columns:
              min_p = float(self.df['event_price'].min())
              max_p = float(self.df['event_price'].quantile(0.99))
-        self.slider_price = self._create_range_slider(self.ax_slider_price, 'event_price', "Breakout Price", min_p, max_p)
+        self.slider_price = self._create_minmax_inputs(self.ax_slider_price, 'event_price', "Breakout Price", min_p, max_p, fmt=".2f")
 
         # 5. Direction (Horizontal Buttons)
         gs_dir = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[5], wspace=0.05)
@@ -191,40 +302,38 @@ class MomentumEarningsDashboard:
             btn.on_clicked(lambda e, v=val: self.set_direction(v))
             self.btns_dir[val] = {'btn': btn, 'ax': ax}
 
-        # 6-8. Momentum Filters (Shifted up, index 6)
+        # 6-8. Momentum Filters (now Min/Max TextBoxes)
         self.mom_sliders = {}
         for i, mom_col in enumerate(['1M_chg', '3M_chg', '6M_chg']):
             ax = self.fig.add_subplot(gs_controls[6+i])
-            self.mom_sliders[mom_col] = self._create_range_slider(ax, mom_col, mom_col, -50, 50)
+            self.mom_sliders[mom_col] = self._create_minmax_inputs(ax, mom_col, mom_col, -50, 50, fmt=".1f")
 
-        # 9-13. Underlying EMA Filters (Shifted up, index 9)
+        # 9-13. Underlying EMA Filters (now Min/Max TextBoxes)
         self.ema_sliders = {}
         ema_dists = ['ema10', 'ema20', 'ema50', 'ema100', 'ema200']
         for i, ema_name in enumerate(ema_dists):
             col = f"{ema_name}_dist0"
             ax = self.fig.add_subplot(gs_controls[9+i])
-            self.ema_sliders[col] = self._create_range_slider(ax, col, f"{ema_name} Dist", -20, 20)
+            self.ema_sliders[col] = self._create_minmax_inputs(ax, col, f"{ema_name} Dist", -20, 20, fmt=".2f")
 
-        # 14-18. SPY EMA Filters (Shifted up, index 14)
+        # 14-18. SPY EMA Filters (now Min/Max TextBoxes)
         self.spy_ema_sliders = {}
         for i, ema_name in enumerate(ema_dists):
             col = f"spy_{ema_name}_dist0"
             ax = self.fig.add_subplot(gs_controls[14+i])
-            self.spy_ema_sliders[col] = self._create_range_slider(ax, col, f"SPY {ema_name} Dist", -10, 10)
+            self.spy_ema_sliders[col] = self._create_minmax_inputs(ax, col, f"SPY {ema_name} Dist", -10, 10, fmt=".2f")
 
-        # 19. Conditional Survival Filter (Shifted up, index 19)
+        # 19. Conditional Survival Filter
         gs_cond = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[19], width_ratios=[1, 2], wspace=0.1)
-        
+
         self.ax_slider_cond_t = self.fig.add_subplot(gs_cond[0])
         self.ax_slider_cond_t.set_title("Cond. Day/Wk", fontsize=9)
-        # Use Slider instead of TextBox
         self.slider_cond_t = Slider(self.ax_slider_cond_t, '', 0, 24, valinit=0, valstep=1, color='cyan')
         self.slider_cond_t.on_changed(self._on_cond_t_change)
-        
+
+        # Replace the conditional RangeSlider with Min/Max inputs (consistent UX)
         self.ax_slider_cond_v = self.fig.add_subplot(gs_cond[1])
-        self.ax_slider_cond_v.set_title("Cond. Range", fontsize=9)
-        self.slider_cond_v = RangeSlider(self.ax_slider_cond_v, '', -20, 50, valinit=(-20, 50))
-        # No auto-update
+        self.slider_cond_v = self._create_minmax_inputs(self.ax_slider_cond_v, 'cond_range', "Cond. Range", -20, 50, fmt=".1f")
 
         # 20. Misc Filters (Shifted up, index 20)
         gs_misc = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs_controls[20], hspace=0.1)
@@ -272,6 +381,9 @@ class MomentumEarningsDashboard:
         self.ax_w_path = self.fig.add_subplot(gs_charts[0], label='weekly_path', frameon=False)
         self.ax_w_violin = self.fig.add_subplot(gs_charts[1], label='weekly_violin', frameon=False)
         self.ax_w_probs = self.fig.add_subplot(gs_charts[2], label='weekly_probs', frameon=False)
+
+        # Keep updates decoupled: only the Update button triggers filtering/plotting.
+        self.btn_update.on_clicked(self.update)
 
         self.update(None)
 
@@ -347,23 +459,20 @@ class MomentumEarningsDashboard:
         self._cond_timer.start()
 
     def _update_cond_v_bounds_from_data(self):
-        """Update slider_cond_v allowed min/max based on selected cond_t column distribution."""
+        """Update conditional allowed min/max based on selected cond_t distribution."""
         try:
             cond_t = int(self.slider_cond_t.val)
         except Exception:
             cond_t = 0
 
-        # If disabled, keep a broad default range
         if cond_t <= 0:
             vmin, vmax = -20.0, 50.0
         else:
             tf = self.view_tab
             col = f'cpct{cond_t}' if tf == 'Daily' else f'w_cpct{cond_t}'
-
             if col in self.df.columns:
                 vals = self.df[col].dropna()
                 if not vals.empty:
-                    # Robust bounds (avoid outliers dominating)
                     vmin = float(vals.quantile(0.01))
                     vmax = float(vals.quantile(0.99))
                 else:
@@ -374,26 +483,44 @@ class MomentumEarningsDashboard:
         if vmin >= vmax:
             vmax = vmin + 1.0
 
-        # Expand slightly so handles aren't pinned to the edges
-        rng = vmax - vmin
-        vmin_s, vmax_s = vmin - rng * 0.1, vmax + rng * 0.1
-
-        # Update RangeSlider bounds + axis limits
-        self.slider_cond_v.valmin = vmin_s
-        self.slider_cond_v.valmax = vmax_s
-        self.slider_cond_v.ax.set_xlim(vmin_s, vmax_s)
-
-        # Clamp current selection into the new bounds
-        cur_min, cur_max = self.slider_cond_v.val
-        new_min = min(max(cur_min, vmin_s), vmax_s)
-        new_max = min(max(cur_max, vmin_s), vmax_s)
-        if new_min > new_max:
-            new_min, new_max = vmin, vmax
-
-        self.slider_cond_v.set_val((new_min, new_max))
-        self.ax_slider_cond_v.set_title(f"Cond. Range: [{new_min:.1f}, {new_max:.1f}]", fontsize=9)
-
+        # Set defaults in the input boxes (UI only; still decoupled from filtering)
+        self.slider_cond_v.set_val((vmin, vmax))
+        self._pending_update = True
         self.fig.canvas.draw_idle()
+
+    def _create_minmax_inputs(self, ax, col_name, title, default_min, default_max, fmt=".2f", show_header=False):
+        vmin, vmax = float(default_min), float(default_max)
+
+        # Special: "Year Range" is derived from the date column
+        if col_name == 'date_year' and (not self.df.empty) and ('date' in self.df.columns):
+            years = self.df['date'].dt.year.dropna()
+            if not years.empty:
+                vmin = float(int(years.min()))
+                vmax = float(int(years.max()))
+
+        elif (not self.df.empty) and (col_name in self.df.columns):
+            vals = self.df[col_name].dropna()
+            if not vals.empty:
+                vmin = float(vals.min())
+                vmax = float(vals.max())
+
+        if vmin >= vmax:
+            vmax = vmin + 1.0
+
+        # UI-only callback: mark "pending update" and do a light redraw (no filtering).
+        def _ui_only(_val):
+            self._pending_update = True
+            if self._ui_timer is None:
+                self._ui_timer = self.fig.canvas.new_timer(interval=100)
+                self._ui_timer.single_shot = True
+                self._ui_timer.add_callback(lambda: self.fig.canvas.draw_idle())
+            try:
+                self._ui_timer.stop()
+            except Exception:
+                pass
+            self._ui_timer.start()
+
+        return _MinMaxInput(ax, title, vmin, vmax, fmt=fmt, on_change=_ui_only, show_header=show_header)
 
     def _create_range_slider(self, ax, col_name, title, default_min, default_max, cap_at_quantile=False):
         """Helper to create consistent range sliders with labels."""
@@ -422,19 +549,19 @@ class MomentumEarningsDashboard:
     def get_filtered_data(self):
         mask = pd.Series(True, index=self.df.index)
 
-        # 0. Year Range
+        # 0. Year Range (from Min/Max inputs)
         min_y, max_y = self.slider_year.val
         if 'date' in self.df.columns:
-             mask &= (self.df['date'].dt.year >= min_y) & (self.df['date'].dt.year <= max_y)
+            mask &= (self.df['date'].dt.year >= int(min_y)) & (self.df['date'].dt.year <= int(max_y))
 
         # 1. Signed Move
         min_m, max_m = self.slider_move.val
         mask &= (self.df['event_move'] >= min_m) & (self.df['event_move'] <= max_m)
 
-        # 1b. Breakout Price (use event_price)
+        # 1b. Breakout Price
         min_p, max_p = self.slider_price.val
         if 'event_price' in self.df.columns:
-             mask &= (self.df['event_price'] >= min_p) & (self.df['event_price'] <= max_p)
+            mask &= (self.df['event_price'] >= min_p) & (self.df['event_price'] <= max_p)
 
         # 2. Momentum (Multi-Select)
         for mom_col, slider in self.mom_sliders.items():
@@ -482,14 +609,14 @@ class MomentumEarningsDashboard:
         if cond_t > 0:
             tf = self.view_tab
             min_c, max_c = self.slider_cond_v.val
-            
+
             # Construct column name based on timeframe
             # We use aligned columns to match positive/negative logic
             if tf == 'Daily':
                 col = f'cpct{cond_t}'
             else:
                 col = f'w_cpct{cond_t}'
-            
+
             if col in self.df.columns:
                  mask &= (self.df[col] >= min_c) & (self.df[col] <= max_c)
 
@@ -498,7 +625,7 @@ class MomentumEarningsDashboard:
     def update(self, val):
         sub_df = self.get_filtered_data()
 
-        for ax in [self.ax_d_path, self.ax_d_violin, self.ax_d_probs, 
+        for ax in [self.ax_d_path, self.ax_d_violin, self.ax_d_probs,
                    self.ax_w_path, self.ax_w_violin, self.ax_w_probs]:
             ax.clear()
 
