@@ -67,7 +67,7 @@ def classify_market_cap(mcap_value, year, df_thresholds):
         return "Micro"
 
 def calculate_performance(df_ticker, df_day, length_days):
-  df_c = df_day.iloc[df_day.index.get_indexer(df_ticker.date - timedelta(days=length_days), method='ffill')]['c'].copy()
+  df_c = df_day.iloc[df_day.index.get_indexer(df_ticker.date - timedelta(days=length_days), method='ffill')]['c']
   df_diff = df_ticker.date - df_c.index
   df_c[(df_diff.abs() > timedelta(days=length_days + 5)).values] = np.nan
 
@@ -209,7 +209,7 @@ for i, ticker in enumerate(symbols_to_process):
 
         # Slice DataFrames
         df_slice_day = df_day.iloc[reaction_idx - OFFSET_DAYS : reaction_idx + OFFSET_DAYS]
-        df_tracking_day = df_slice_day[INDICATORS].copy()
+        df_tracking_day = df_slice_day[INDICATORS]
     
         if len(df_tracking_day) < 2 * OFFSET_DAYS or df_slice_day.c.isna().all():
             # print(f"  Insufficient tracking data ({len(df_tracking_day)} rows) for {ticker} at {reaction_date.date()}, skipping.")
@@ -229,7 +229,7 @@ for i, ticker in enumerate(symbols_to_process):
         effective_week_offset = idx_week - idx_start_week
 
         df_slice_week = df_week.iloc[idx_start_week : idx_end_week]
-        df_tracking_week = df_slice_week[INDICATORS].copy()
+        df_tracking_week = df_slice_week[INDICATORS]
     
         if not df_tracking_week.empty:
             ref_c_week = df_tracking_week['c'].iloc[effective_week_offset-1] if effective_week_offset > 0 else df_tracking_week['c'].iloc[0]
@@ -344,22 +344,22 @@ for i, ticker in enumerate(symbols_to_process):
 # --- 4. Final Aggregation ---
 print("Aggregating all files...")
 all_data = []
-all_data_filename = f'finance/_data/{output_name}/all.pkl'
+all_data_filename = f'finance/_data/{output_name}/all.parquet'
 for ticker in liquid_symbols:
     filename = f'{data_path}/{ticker}.pkl'
     if os.path.exists(filename):
         all_data.append(pd.read_pickle(filename))
-
+#%%
 if all_data:
     df_all = pd.concat(all_data)
-    df_all.to_pickle()
+    df_all.to_parquet(all_data_filename)
     print(f"Complete. Saved to {all_data_filename}")
 
 #%% Split file into chunks by year starting from < 2010, 2011, ... 2025
 previous_year = 1900
 for year in range(2010, 2026):
-    filename = f'finance/_data/{output_name}/all_{year}.pkl'
+    filename = f'finance/_data/{output_name}/all_{year}.parquet'
     df_year = df_all[(df_all.date.dt.year > previous_year) & (df_all.date.dt.year <= year)]
-    df_year.to_pickle(filename)
+    df_year.to_parquet(filename)
     print(f"Complete. Saved to {filename}")
     previous_year = year

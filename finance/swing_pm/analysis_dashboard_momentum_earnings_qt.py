@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import sys
+import os
 from dataclasses import dataclass
 from typing import Callable, Optional
-from scipy.stats import gaussian_kde  # type: ignore
 
 import numpy as np
 import pandas as pd
@@ -12,12 +11,14 @@ import pandas as pd
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import pyqtgraph as pg
-use_violin = True
+import pyarrow.parquet as pq  # type: ignore
+
 
 #%%
 # Global cache for reusing the window and app across multiple plot calls
 _GLOBAL_QT_APP: Optional[QtWidgets.QApplication] = None
 _GLOBAL_DASHBOARD_WIN: Optional["DashboardQt"] = None
+_GLOBAL_LOADED_DF: Optional[pd.DataFrame] = None
 
 # Run %gui qt only once (re-running it can cause odd behavior / CPU churn in some consoles)
 _IPYTHON_GUI_QT_ENABLED = False
@@ -90,13 +91,71 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
   Important: keep this function aligned with analysis_dashboard_momentum_earnings.py
   so that filters/plots behave the same across both UIs.
   """
+
+  def _required_columns() -> list[str]:
+    cols: set[str] = {
+      # core
+      "date",
+      "original_price",
+      "c0",
+      "cpct0",
+      "atrp200",
+      "is_earnings",
+      "spy0",
+      "spy5",
+      "market_cap_class",
+      # filters
+      "1M_chg",
+      "3M_chg",
+      "6M_chg",
+      "ma10_dist0",
+      "ma20_dist0",
+      "ma50_dist0",
+      "ma100_dist0",
+      "ma200_dist0",
+      "spy_ma10_dist0",
+      "spy_ma20_dist0",
+      "spy_ma50_dist0",
+      "spy_ma100_dist0",
+      "spy_ma200_dist0",
+    }
+
+    # Trajectory / dist / cond filter (daily)
+    for i in range(1, 25):
+      cols.add(f"cpct{i}")
+
+    # Trajectory / dist / cond filter (weekly)
+    for i in range(1, 9):
+      cols.add(f"w_cpct{i}")
+
+    # Probability lines (daily)
+    for i in range(1, 25):
+      cols.add(f"ma5_dist{i}")
+      cols.add(f"ma10_dist{i}")
+      cols.add(f"ma20_dist{i}")
+      cols.add(f"ma50_dist{i}")
+
+    # Probability lines (weekly)
+    for i in range(1, 9):
+      cols.add(f"w_ma5_dist{i}")
+      cols.add(f"w_ma10_dist{i}")
+      cols.add(f"w_ma20_dist{i}")
+      cols.add(f"w_ma50_dist{i}")
+
+    return sorted(cols)
+
+  required_cols = _required_columns()
+
   dfs: list[pd.DataFrame] = []
   for year in years:
-    filename = f"finance/_data/momentum_earnings/all_{year}.pkl"
-    try:
-      dfs.append(pd.read_pickle(filename))
-    except FileNotFoundError:
+    parquet_path = f"finance/_data/momentum_earnings/all_{year}.parquet"
+
+    if not os.path.exists(parquet_path):
+      print(f"WARNING: {parquet_path} not found. Skipping.")
       continue
+    available = set(pq.ParquetFile(parquet_path).schema.names)
+    cols_to_read = [c for c in required_cols if c in available]
+    dfs.append(pd.read_parquet(parquet_path, columns=cols_to_read))
 
   if not dfs:
     return pd.DataFrame()
@@ -107,7 +166,7 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
   if "original_price" in df.columns:
     df = df[df["original_price"] < 10e5]
 
-  df = df.replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
+  df = df.replace([np.inf, -np.inf], np.nan).infer_objects()
 
   if "date" in df.columns:
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
@@ -165,6 +224,7 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     self.setWindowTitle("Momentum & Earnings Dashboard (Qt)")
     self.resize(3400, 1900)
+    self.setWindowState(self.windowState() | QtCore.Qt.WindowState.WindowMaximized)
 
     self.view_tab = "Daily"  # keep in sync with matplotlib dashboard behavior
 
@@ -193,6 +253,39 @@ class DashboardQt(QtWidgets.QMainWindow):
     c_layout = QtWidgets.QVBoxLayout(controls)
     c_layout.setContentsMargins(8, 8, 8, 8)
     c_layout.setSpacing(10)
+
+    # ---- Data loader (Year range -> load files) ----
+    load_box = QtWidgets.QGroupBox("Data")
+    load_layout = QtWidgets.QGridLayout(load_box)
+    load_layout.setHorizontalSpacing(10)
+    load_layout.setVerticalSpacing(6)
+
+    self.lbl_load_years = QtWidgets.QLabel("Load Years:")
+    self.load_year_min = QtWidgets.QSpinBox()
+    self.load_year_max = QtWidgets.QSpinBox()
+    for b in (self.load_year_min, self.load_year_max):
+      b.setRange(1900, 2100)
+      b.setSingleStep(1)
+      b.setAccelerated(True)
+
+    this_year = int(pd.Timestamp.now().year)
+    self.load_year_min.setValue(2012)
+    self.load_year_max.setValue(this_year)
+
+    self.btn_load = QtWidgets.QPushButton("Load")
+    self.btn_load.setMinimumHeight(30)
+    self.btn_load.clicked.connect(self._load_data_from_ui)
+
+    self.lbl_data_status = QtWidgets.QLabel("")
+    self.lbl_data_status.setStyleSheet("color: #AAAAAA;")
+
+    load_layout.addWidget(self.lbl_load_years, 0, 0, 1, 1)
+    load_layout.addWidget(self.load_year_min, 0, 1, 1, 1)
+    load_layout.addWidget(self.load_year_max, 0, 2, 1, 1)
+    load_layout.addWidget(self.btn_load, 1, 0, 1, 3)
+    load_layout.addWidget(self.lbl_data_status, 2, 0, 1, 3)
+
+    c_layout.addWidget(load_box)
 
     title = QtWidgets.QLabel("Filters")
     title.setStyleSheet("font-size: 16px; font-weight: 600;")
@@ -250,17 +343,17 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.mom_3m = self._add_range(grid, "3M_chg", df, col="3M_chg", decimals=1, step=1.0)
     self.mom_6m = self._add_range(grid, "6M_chg", df, col="6M_chg", decimals=1, step=1.0)
 
-    # 9-13. Underlying EMA dist0 filters
-    self.ema_filters: dict[str, MinMaxSpin] = {}
-    for ema_name in ["ema10", "ema20", "ema50", "ema100", "ema200"]:
-      col = f"{ema_name}_dist0"
-      self.ema_filters[col] = self._add_range(grid, f"{ema_name} Dist", df, col=col, decimals=2, step=0.25)
+    # 9-13. Underlying ma dist0 filters
+    self.ma_filters: dict[str, MinMaxSpin] = {}
+    for ma_name in ["ma10", "ma20", "ma50", "ma100", "ma200"]:
+      col = f"{ma_name}_dist0"
+      self.ma_filters[col] = self._add_range(grid, f"{ma_name} Dist", df, col=col, decimals=2, step=0.25)
 
-    # 14-18. SPY EMA dist0 filters
-    self.spy_ema_filters: dict[str, MinMaxSpin] = {}
-    for ema_name in ["ema10", "ema20", "ema50", "ema100", "ema200"]:
-      col = f"spy_{ema_name}_dist0"
-      self.spy_ema_filters[col] = self._add_range(grid, f"SPY {ema_name} Dist", df, col=col, decimals=2, step=0.25)
+    # 14-18. SPY ma dist0 filters
+    self.spy_ma_filters: dict[str, MinMaxSpin] = {}
+    for ma_name in ["ma10", "ma20", "ma50", "ma100", "ma200"]:
+      col = f"spy_{ma_name}_dist0"
+      self.spy_ma_filters[col] = self._add_range(grid, f"SPY {ma_name} Dist", df, col=col, decimals=2, step=0.25)
 
     # Direction
     dir_box = QtWidgets.QGroupBox("Direction")
@@ -378,13 +471,106 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.plot_dist.setTitle("Distribution of Changes", color="#DDDDDD", size="12pt")
     self.plot_probs.setTitle("Probability of Holding Levels", color="#DDDDDD", size="12pt")
 
-    p_layout.addWidget(self.plot_path, 2)
-    p_layout.addWidget(self.plot_dist, 2)
+    p_layout.addWidget(self.plot_path, 1)
+    p_layout.addWidget(self.plot_dist, 1)
     p_layout.addWidget(self.plot_probs, 1)
 
     # Initialize UI bounds, but DO NOT render any data yet.
     self._update_cond_label_and_bounds()
     self._show_empty_state()
+    self._update_data_status()
+
+  def _update_data_status(self) -> None:
+    n = 0 if self.df is None else int(len(self.df))
+    years_str = "—"
+    if self.df is not None and (not self.df.empty) and ("date" in self.df.columns):
+      yy = self.df["date"].dt.year.dropna()
+      if not yy.empty:
+        years_str = f"{int(yy.min())}–{int(yy.max())}"
+    self.lbl_data_status.setText(f"Loaded: {years_str}   N={n:,}")
+
+  def _refresh_filter_bounds_from_df(self) -> None:
+    """
+    After loading new data, refresh the spinbox ranges/values so filters match the new DF.
+    Keeps it simple: reset each filter to the full available data range.
+    """
+    df = self.df
+    if df is None or df.empty:
+      return
+
+    def _reset_from_series(w: MinMaxSpin, s: pd.Series) -> None:
+      s = s.dropna()
+      if s.empty:
+        return
+      a = float(np.nanmin(s.to_numpy(dtype=float)))
+      b = float(np.nanmax(s.to_numpy(dtype=float)))
+      if not np.isfinite(a) or not np.isfinite(b):
+        return
+      if a > b:
+        a, b = b, a
+      for box, val in ((w.min_box, a), (w.max_box, b)):
+        box.blockSignals(True)
+        box.setRange(a, b)
+        box.setValue(val)
+        box.blockSignals(False)
+
+    # Year filter from date
+    if "date" in df.columns:
+      yy = df["date"].dt.year.dropna()
+      if not yy.empty:
+        y0, y1 = int(yy.min()), int(yy.max())
+        for box, val in ((self.year.min_box, y0), (self.year.max_box, y1)):
+          box.blockSignals(True)
+          box.setRange(1900, 2100)
+          box.setValue(val)
+          box.blockSignals(False)
+
+    # Simple numeric filters
+    if "event_move" in df.columns:
+      _reset_from_series(self.event_move, df["event_move"])
+    if "event_price" in df.columns:
+      _reset_from_series(self.event_price, df["event_price"])
+
+    for w, col in ((self.mom_1m, "1M_chg"), (self.mom_3m, "3M_chg"), (self.mom_6m, "6M_chg")):
+      if col in df.columns:
+        _reset_from_series(w, df[col])
+
+    for col, w in self.ma_filters.items():
+      if col in df.columns:
+        _reset_from_series(w, df[col])
+
+    for col, w in self.spy_ma_filters.items():
+      if col in df.columns:
+        _reset_from_series(w, df[col])
+
+    self._update_cond_label_and_bounds()
+
+  def _load_data_from_ui(self) -> None:
+    global _GLOBAL_LOADED_DF
+    y0 = int(self.load_year_min.value())
+    y1 = int(self.load_year_max.value())
+    if y0 > y1:
+      y0, y1 = y1, y0
+
+    self.lbl_data_status.setText("Loading…")
+    QtWidgets.QApplication.processEvents()
+
+    df_new = load_and_prep_data(range(y0, y1 + 1))
+    if df_new is None or df_new.empty:
+      self.df = pd.DataFrame()
+      _GLOBAL_LOADED_DF = self.df
+      self._show_empty_state()
+      self._update_data_status()
+      self.lbl_status.setText("No data loaded for that range.")
+      return
+
+    self.df = df_new
+    _GLOBAL_LOADED_DF = df_new
+
+    self._refresh_filter_bounds_from_df()
+    self._show_empty_state()
+    self._update_data_status()
+    self.lbl_status.setText("Loaded. Click Update to render.")
 
   def _show_empty_state(self) -> None:
     self.plot_path.clear()
@@ -556,14 +742,14 @@ class DashboardQt(QtWidgets.QMainWindow):
       if col in df.columns:
         mask &= (df[col] >= a) & (df[col] <= b)
 
-    # Underlying EMA dist0
-    for col, w in self.ema_filters.items():
+    # Underlying ma dist0
+    for col, w in self.ma_filters.items():
       a, b = w.value()
       if col in df.columns:
         mask &= (df[col] >= a) & (df[col] <= b)
 
-    # SPY EMA dist0
-    for col, w in self.spy_ema_filters.items():
+    # SPY ma dist0
+    for col, w in self.spy_ma_filters.items():
       a, b = w.value()
       if col in df.columns:
         mask &= (df[col] >= a) & (df[col] <= b)
@@ -645,11 +831,20 @@ class DashboardQt(QtWidgets.QMainWindow):
     if cols:
       data = sub_df[cols].to_numpy(dtype=float)
       q05 = np.nanquantile(data, 0.05, axis=0)
+      q25 = np.nanquantile(data, 0.25, axis=0)
       q50 = np.nanquantile(data, 0.50, axis=0)
+      q75 = np.nanquantile(data, 0.75, axis=0)
       q95 = np.nanquantile(data, 0.95, axis=0)
 
       x = np.array(periods, dtype=float)
-      self.plot_path.plot(x, q50, pen=pg.mkPen("c", width=2), name="50th (Median)")
+
+      # 50th (median)
+      self.plot_path.plot(x, q50, pen=pg.mkPen("c", width=3), name="50th (Median)")
+
+      # 25th / 75th dashed lines
+      dash_pen = pg.mkPen((0, 255, 255, 140), width=2, style=QtCore.Qt.PenStyle.DashLine)
+      self.plot_path.addItem(pg.PlotDataItem(x, q25, pen=dash_pen))
+      self.plot_path.addItem(pg.PlotDataItem(x, q75, pen=dash_pen))
 
       # 5th / 95th quantiles + filled band
       upper_item = pg.PlotDataItem(x, q95, pen=pg.mkPen((0, 255, 255, 80)))
@@ -763,27 +958,27 @@ class DashboardQt(QtWidgets.QMainWindow):
         name=f"{dir_prefix} Entry",
       )
 
-      # EMA survival lines (direction-aware labels + sign)
+      # ma survival lines (direction-aware labels + sign)
       if self.view_tab == "Daily":
-        ema5_gen = lambda i: f"ema5_dist{i}"
-        ema10_gen = lambda i: f"ema10_dist{i}"
-        ema20_gen = lambda i: f"ema20_dist{i}"
-        ema50_gen = lambda i: f"ema50_dist{i}"
+        ma5_gen = lambda i: f"ma5_dist{i}"
+        ma10_gen = lambda i: f"ma10_dist{i}"
+        ma20_gen = lambda i: f"ma20_dist{i}"
+        ma50_gen = lambda i: f"ma50_dist{i}"
       else:
-        ema5_gen = lambda i: f"w_ema5_dist{i}"
-        ema10_gen = lambda i: f"w_ema10_dist{i}"
-        ema20_gen = lambda i: f"w_ema20_dist{i}"
-        ema50_gen = lambda i: f"w_ema50_dist{i}"
+        ma5_gen = lambda i: f"w_ma5_dist{i}"
+        ma10_gen = lambda i: f"w_ma10_dist{i}"
+        ma20_gen = lambda i: f"w_ma20_dist{i}"
+        ma50_gen = lambda i: f"w_ma50_dist{i}"
 
-      y_ema5 = prob_curve(ema5_gen, 0.0)
-      y_ema10 = prob_curve(ema10_gen, 0.0)
-      y_ema20 = prob_curve(ema20_gen, 0.0)
-      y_ema50 = prob_curve(ema50_gen, 0.0)
+      y_ma5 = prob_curve(ma5_gen, 0.0)
+      y_ma10 = prob_curve(ma10_gen, 0.0)
+      y_ma20 = prob_curve(ma20_gen, 0.0)
+      y_ma50 = prob_curve(ma50_gen, 0.0)
 
-      self.plot_probs.plot(x, y_ema5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA5")
-      self.plot_probs.plot(x, y_ema10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA10")
-      self.plot_probs.plot(x, y_ema20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA20")
-      self.plot_probs.plot(x, y_ema50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA50")
+      self.plot_probs.plot(x, y_ma5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma5")
+      self.plot_probs.plot(x, y_ma10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma10")
+      self.plot_probs.plot(x, y_ma20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma20")
+      self.plot_probs.plot(x, y_ma50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma50")
 
     self.plot_probs.setYRange(0, 105)
     self.plot_probs.getPlotItem().addLegend(
@@ -806,8 +1001,8 @@ def _apply_dark_palette(app: QtWidgets.QApplication) -> None:
   app.setPalette(palette)
 
 
-def main(df: pd.DataFrame, *, exec_: Optional[bool] = None) -> DashboardQt:
-  global _GLOBAL_QT_APP, _GLOBAL_DASHBOARD_WIN
+def main(start_year, *, exec_: Optional[bool] = None) -> DashboardQt:
+  global _GLOBAL_QT_APP, _GLOBAL_DASHBOARD_WIN, _GLOBAL_LOADED_DF
 
   _ensure_ipython_qt_event_loop()
 
@@ -824,15 +1019,27 @@ def main(df: pd.DataFrame, *, exec_: Optional[bool] = None) -> DashboardQt:
     except Exception:
       _GLOBAL_DASHBOARD_WIN = None
 
+  # If caller passed no usable df, reuse global loaded data; if none, load defaults (2012..this year)
+  if _GLOBAL_LOADED_DF is not None and (not _GLOBAL_LOADED_DF.empty):
+    df = _GLOBAL_LOADED_DF
+  else:
+    this_year = int(pd.Timestamp.now().year)
+    df = load_and_prep_data(range(start_year, this_year + 1))
+    _GLOBAL_LOADED_DF = df
+
   if _GLOBAL_DASHBOARD_WIN is None:
     _GLOBAL_DASHBOARD_WIN = DashboardQt(df)
   else:
     _GLOBAL_DASHBOARD_WIN.df = df
+    _GLOBAL_LOADED_DF = df
     # IMPORTANT: do NOT auto-render on reopen; keep it empty until user clicks Update.
     _GLOBAL_DASHBOARD_WIN._update_cond_label_and_bounds()
+    _GLOBAL_DASHBOARD_WIN._refresh_filter_bounds_from_df()
     _GLOBAL_DASHBOARD_WIN._show_empty_state()
+    _GLOBAL_DASHBOARD_WIN._update_data_status()
 
   _GLOBAL_DASHBOARD_WIN.show()
+  _GLOBAL_DASHBOARD_WIN.showMaximized()
   _GLOBAL_DASHBOARD_WIN.raise_()
   _GLOBAL_DASHBOARD_WIN.activateWindow()
 
@@ -854,12 +1061,8 @@ def main(df: pd.DataFrame, *, exec_: Optional[bool] = None) -> DashboardQt:
 # %%
 # Only run automatically when executed as a script, not when imported into IPython.
 if __name__ == "__main__":
-  # df = load_and_prep_data(range(2012, 2026))
-  df = load_and_prep_data(range(2022, 2026))
-  main(df, exec_=True)
+  main(start_year=2022, exec_=True)
 
 # %%
-df = load_and_prep_data(range(2022, 2026))
-# df = load_and_prep_data(range(2012, 2026))
-# %%
-main(df)   # returns immediately in IPython; window stays open
+# main(df)   # returns immediately in IPython; window stays open
+main(start_year=2022, exec_=True)
