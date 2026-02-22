@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -120,27 +121,39 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
       "spy_ma200_dist0",
     }
 
-    # Trajectory / dist / cond filter (daily)
+    # Trajectory / dist / cond filter (daily + weekly)
     for i in range(1, 25):
       cols.add(f"cpct{i}")
-
-    # Trajectory / dist / cond filter (weekly)
     for i in range(1, 9):
       cols.add(f"w_cpct{i}")
 
-    # Probability lines (daily)
+    # Probability lines (daily + weekly)
     for i in range(1, 25):
       cols.add(f"ma5_dist{i}")
       cols.add(f"ma10_dist{i}")
       cols.add(f"ma20_dist{i}")
       cols.add(f"ma50_dist{i}")
-
-    # Probability lines (weekly)
     for i in range(1, 9):
       cols.add(f"w_ma5_dist{i}")
       cols.add(f"w_ma10_dist{i}")
       cols.add(f"w_ma20_dist{i}")
       cols.add(f"w_ma50_dist{i}")
+
+    # Distribution-over-time options (daily + weekly)
+    dist_metrics = [
+      "ma5_slope",
+      "ma10_slope",
+      "ma20_slope",
+      "ma50_slope",
+      "rvol20",
+      "hv20",
+      "atrp20",
+    ]
+    for m in dist_metrics:
+      for i in range(1, 25):
+        cols.add(f"{m}{i}")
+      for i in range(1, 9):
+        cols.add(f"w_{m}{i}")
 
     return sorted(cols)
 
@@ -221,6 +234,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     super().__init__()
     self.df = df
     self._has_rendered_once = False
+    self._last_sub_df: Optional[pd.DataFrame] = None
 
     self.setWindowTitle("Momentum & Earnings Dashboard (Qt)")
     self.resize(3400, 1900)
@@ -290,6 +304,33 @@ class DashboardQt(QtWidgets.QMainWindow):
     title = QtWidgets.QLabel("Filters")
     title.setStyleSheet("font-size: 16px; font-weight: 600;")
     c_layout.addWidget(title)
+
+    # --- Distribution selector (replots middle panel on change) ---
+    dist_box = QtWidgets.QGroupBox("Distribution View")
+    dist_layout = QtWidgets.QHBoxLayout(dist_box)
+
+    self.cmb_dist = QtWidgets.QComboBox()
+    self.cmb_dist.addItem("Price Change (cpct1..N)", userData="cpct")
+    self.cmb_dist.addItem("MA5 slope (1..N)", userData="ma5_slope")
+    self.cmb_dist.addItem("MA10 slope (1..N)", userData="ma10_slope")
+    self.cmb_dist.addItem("MA20 slope (1..N)", userData="ma20_slope")
+    self.cmb_dist.addItem("MA50 slope (1..N)", userData="ma50_slope")
+    self.cmb_dist.addItem("RVOL20 (1..N)", userData="rvol20")
+    self.cmb_dist.addItem("HV20 (1..N)", userData="hv20")
+    self.cmb_dist.addItem("ATRP20 (1..N)", userData="atrp20")
+    self.cmb_dist.setCurrentIndex(0)
+
+    def _on_dist_change(_idx: int) -> None:
+      # Recalculate distribution plot immediately using last filtered subset (no need to hit Update)
+      if (not self._has_rendered_once) or (self._last_sub_df is None):
+        return
+      self._plot(self._last_sub_df)
+
+    self.cmb_dist.currentIndexChanged.connect(_on_dist_change)
+
+    dist_layout.addWidget(QtWidgets.QLabel("Show:"))
+    dist_layout.addWidget(self.cmb_dist, 1)
+    c_layout.addWidget(dist_box)
 
     # --- View Tab (Daily / Weekly) ---
     tab_row = QtWidgets.QHBoxLayout()
@@ -709,8 +750,6 @@ class DashboardQt(QtWidgets.QMainWindow):
 
   # ---------- Filtering + plotting ----------
   def apply_filters(self) -> None:
-    import time
-
     t0 = time.perf_counter()
 
     df = self.df
@@ -789,6 +828,7 @@ class DashboardQt(QtWidgets.QMainWindow):
         mask &= (df[col] >= cmin) & (df[col] <= cmax)
 
     sub = df.loc[mask]
+    self._last_sub_df = sub
 
     self._plot(sub)
     self._has_rendered_once = True
@@ -798,7 +838,6 @@ class DashboardQt(QtWidgets.QMainWindow):
 
   def _plot(self, sub_df: pd.DataFrame) -> None:
     # ... keep your existing _plot implementation, including the scatter downsampling caps ...
-    # (no change required here beyond what you already have)
     self.plot_path.clear()
     self.plot_dist.clear()
     self.plot_probs.clear()
@@ -817,19 +856,24 @@ class DashboardQt(QtWidgets.QMainWindow):
       pen=pg.mkPen("#666666"),
     )
 
-    prefix = "cpct" if self.view_tab == "Daily" else "w_cpct"
+    # ---- Selected metric for BOTH top + middle ----
+    metric = str(self.cmb_dist.currentData() or "cpct")
+    metric_prefix = "" if self.view_tab == "Daily" else "w_"
     max_n = 24 if self.view_tab == "Daily" else 8
 
     periods: list[int] = []
-    cols: list[str] = []
+    metric_cols: list[str] = []
     for i in range(1, max_n + 1):
-      c = f"{prefix}{i}"
+      c = f"{metric_prefix}{metric}{i}"
       if c in sub_df.columns:
         periods.append(i)
-        cols.append(c)
+        metric_cols.append(c)
 
-    if cols:
-      data = sub_df[cols].to_numpy(dtype=float)
+    # ---- Trajectory (top plot) now reflects the selected metric ----
+    self.plot_path.setTitle(f"Trajectory ({metric_prefix}{metric} quantiles)", color="#DDDDDD", size="12pt")
+
+    if metric_cols:
+      data = sub_df[metric_cols].to_numpy(dtype=float)
       q05 = np.nanquantile(data, 0.05, axis=0)
       q25 = np.nanquantile(data, 0.25, axis=0)
       q50 = np.nanquantile(data, 0.50, axis=0)
@@ -838,147 +882,144 @@ class DashboardQt(QtWidgets.QMainWindow):
 
       x = np.array(periods, dtype=float)
 
-      # 50th (median)
       self.plot_path.plot(x, q50, pen=pg.mkPen("c", width=3), name="50th (Median)")
 
-      # 25th / 75th dashed lines
       dash_pen = pg.mkPen((0, 255, 255, 140), width=2, style=QtCore.Qt.PenStyle.DashLine)
       self.plot_path.addItem(pg.PlotDataItem(x, q25, pen=dash_pen))
       self.plot_path.addItem(pg.PlotDataItem(x, q75, pen=dash_pen))
 
-      # 5th / 95th quantiles + filled band
       upper_item = pg.PlotDataItem(x, q95, pen=pg.mkPen((0, 255, 255, 80)))
       lower_item = pg.PlotDataItem(x, q05, pen=pg.mkPen((0, 255, 255, 80)))
       self.plot_path.addItem(upper_item)
       self.plot_path.addItem(lower_item)
       self.plot_path.addItem(pg.FillBetweenItem(upper_item, lower_item, brush=pg.mkBrush(0, 255, 255, 35)))
 
-      self.plot_path.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
-      self.plot_dist.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
+    self.plot_path.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
 
-      # --- Violin-style distribution in the middle panel (replaces scatter cloud) ---
-      self.plot_dist.setTitle("Distribution (Violin)", color="#DDDDDD", size="12pt")
+    # ---- Distribution plot (middle) uses the SAME selected metric ----
+    dist_periods = periods
+    dist_cols = metric_cols
 
-      def _add_violin_fast(
-          x0: float,
-          vals: np.ndarray,
-          *,
-          width: float = 0.38,
-          max_points: int = 2500,   # cap per period to keep it snappy
-          bins: int = 28,           # fewer bins = faster
-      ) -> None:
-        vals = vals[np.isfinite(vals)]
-        if vals.size < 10:
-          return
+    def _add_violin_fast(
+        x0: float,
+        vals: np.ndarray,
+        *,
+        width: float = 0.38,
+        max_points: int = 2500,
+        bins: int = 28,
+    ) -> None:
+      vals = vals[np.isfinite(vals)]
+      if vals.size < 10:
+        return
 
-        # Downsample aggressively (histogram shape is stable with a couple thousand points)
-        if vals.size > max_points:
-          rr = np.random.default_rng(0)
-          vals = rr.choice(vals, size=max_points, replace=False)
+      if vals.size > max_points:
+        rr = np.random.default_rng(0)
+        vals = rr.choice(vals, size=max_points, replace=False)
 
-        # Robust bounds so outliers don't crush the violin
-        y_lo = float(np.nanquantile(vals, 0.01))
-        y_hi = float(np.nanquantile(vals, 0.99))
-        if not np.isfinite(y_lo) or not np.isfinite(y_hi) or y_hi <= y_lo:
-          y_lo = float(np.nanmin(vals))
-          y_hi = float(np.nanmax(vals))
-        if not np.isfinite(y_lo) or not np.isfinite(y_hi) or y_hi <= y_lo:
-          return
+      y_lo = float(np.nanquantile(vals, 0.01))
+      y_hi = float(np.nanquantile(vals, 0.99))
+      if not np.isfinite(y_lo) or not np.isfinite(y_hi) or y_hi <= y_lo:
+        y_lo = float(np.nanmin(vals))
+        y_hi = float(np.nanmax(vals))
+      if not np.isfinite(y_lo) or not np.isfinite(y_hi) or y_hi <= y_lo:
+        return
 
-        # Histogram-density "violin" (fast approximation)
-        hist, edges = np.histogram(vals, bins=bins, range=(y_lo, y_hi), density=True)
-        centers = 0.5 * (edges[:-1] + edges[1:])
+      hist, edges = np.histogram(vals, bins=bins, range=(y_lo, y_hi), density=True)
+      centers = 0.5 * (edges[:-1] + edges[1:])
 
-        dens = np.asarray(hist, dtype=float)
-        dens[~np.isfinite(dens)] = 0.0
-        if dens.max() <= 0:
-          return
+      dens = np.asarray(hist, dtype=float)
+      dens[~np.isfinite(dens)] = 0.0
+      if dens.max() <= 0:
+        return
 
-        half_w = (dens / dens.max()) * width
-        x_left = x0 - half_w
-        x_right = x0 + half_w
+      half_w = (dens / dens.max()) * width
+      x_left = x0 - half_w
+      x_right = x0 + half_w
 
-        poly_x = np.concatenate([x_left, x_right[::-1]])
-        poly_y = np.concatenate([centers, centers[::-1]])
+      poly_x = np.concatenate([x_left, x_right[::-1]])
+      poly_y = np.concatenate([centers, centers[::-1]])
 
-        item = pg.PlotDataItem(
-          poly_x,
-          poly_y,
-          pen=pg.mkPen((72, 219, 251, 90), width=1),
-          brush=pg.mkBrush(72, 219, 251, 60),
-        )
-        self.plot_dist.addItem(item)
+      item = pg.PlotDataItem(
+        poly_x,
+        poly_y,
+        pen=pg.mkPen((72, 219, 251, 90), width=1),
+        brush=pg.mkBrush(72, 219, 251, 60),
+      )
+      self.plot_dist.addItem(item)
 
-        # Median + IQR markers
-        med = float(np.nanmedian(vals))
-        q1 = float(np.nanquantile(vals, 0.25))
-        q3 = float(np.nanquantile(vals, 0.75))
+      med = float(np.nanmedian(vals))
+      q1 = float(np.nanquantile(vals, 0.25))
+      q3 = float(np.nanquantile(vals, 0.75))
 
-        self.plot_dist.addItem(
-          pg.PlotDataItem([x0 - width * 0.55, x0 + width * 0.55], [med, med], pen=pg.mkPen("w", width=2))
-        )
-        self.plot_dist.addItem(
-          pg.PlotDataItem([x0, x0], [q1, q3], pen=pg.mkPen("w", width=2))
-        )
-
-      for i, col in zip(periods, cols):
-        vals = sub_df[col].dropna().to_numpy(dtype=float)
-        _add_violin_fast(float(i), vals)
-
-        # Direction-aware survival:
-        # - Positive breakouts: want values > 0  ("> Entry", "> EMAx")
-        # - Negative breakouts: want values < 0  ("< Entry", "< EMAx")
-        dir_sign = 1.0 if self.dir_pos.isChecked() else -1.0
-        dir_prefix = ">" if dir_sign > 0 else "<"
-
-      def prob_curve(col_gen: Callable[[int], str], thresh: float = 0.0) -> np.ndarray:
-        ys = []
-        for i in range(1, max_n + 1):
-          col = col_gen(i)
-          if col not in sub_df.columns:
-            ys.append(np.nan)
-            continue
-          v = sub_df[col].to_numpy(dtype=float)
-          v = v[np.isfinite(v)]
-          if v.size:
-            # sign-flip makes the condition always "continuation is positive"
-            ys.append(float(np.mean((dir_sign * v) > thresh) * 100.0))
-          else:
-            ys.append(np.nan)
-        return np.array(ys, dtype=float)
-
-      x = np.arange(1, max_n + 1, dtype=float)
-
-      # Entry (breakout) survival
-      y_entry = prob_curve(lambda i: f"{prefix}{i}", 0.0)
-      self.plot_probs.plot(
-        x, y_entry,
-        pen=pg.mkPen("#ff6b6b", width=2),
-        symbol="o", symbolSize=5,
-        name=f"{dir_prefix} Entry",
+      self.plot_dist.addItem(
+        pg.PlotDataItem([x0 - width * 0.55, x0 + width * 0.55], [med, med], pen=pg.mkPen("w", width=2))
+      )
+      self.plot_dist.addItem(
+        pg.PlotDataItem([x0, x0], [q1, q3], pen=pg.mkPen("w", width=2))
       )
 
-      # ma survival lines (direction-aware labels + sign)
-      if self.view_tab == "Daily":
-        ma5_gen = lambda i: f"ma5_dist{i}"
-        ma10_gen = lambda i: f"ma10_dist{i}"
-        ma20_gen = lambda i: f"ma20_dist{i}"
-        ma50_gen = lambda i: f"ma50_dist{i}"
-      else:
-        ma5_gen = lambda i: f"w_ma5_dist{i}"
-        ma10_gen = lambda i: f"w_ma10_dist{i}"
-        ma20_gen = lambda i: f"w_ma20_dist{i}"
-        ma50_gen = lambda i: f"w_ma50_dist{i}"
+    self.plot_dist.setTitle(f"Distribution ({metric_prefix}{metric}1..N)", color="#DDDDDD", size="12pt")
+    self.plot_dist.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
 
-      y_ma5 = prob_curve(ma5_gen, 0.0)
-      y_ma10 = prob_curve(ma10_gen, 0.0)
-      y_ma20 = prob_curve(ma20_gen, 0.0)
-      y_ma50 = prob_curve(ma50_gen, 0.0)
+    if dist_cols:
+      for i, col in zip(dist_periods, dist_cols):
+        vals = sub_df[col].dropna().to_numpy(dtype=float)
+        _add_violin_fast(float(i), vals)
+    else:
+      self.plot_dist.addItem(
+        pg.TextItem(f"No columns for: {metric_prefix}{metric}1..{max_n}", color="#DDDDDD", anchor=(0.5, 0.5))
+      )
 
-      self.plot_probs.plot(x, y_ma5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma5")
-      self.plot_probs.plot(x, y_ma10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma10")
-      self.plot_probs.plot(x, y_ma20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma20")
-      self.plot_probs.plot(x, y_ma50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma50")
+    # ---- Probability plot (bottom) ----
+    dir_sign = 1.0 if self.dir_pos.isChecked() else -1.0
+    dir_prefix = ">" if dir_sign > 0 else "<"
+
+    def prob_curve(col_gen: Callable[[int], str], thresh: float = 0.0) -> np.ndarray:
+      ys = []
+      for i in range(1, max_n + 1):
+        col = col_gen(i)
+        if col not in sub_df.columns:
+          ys.append(np.nan)
+          continue
+        v = sub_df[col].to_numpy(dtype=float)
+        v = v[np.isfinite(v)]
+        if v.size:
+          ys.append(float(np.mean((dir_sign * v) > thresh) * 100.0))
+        else:
+          ys.append(np.nan)
+      return np.array(ys, dtype=float)
+
+    x = np.arange(1, max_n + 1, dtype=float)
+
+    entry_prefix = "cpct" if self.view_tab == "Daily" else "w_cpct"
+    y_entry = prob_curve(lambda i: f"{entry_prefix}{i}", 0.0)
+    self.plot_probs.plot(
+      x, y_entry,
+      pen=pg.mkPen("#ff6b6b", width=2),
+      symbol="o", symbolSize=5,
+      name=f"{dir_prefix} Entry",
+    )
+
+    if self.view_tab == "Daily":
+      ma5_gen = lambda i: f"ma5_dist{i}"
+      ma10_gen = lambda i: f"ma10_dist{i}"
+      ma20_gen = lambda i: f"ma20_dist{i}"
+      ma50_gen = lambda i: f"ma50_dist{i}"
+    else:
+      ma5_gen = lambda i: f"w_ma5_dist{i}"
+      ma10_gen = lambda i: f"w_ma10_dist{i}"
+      ma20_gen = lambda i: f"w_ma20_dist{i}"
+      ma50_gen = lambda i: f"w_ma50_dist{i}"
+
+    y_ma5 = prob_curve(ma5_gen, 0.0)
+    y_ma10 = prob_curve(ma10_gen, 0.0)
+    y_ma20 = prob_curve(ma20_gen, 0.0)
+    y_ma50 = prob_curve(ma50_gen, 0.0)
+
+    self.plot_probs.plot(x, y_ma5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma5")
+    self.plot_probs.plot(x, y_ma10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma10")
+    self.plot_probs.plot(x, y_ma20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma20")
+    self.plot_probs.plot(x, y_ma50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma50")
 
     self.plot_probs.setYRange(0, 105)
     self.plot_probs.getPlotItem().addLegend(
