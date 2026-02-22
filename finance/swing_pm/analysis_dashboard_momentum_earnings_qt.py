@@ -14,6 +14,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import pyqtgraph as pg
 import pyarrow.parquet as pq  # type: ignore
 
+from finance import utils
+
 
 #%%
 # Global cache for reusing the window and app across multiple plot calls
