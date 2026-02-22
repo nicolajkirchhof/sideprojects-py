@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from typing import Callable, Optional
+from scipy.stats import gaussian_kde  # type: ignore
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,7 @@ import pandas as pd
 from PySide6 import QtCore, QtGui, QtWidgets
 
 import pyqtgraph as pg
+use_violin = True
 
 #%%
 # Global cache for reusing the window and app across multiple plot calls
@@ -659,79 +661,129 @@ class DashboardQt(QtWidgets.QMainWindow):
       self.plot_path.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
       self.plot_dist.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
 
-      rng = np.random.default_rng(0)
-      spots = []
-      total_added = 0
+      # --- Violin-style distribution in the middle panel (replaces scatter cloud) ---
+      self.plot_dist.setTitle("Distribution (Violin)", color="#DDDDDD", size="12pt")
+
+      def _add_violin_fast(
+          x0: float,
+          vals: np.ndarray,
+          *,
+          width: float = 0.38,
+          max_points: int = 2500,   # cap per period to keep it snappy
+          bins: int = 28,           # fewer bins = faster
+      ) -> None:
+        vals = vals[np.isfinite(vals)]
+        if vals.size < 10:
+          return
+
+        # Downsample aggressively (histogram shape is stable with a couple thousand points)
+        if vals.size > max_points:
+          rr = np.random.default_rng(0)
+          vals = rr.choice(vals, size=max_points, replace=False)
+
+        # Robust bounds so outliers don't crush the violin
+        y_lo = float(np.nanquantile(vals, 0.01))
+        y_hi = float(np.nanquantile(vals, 0.99))
+        if not np.isfinite(y_lo) or not np.isfinite(y_hi) or y_hi <= y_lo:
+          y_lo = float(np.nanmin(vals))
+          y_hi = float(np.nanmax(vals))
+        if not np.isfinite(y_lo) or not np.isfinite(y_hi) or y_hi <= y_lo:
+          return
+
+        # Histogram-density "violin" (fast approximation)
+        hist, edges = np.histogram(vals, bins=bins, range=(y_lo, y_hi), density=True)
+        centers = 0.5 * (edges[:-1] + edges[1:])
+
+        dens = np.asarray(hist, dtype=float)
+        dens[~np.isfinite(dens)] = 0.0
+        if dens.max() <= 0:
+          return
+
+        half_w = (dens / dens.max()) * width
+        x_left = x0 - half_w
+        x_right = x0 + half_w
+
+        poly_x = np.concatenate([x_left, x_right[::-1]])
+        poly_y = np.concatenate([centers, centers[::-1]])
+
+        item = pg.PlotDataItem(
+          poly_x,
+          poly_y,
+          pen=pg.mkPen((72, 219, 251, 90), width=1),
+          brush=pg.mkBrush(72, 219, 251, 60),
+        )
+        self.plot_dist.addItem(item)
+
+        # Median + IQR markers
+        med = float(np.nanmedian(vals))
+        q1 = float(np.nanquantile(vals, 0.25))
+        q3 = float(np.nanquantile(vals, 0.75))
+
+        self.plot_dist.addItem(
+          pg.PlotDataItem([x0 - width * 0.55, x0 + width * 0.55], [med, med], pen=pg.mkPen("w", width=2))
+        )
+        self.plot_dist.addItem(
+          pg.PlotDataItem([x0, x0], [q1, q3], pen=pg.mkPen("w", width=2))
+        )
 
       for i, col in zip(periods, cols):
         vals = sub_df[col].dropna().to_numpy(dtype=float)
-        if vals.size <= 0:
-          continue
+        _add_violin_fast(float(i), vals)
 
-        if vals.size > _MAX_SCATTER_POINTS_PER_PERIOD:
-          idx = rng.choice(vals.size, size=_MAX_SCATTER_POINTS_PER_PERIOD, replace=False)
-          vals = vals[idx]
+        # Direction-aware survival:
+        # - Positive breakouts: want values > 0  ("> Entry", "> EMAx")
+        # - Negative breakouts: want values < 0  ("< Entry", "< EMAx")
+        dir_sign = 1.0 if self.dir_pos.isChecked() else -1.0
+        dir_prefix = ">" if dir_sign > 0 else "<"
 
-        remaining = _MAX_SCATTER_TOTAL_POINTS - total_added
-        if remaining <= 0:
-          break
-        if vals.size > remaining:
-          vals = vals[:remaining]
+      def prob_curve(col_gen: Callable[[int], str], thresh: float = 0.0) -> np.ndarray:
+        ys = []
+        for i in range(1, max_n + 1):
+          col = col_gen(i)
+          if col not in sub_df.columns:
+            ys.append(np.nan)
+            continue
+          v = sub_df[col].to_numpy(dtype=float)
+          v = v[np.isfinite(v)]
+          if v.size:
+            # sign-flip makes the condition always "continuation is positive"
+            ys.append(float(np.mean((dir_sign * v) > thresh) * 100.0))
+          else:
+            ys.append(np.nan)
+        return np.array(ys, dtype=float)
 
-        jitter = (rng.random(vals.size) - 0.5) * 0.6
-        for v, j in zip(vals, jitter):
-          spots.append({
-            "pos": (i + float(j), float(v)),
-            "size": 3,
-            "pen": None,
-            "brush": pg.mkBrush(72, 219, 251, 40),
-          })
-        total_added += vals.size
+      x = np.arange(1, max_n + 1, dtype=float)
 
-      scatter = pg.ScatterPlotItem(pxMode=True)
-      if spots:
-        scatter.addPoints(spots)
-        self.plot_dist.addItem(scatter)
+      # Entry (breakout) survival
+      y_entry = prob_curve(lambda i: f"{prefix}{i}", 0.0)
+      self.plot_probs.plot(
+        x, y_entry,
+        pen=pg.mkPen("#ff6b6b", width=2),
+        symbol="o", symbolSize=5,
+        name=f"{dir_prefix} Entry",
+      )
 
-    def prob_curve(col_gen: Callable[[int], str], thresh: float = 0.0) -> np.ndarray:
-      ys = []
-      for i in range(1, max_n + 1):
-        col = col_gen(i)
-        if col not in sub_df.columns:
-          ys.append(np.nan)
-          continue
-        v = sub_df[col].to_numpy(dtype=float)
-        v = v[np.isfinite(v)]
-        ys.append(float(np.mean(v > thresh) * 100.0) if v.size else np.nan)
-      return np.array(ys, dtype=float)
+      # EMA survival lines (direction-aware labels + sign)
+      if self.view_tab == "Daily":
+        ema5_gen = lambda i: f"ema5_dist{i}"
+        ema10_gen = lambda i: f"ema10_dist{i}"
+        ema20_gen = lambda i: f"ema20_dist{i}"
+        ema50_gen = lambda i: f"ema50_dist{i}"
+      else:
+        ema5_gen = lambda i: f"w_ema5_dist{i}"
+        ema10_gen = lambda i: f"w_ema10_dist{i}"
+        ema20_gen = lambda i: f"w_ema20_dist{i}"
+        ema50_gen = lambda i: f"w_ema50_dist{i}"
 
-    x = np.arange(1, max_n + 1, dtype=float)
+      y_ema5 = prob_curve(ema5_gen, 0.0)
+      y_ema10 = prob_curve(ema10_gen, 0.0)
+      y_ema20 = prob_curve(ema20_gen, 0.0)
+      y_ema50 = prob_curve(ema50_gen, 0.0)
 
-    # Entry (breakout) survival
-    y_entry = prob_curve(lambda i: f"{prefix}{i}", 0.0)
-    self.plot_probs.plot(x, y_entry, pen=pg.mkPen("#ff6b6b", width=2), symbol="o", symbolSize=5, name="> Entry")
-
-    # EMA survival lines (bring back >EMA5/>EMA10/>EMA20/>EMA50)
-    if self.view_tab == "Daily":
-      ema5_gen = lambda i: f"ema5_dist{i}"
-      ema10_gen = lambda i: f"ema10_dist{i}"
-      ema20_gen = lambda i: f"ema20_dist{i}"
-      ema50_gen = lambda i: f"ema50_dist{i}"
-    else:
-      ema5_gen = lambda i: f"w_ema5_dist{i}"
-      ema10_gen = lambda i: f"w_ema10_dist{i}"
-      ema20_gen = lambda i: f"w_ema20_dist{i}"
-      ema50_gen = lambda i: f"w_ema50_dist{i}"
-
-    y_ema5 = prob_curve(ema5_gen, 0.0)
-    y_ema10 = prob_curve(ema10_gen, 0.0)
-    y_ema20 = prob_curve(ema20_gen, 0.0)
-    y_ema50 = prob_curve(ema50_gen, 0.0)
-
-    self.plot_probs.plot(x, y_ema5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name="> EMA5")
-    self.plot_probs.plot(x, y_ema10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name="> EMA10")
-    self.plot_probs.plot(x, y_ema20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name="> EMA20")
-    self.plot_probs.plot(x, y_ema50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name="> EMA50")
+      self.plot_probs.plot(x, y_ema5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA5")
+      self.plot_probs.plot(x, y_ema10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA10")
+      self.plot_probs.plot(x, y_ema20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA20")
+      self.plot_probs.plot(x, y_ema50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} EMA50")
 
     self.plot_probs.setYRange(0, 105)
     self.plot_probs.getPlotItem().addLegend(
