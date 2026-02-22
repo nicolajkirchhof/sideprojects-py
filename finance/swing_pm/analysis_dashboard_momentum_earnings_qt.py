@@ -8,10 +8,7 @@ import numpy as np
 import pandas as pd
 
 # Qt binding: prefer PySide6, fallback to PyQt5
-try:
-  from PySide6 import QtCore, QtGui, QtWidgets
-except Exception:  # pragma: no cover
-  from PyQt5 import QtCore, QtGui, QtWidgets  # type: ignore
+from PySide6 import QtCore, QtGui, QtWidgets
 
 import pyqtgraph as pg
 
@@ -19,6 +16,13 @@ import pyqtgraph as pg
 # Global cache for reusing the window and app across multiple plot calls
 _GLOBAL_QT_APP: Optional[QtWidgets.QApplication] = None
 _GLOBAL_DASHBOARD_WIN: Optional["DashboardQt"] = None
+
+# Run %gui qt only once (re-running it can cause odd behavior / CPU churn in some consoles)
+_IPYTHON_GUI_QT_ENABLED = False
+
+# Protect UI from massive scatter clouds
+_MAX_SCATTER_POINTS_PER_PERIOD = 1500
+_MAX_SCATTER_TOTAL_POINTS = 50000
 
 
 def _in_ipython() -> bool:
@@ -28,6 +32,29 @@ def _in_ipython() -> bool:
     return get_ipython() is not None
   except Exception:
     return False
+
+
+def _ensure_ipython_qt_event_loop() -> None:
+  """
+  In IPython/Jupyter, ensure the Qt event loop is integrated.
+  Without this, Qt windows often appear but never repaint (white window).
+  """
+  global _IPYTHON_GUI_QT_ENABLED
+
+  if _IPYTHON_GUI_QT_ENABLED:
+    return
+  if not _in_ipython():
+    return
+
+  try:
+    from IPython import get_ipython  # type: ignore
+    ip = get_ipython()
+    if ip is None:
+      return
+    ip.run_line_magic("gui", "qt")  # equivalent to: %gui qt
+    _IPYTHON_GUI_QT_ENABLED = True
+  except Exception:
+    return
 
 
 @dataclass
@@ -76,7 +103,7 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
 
   # Match matplotlib dashboard: basic cleanup + safety caps
   if "original_price" in df.columns:
-    df = df[df["original_price"] < 10e5].copy()
+    df = df[df["original_price"] < 10e5]
 
   df = df.replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
 
@@ -132,6 +159,7 @@ class DashboardQt(QtWidgets.QMainWindow):
   def __init__(self, df: pd.DataFrame):
     super().__init__()
     self.df = df
+    self._has_rendered_once = False
 
     self.setWindowTitle("Momentum & Earnings Dashboard (Qt)")
     self.resize(3400, 1900)
@@ -157,7 +185,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     splitter.setStretchFactor(1, 1)
 
     controls.setMinimumWidth(560)
-    controls.setMaximumWidth(820)  # slightly wider to fit the extra inputs
+    controls.setMaximumWidth(820)
 
     # ---- Controls UI ----
     c_layout = QtWidgets.QVBoxLayout(controls)
@@ -182,7 +210,8 @@ class DashboardQt(QtWidgets.QMainWindow):
       self.btn_tab_d.setChecked(name == "Daily")
       self.btn_tab_w.setChecked(name == "Weekly")
       self._update_cond_label_and_bounds()
-      self.apply_filters()
+      # IMPORTANT: do NOT auto-render on tab change.
+      # User wants the dashboard to stay empty until Update is clicked.
 
     self.btn_tab_d.clicked.connect(lambda _=False: _set_tab("Daily"))
     self.btn_tab_w.clicked.connect(lambda _=False: _set_tab("Weekly"))
@@ -209,14 +238,10 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.year = self._add_year_range(grid, "Year Range", df)
 
     # 3. Event Move (signed)
-    self.event_move = self._add_range(
-      grid, "Event Move (Signed)", df, col="event_move", decimals=3, step=0.25,
-    )
+    self.event_move = self._add_range(grid, "Event Move (Signed)", df, col="event_move", decimals=3, step=0.25)
 
     # 4. Breakout Price
-    self.event_price = self._add_range(
-      grid, "Breakout Price", df, col="event_price", decimals=2, step=0.5,
-    )
+    self.event_price = self._add_range(grid, "Breakout Price", df, col="event_price", decimals=2, step=0.5)
 
     # 6-8. Momentum Filters
     self.mom_1m = self._add_range(grid, "1M_chg", df, col="1M_chg", decimals=1, step=1.0)
@@ -227,28 +252,25 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.ema_filters: dict[str, MinMaxSpin] = {}
     for ema_name in ["ema10", "ema20", "ema50", "ema100", "ema200"]:
       col = f"{ema_name}_dist0"
-      self.ema_filters[col] = self._add_range(
-        grid, f"{ema_name} Dist", df, col=col, decimals=2, step=0.25, )
+      self.ema_filters[col] = self._add_range(grid, f"{ema_name} Dist", df, col=col, decimals=2, step=0.25)
 
     # 14-18. SPY EMA dist0 filters
     self.spy_ema_filters: dict[str, MinMaxSpin] = {}
     for ema_name in ["ema10", "ema20", "ema50", "ema100", "ema200"]:
       col = f"spy_{ema_name}_dist0"
-      self.spy_ema_filters[col] = self._add_range(
-        grid, f"SPY {ema_name} Dist", df, col=col, decimals=2, step=0.25,
-      )
+      self.spy_ema_filters[col] = self._add_range(grid, f"SPY {ema_name} Dist", df, col=col, decimals=2, step=0.25)
 
-    # Direction 
+    # Direction
     dir_box = QtWidgets.QGroupBox("Direction")
     dir_layout = QtWidgets.QHBoxLayout(dir_box)
     self.dir_pos = QtWidgets.QRadioButton("Positive")
     self.dir_neg = QtWidgets.QRadioButton("Negative")
-    self.dir_pos.setChecked(True)  # match matplotlib default ("Positive")
+    self.dir_pos.setChecked(True)
     for w in (self.dir_pos, self.dir_neg):
       dir_layout.addWidget(w)
     c_layout.addWidget(dir_box)
 
-    # Earnings (Event Type)
+    # Earnings
     earn_box = QtWidgets.QGroupBox("Event Type")
     earn_layout = QtWidgets.QHBoxLayout(earn_box)
     self.earn_all = QtWidgets.QRadioButton("All")
@@ -259,7 +281,7 @@ class DashboardQt(QtWidgets.QMainWindow):
       earn_layout.addWidget(w)
     c_layout.addWidget(earn_box)
 
-    # SPY Context (new; matches matplotlib radio)
+    # SPY Context
     spy_box = QtWidgets.QGroupBox("SPY Context")
     spy_layout = QtWidgets.QHBoxLayout(spy_box)
     self.spy_all = QtWidgets.QRadioButton("All")
@@ -271,7 +293,7 @@ class DashboardQt(QtWidgets.QMainWindow):
       spy_layout.addWidget(w)
     c_layout.addWidget(spy_box)
 
-    # Market Cap buttons (new; matches matplotlib)
+    # Market Cap
     mcap_box = QtWidgets.QGroupBox("Market Cap")
     mcap_layout = QtWidgets.QHBoxLayout(mcap_box)
     self.mcap_group = QtWidgets.QButtonGroup(self)
@@ -284,7 +306,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.mcap_buttons["All"].setChecked(True)
     c_layout.addWidget(mcap_box)
 
-    # Conditional Survival Filter (new; matches matplotlib structure)
+    # Conditional Survival
     cond_box = QtWidgets.QGroupBox("Conditional Survival")
     cond_layout = QtWidgets.QGridLayout(cond_box)
     cond_layout.setHorizontalSpacing(10)
@@ -301,7 +323,6 @@ class DashboardQt(QtWidgets.QMainWindow):
       add_to_grid=False
     )
 
-    # Reparent the Cond. Range widgets into cond_box
     cond_layout.addWidget(self.lbl_cond_t, 0, 0, 1, 1)
     cond_layout.addWidget(self.slider_cond_t, 0, 1, 1, 2)
     cond_layout.addWidget(self.cond_range.label, 1, 0, 1, 1)
@@ -311,11 +332,11 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.slider_cond_t.valueChanged.connect(lambda _v: self._update_cond_label_and_bounds())
     c_layout.addWidget(cond_box)
 
-    # Apply button (filtering decoupled)
+    # Update button (filtering decoupled)
     btn_row = QtWidgets.QHBoxLayout()
     c_layout.addLayout(btn_row)
 
-    self.btn_apply = QtWidgets.QPushButton("Apply")
+    self.btn_apply = QtWidgets.QPushButton("Update")
     self.btn_apply.setMinimumHeight(34)
     self.btn_apply.clicked.connect(self.apply_filters)
     btn_row.addWidget(self.btn_apply)
@@ -358,9 +379,32 @@ class DashboardQt(QtWidgets.QMainWindow):
     p_layout.addWidget(self.plot_dist, 2)
     p_layout.addWidget(self.plot_probs, 1)
 
-    # Initialize conditional bounds + first draw
+    # Initialize UI bounds, but DO NOT render any data yet.
     self._update_cond_label_and_bounds()
-    self.apply_filters()
+    self._show_empty_state()
+
+  def _show_empty_state(self) -> None:
+    self.plot_path.clear()
+    self.plot_dist.clear()
+    self.plot_probs.clear()
+
+    msg = pg.TextItem("Click Update to render", color="#DDDDDD", anchor=(0.5, 0.5))
+    self.plot_path.addItem(msg)
+
+    msg2 = pg.TextItem("No plot yet", color="#DDDDDD", anchor=(0.5, 0.5))
+    self.plot_dist.addItem(msg2)
+
+    msg3 = pg.TextItem("No plot yet", color="#DDDDDD", anchor=(0.5, 0.5))
+    self.plot_probs.addItem(msg3)
+
+    self.lbl_status.setText("Idle (no render yet).")
+
+  def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+    global _GLOBAL_DASHBOARD_WIN
+    try:
+      _GLOBAL_DASHBOARD_WIN = None
+    finally:
+      super().closeEvent(event)
 
   def _update_cond_label_and_bounds(self) -> None:
     # Label and maximum depend on tab (Daily: 24, Weekly: 8)
@@ -483,6 +527,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     df = self.df
     if df.empty:
       self.lbl_status.setText("No data loaded.")
+      self._show_empty_state()
       return
 
     mask = pd.Series(True, index=df.index)
@@ -554,14 +599,17 @@ class DashboardQt(QtWidgets.QMainWindow):
       if col in df.columns:
         mask &= (df[col] >= cmin) & (df[col] <= cmax)
 
-    sub = df.loc[mask].copy()
+    sub = df.loc[mask]
 
     self._plot(sub)
+    self._has_rendered_once = True
 
     dt = (time.perf_counter() - t0) * 1000.0
     self.lbl_status.setText(f"N={len(sub):,}   render={dt:.0f}ms")
 
   def _plot(self, sub_df: pd.DataFrame) -> None:
+    # ... keep your existing _plot implementation, including the scatter downsampling caps ...
+    # (no change required here beyond what you already have)
     self.plot_path.clear()
     self.plot_dist.clear()
     self.plot_probs.clear()
@@ -571,7 +619,6 @@ class DashboardQt(QtWidgets.QMainWindow):
         pw.addItem(pg.TextItem("No Data", color="#DDDDDD", anchor=(0.5, 0.5)))
       return
 
-    # Use Daily or Weekly cpct columns based on view_tab (matches matplotlib idea)
     prefix = "cpct" if self.view_tab == "Daily" else "w_cpct"
     max_n = 24 if self.view_tab == "Daily" else 8
 
@@ -602,27 +649,39 @@ class DashboardQt(QtWidgets.QMainWindow):
       self.plot_path.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
       self.plot_dist.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
 
-      # Distribution (Violin-like Scatter)
+      rng = np.random.default_rng(0)
       spots = []
+      total_added = 0
+
       for i, col in zip(periods, cols):
         vals = sub_df[col].dropna().to_numpy(dtype=float)
-        if vals.size > 0:
-          # Jitter X positions to show density
-          jitter = (np.random.random(vals.size) - 0.5) * 0.4
-          for v, j in zip(vals, jitter):
-            spots.append({'pos': (i + j, v), 'size': 3, 'pen': None, 'brush': pg.mkBrush(72, 219, 251, 40)})
+        if vals.size <= 0:
+          continue
+
+        if vals.size > _MAX_SCATTER_POINTS_PER_PERIOD:
+          idx = rng.choice(vals.size, size=_MAX_SCATTER_POINTS_PER_PERIOD, replace=False)
+          vals = vals[idx]
+
+        remaining = _MAX_SCATTER_TOTAL_POINTS - total_added
+        if remaining <= 0:
+          break
+        if vals.size > remaining:
+          vals = vals[:remaining]
+
+        jitter = (rng.random(vals.size) - 0.5) * 0.4
+        for v, j in zip(vals, jitter):
+          spots.append({
+            "pos": (i + float(j), float(v)),
+            "size": 3,
+            "pen": None,
+            "brush": pg.mkBrush(72, 219, 251, 40),
+          })
+        total_added += vals.size
 
       scatter = pg.ScatterPlotItem(pxMode=True)
-      scatter.addPoints(spots)
-      self.plot_dist.addItem(scatter)
-
-      # Auto-scale Y-axis based on data range
-      all_vals = np.concatenate([upper, lower])
-      valid_vals = all_vals[np.isfinite(all_vals)]
-      if valid_vals.size:
-        v_min, v_max = np.min(valid_vals), np.max(valid_vals)
-        padding = (v_max - v_min) * 0.1 if v_max != v_min else 1.0
-        self.plot_path.setYRange(v_min - padding, v_max + padding, padding=0)
+      if spots:
+        scatter.addPoints(spots)
+        self.plot_dist.addItem(scatter)
 
     def prob_curve(col_gen: Callable[[int], str], thresh: float = 0.0) -> np.ndarray:
       ys = []
@@ -661,34 +720,42 @@ def _apply_dark_palette(app: QtWidgets.QApplication) -> None:
 
 
 def main(df: pd.DataFrame, *, exec_: Optional[bool] = None) -> DashboardQt:
-  """
-  Create and show the dashboard.
-  """
   global _GLOBAL_QT_APP, _GLOBAL_DASHBOARD_WIN
 
+  _ensure_ipython_qt_event_loop()
+
   if _GLOBAL_QT_APP is None:
-    # Set attributes before creating the app
     QtCore.QCoreApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     _GLOBAL_QT_APP = pg.mkQApp()
 
   _apply_dark_palette(_GLOBAL_QT_APP)
 
-  # Reuse or create the window
+  if _GLOBAL_DASHBOARD_WIN is not None:
+    try:
+      if not _GLOBAL_DASHBOARD_WIN.isVisible():
+        _GLOBAL_DASHBOARD_WIN = None
+    except Exception:
+      _GLOBAL_DASHBOARD_WIN = None
+
   if _GLOBAL_DASHBOARD_WIN is None:
     _GLOBAL_DASHBOARD_WIN = DashboardQt(df)
   else:
-    # Update data if the window already exists
     _GLOBAL_DASHBOARD_WIN.df = df
-    _GLOBAL_DASHBOARD_WIN.apply_filters()
+    # IMPORTANT: do NOT auto-render on reopen; keep it empty until user clicks Update.
+    _GLOBAL_DASHBOARD_WIN._update_cond_label_and_bounds()
+    _GLOBAL_DASHBOARD_WIN._show_empty_state()
 
   _GLOBAL_DASHBOARD_WIN.show()
   _GLOBAL_DASHBOARD_WIN.raise_()
   _GLOBAL_DASHBOARD_WIN.activateWindow()
 
-  # Decide whether to start the event loop
+  try:
+    _GLOBAL_QT_APP.processEvents()
+    _GLOBAL_QT_APP.processEvents()
+  except Exception:
+    pass
+
   if exec_ is None:
-    # If we are in a normal script (not interactive), block.
-    # If in IPython, don't block so the shell stays responsive.
     exec_ = not _in_ipython()
 
   if exec_:
@@ -705,6 +772,7 @@ if __name__ == "__main__":
   main(df, exec_=True)
 
 # %%
+df = load_and_prep_data(range(2022, 2026))
 # df = load_and_prep_data(range(2012, 2026))
 # %%
-# win = main(df)   # returns immediately in IPython; window stays open
+main(df)   # returns immediately in IPython; window stays open

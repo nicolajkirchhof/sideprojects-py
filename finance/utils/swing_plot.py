@@ -8,75 +8,76 @@ from datetime import datetime
 import sys
 
 # %% Global Plot Configurations
-EMA_CONFIGS = {
-    'ema5': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Wheat (Lightest)
-    'ema10': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Wheat (Lightest)
-    'ema20': {'color': '#b26529', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema50': {'color': '#7b4326', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema100': {'color': '#703b24', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema200': {'color': '#5a2c27', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Darkest
-    'vwap3': {'color': '#47a3b9', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Darkest
+MA_CONFIGS = {
+    'ma5': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Wheat (Lightest)
+    'ma10': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Wheat (Lightest)
+    'ma20': {'color': '#b26529', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma50': {'color': '#7b4326', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma100': {'color': '#703b24', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma200': {'color': '#5a2c27', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Darkest
+    # 'vwap3': {'color': '#47a3b9', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Darkest
 }
 
 ATR_CONFIGS = {
     'atrp1': {'color': '#f5a1df', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Steel Blue
-    'atrp9': {'color': '#f81cfc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Light Steel Blue
+    # 'atrp9': {'color': '#f81cfc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Light Steel Blue
     'atrp20': {'color': '#b72494', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},  # Navy
-    'atrp50': {'color': '#6b1255', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}  # Navy
+    # 'atrp50': {'color': '#6b1255', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}  # Navy
 }
 
-STD_CONFIGS = {
-    'std': {'color': '#ba68c8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Blue
-}
-
-AC_CONFIGS = {
-    'ac100_lag_1': {'color': '#e0ffff', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Cyan
-    'ac100_lag_5': {'color': '#00ced1', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Dark Turquoise
-    'ac100_lag_10': {'color': '#00bfff', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Sky Blue
-    'ac100_lag_20': {'color': '#008080', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Teal
-}
+# STD_CONFIGS = {
+#     'std': {'color': '#ba68c8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Blue
+# }
+#
+# AC_CONFIGS = {
+#     'ac100_lag_1': {'color': '#e0ffff', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Cyan
+#     'ac100_lag_5': {'color': '#00ced1', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Dark Turquoise
+#     'ac100_lag_10': {'color': '#00bfff', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Sky Blue
+#     'ac100_lag_20': {'color': '#008080', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Teal
+# }
 
 # New configuration for the Autocorrelation Regime pane
-AC_REGIME_CONFIGS = {
-    'ac_mom': {'color': '#e1bee7', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Purple (Momentum)
-    'ac_mr': {'color': '#ba68c8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
-    # Medium Purple (Mean Reversion)
-    'ac_comp': {'color': '#4a148c', 'width': 2.2, 'style': QtCore.Qt.PenStyle.SolidLine}
-    # Indigo/Darkest (Composite)
-}
+# AC_REGIME_CONFIGS = {
+#     'ac_mom': {'color': '#e1bee7', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Purple (Momentum)
+#     'ac_mr': {'color': '#ba68c8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
+#     # Medium Purple (Mean Reversion)
+#     'ac_comp': {'color': '#4a148c', 'width': 2.2, 'style': QtCore.Qt.PenStyle.SolidLine}
+#     # Indigo/Darkest (Composite)
+# }
 
 SLOPE_CONFIGS = {
+    'ema5_slope': {'color': '#ffccbc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
     'ema10_slope': {'color': '#ffccbc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
     'ema20_slope': {'color': '#ff8a65', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
     'ema50_slope': {'color': '#ff5722', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema100_slope': {'color': '#e64a19', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    # 'ema100_slope': {'color': '#e64a19', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
     'ema200_slope': {'color': '#bf360c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Deep Orange Dark
 }
 
 VOL_CONFIGS = {
     'v': {'color': '#49bdd9', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Deep Orange Light
-    'v9': {'color': '#fcec98', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},
+    # 'v9': {'color': '#fcec98', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},
     'v20': {'color': '#f3cb21', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'v50': {'color': '#dab312', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}
+    # 'v50': {'color': '#dab312', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}
 }
 
 DIST_CONFIGS = {
-    'ema10_dist': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
-    'ema20_dist': {'color': '#b26529', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema50_dist': {'color': '#7b4326', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema100_dist': {'color': '#703b24', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema200_dist': {'color': '#5a2c27', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Deep Orange Dark
+    'ma10_dist': {'color': '#9b7f6c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
+    'ma20_dist': {'color': '#b26529', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma50_dist': {'color': '#7b4326', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma100_dist': {'color': '#703b24', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma200_dist': {'color': '#5a2c27', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Deep Orange Dark
 }
 
-HURST_CONFIGS = {
-    'hurst50': {'color': '#fff59d', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Yellow
-    'hurst100': {'color': '#fbc02d', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Dimmed Gold/Brownish
-}
+# HURST_CONFIGS = {
+#     'hurst50': {'color': '#fff59d', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Yellow
+#     'hurst100': {'color': '#fbc02d', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Dimmed Gold/Brownish
+# }
 
 HV_CONFIGS = {
     'hv9': {'color': '#b7a3db', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Light Green
     'hv20': {'color': '#6539b4', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},  # Medium Green
-    'hv50': {'color': '#583098', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Dark Green
+    # 'hv50': {'color': '#583098', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Dark Green
     'iv': {'color': '#49bcd8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Magenta (Standout)
 }
 
@@ -568,7 +569,7 @@ def _get_export_context(width, height):
         export_state = {
             'ohlc': ohlc_item,
             'vp': vp_item, # Store ref
-            'ema': _mk_series_items(p1, EMA_CONFIGS),
+            'ema': _mk_series_items(p1, MA_CONFIGS),
             'bb': _mk_series_items(p1, BB_CONFIGS),  # Add Bollinger Bands
             'vol': _mk_series_items(p7, VOL_CONFIGS),
             'dist': _mk_series_items(p3, DIST_CONFIGS),
@@ -710,7 +711,7 @@ def _add_plot_content(plots, df, vlines):
 
     p1.addItem(OHLCItem([(i, df.o.iloc[i], df.h.iloc[i], df.l.iloc[i], df.c.iloc[i]) for i in x_range]))
 
-    for col, cfg in EMA_CONFIGS.items():
+    for col, cfg in MA_CONFIGS.items():
         if col in df.columns:
             p1.plot(x=x_range, y=df[col].values, pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']))
 
@@ -998,7 +999,7 @@ def interactive(full_df, display_range=250, title: str | None = None):
                 if 'v' in df.columns and pd.notna(row.get('v', np.nan)):
                     txt_p1 += f" V:{row.v/1000:,.0f}k"
                 
-                emas = _fmt_group(EMA_CONFIGS, lambda v: f"{v:.2f}", lambda c: c.upper())
+                emas = _fmt_group(MA_CONFIGS, lambda v: f"{v:.2f}", lambda c: c.upper())
                 bbs = _fmt_group(BB_CONFIGS, lambda v: f"{v:.2f}", lambda c: c.upper())
                 
                 if emas: txt_p1 += " | " + emas
