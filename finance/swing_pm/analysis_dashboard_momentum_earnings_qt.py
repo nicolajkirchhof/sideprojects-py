@@ -360,6 +360,7 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     self.plot_path.setMouseEnabled(x=False, y=True)
     self.plot_dist.setMouseEnabled(x=False, y=True)
+    self.plot_probs.setMouseEnabled(x=False, y=True)
     self.plot_dist.setXLink(self.plot_path)
     self.plot_dist.setYLink(self.plot_path)
 
@@ -371,7 +372,7 @@ class DashboardQt(QtWidgets.QMainWindow):
       pw.getPlotItem().getAxis("left").setTextPen(pg.mkPen("#AAAAAA"))
       pw.getPlotItem().getAxis("bottom").setTextPen(pg.mkPen("#AAAAAA"))
 
-    self.plot_path.setTitle("Trajectory (Mean + Std)", color="#DDDDDD", size="12pt")
+    self.plot_path.setTitle("Trajectory (5th/50th/95th Quantiles)", color="#DDDDDD", size="12pt")
     self.plot_dist.setTitle("Distribution of Changes", color="#DDDDDD", size="12pt")
     self.plot_probs.setTitle("Probability of Holding Levels", color="#DDDDDD", size="12pt")
 
@@ -619,6 +620,15 @@ class DashboardQt(QtWidgets.QMainWindow):
         pw.addItem(pg.TextItem("No Data", color="#DDDDDD", anchor=(0.5, 0.5)))
       return
 
+    # Ensure legend exists BEFORE plotting (pyqtgraph only auto-registers items created after the legend)
+    probs_pi = self.plot_probs.getPlotItem()
+    probs_pi.addLegend(
+      offset=(10, 10),
+      labelTextColor="#DDDDDD",
+      brush=pg.mkBrush(0, 0, 0, 120),
+      pen=pg.mkPen("#666666"),
+    )
+
     prefix = "cpct" if self.view_tab == "Daily" else "w_cpct"
     max_n = 24 if self.view_tab == "Daily" else 8
 
@@ -632,19 +642,19 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     if cols:
       data = sub_df[cols].to_numpy(dtype=float)
-      mean = np.nanmean(data, axis=0)
-      std = np.nanstd(data, axis=0)
+      q05 = np.nanquantile(data, 0.05, axis=0)
+      q50 = np.nanquantile(data, 0.50, axis=0)
+      q95 = np.nanquantile(data, 0.95, axis=0)
 
       x = np.array(periods, dtype=float)
-      self.plot_path.plot(x, mean, pen=pg.mkPen("c", width=2), name="Mean")
+      self.plot_path.plot(x, q50, pen=pg.mkPen("c", width=2), name="50th (Median)")
 
-      upper = mean + std
-      lower = mean - std
-      upper_item = pg.PlotDataItem(x, upper, pen=pg.mkPen((0, 255, 255, 60)))
-      lower_item = pg.PlotDataItem(x, lower, pen=pg.mkPen((0, 255, 255, 60)))
+      # 5th / 95th quantiles + filled band
+      upper_item = pg.PlotDataItem(x, q95, pen=pg.mkPen((0, 255, 255, 80)))
+      lower_item = pg.PlotDataItem(x, q05, pen=pg.mkPen((0, 255, 255, 80)))
       self.plot_path.addItem(upper_item)
       self.plot_path.addItem(lower_item)
-      self.plot_path.addItem(pg.FillBetweenItem(upper_item, lower_item, brush=pg.mkBrush(0, 255, 255, 40)))
+      self.plot_path.addItem(pg.FillBetweenItem(upper_item, lower_item, brush=pg.mkBrush(0, 255, 255, 35)))
 
       self.plot_path.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
       self.plot_dist.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
@@ -668,7 +678,7 @@ class DashboardQt(QtWidgets.QMainWindow):
         if vals.size > remaining:
           vals = vals[:remaining]
 
-        jitter = (rng.random(vals.size) - 0.5) * 0.4
+        jitter = (rng.random(vals.size) - 0.5) * 0.6
         for v, j in zip(vals, jitter):
           spots.append({
             "pos": (i + float(j), float(v)),
@@ -696,8 +706,33 @@ class DashboardQt(QtWidgets.QMainWindow):
       return np.array(ys, dtype=float)
 
     x = np.arange(1, max_n + 1, dtype=float)
+
+    # Entry (breakout) survival
     y_entry = prob_curve(lambda i: f"{prefix}{i}", 0.0)
     self.plot_probs.plot(x, y_entry, pen=pg.mkPen("#ff6b6b", width=2), symbol="o", symbolSize=5, name="> Entry")
+
+    # EMA survival lines (bring back >EMA5/>EMA10/>EMA20/>EMA50)
+    if self.view_tab == "Daily":
+      ema5_gen = lambda i: f"ema5_dist{i}"
+      ema10_gen = lambda i: f"ema10_dist{i}"
+      ema20_gen = lambda i: f"ema20_dist{i}"
+      ema50_gen = lambda i: f"ema50_dist{i}"
+    else:
+      ema5_gen = lambda i: f"w_ema5_dist{i}"
+      ema10_gen = lambda i: f"w_ema10_dist{i}"
+      ema20_gen = lambda i: f"w_ema20_dist{i}"
+      ema50_gen = lambda i: f"w_ema50_dist{i}"
+
+    y_ema5 = prob_curve(ema5_gen, 0.0)
+    y_ema10 = prob_curve(ema10_gen, 0.0)
+    y_ema20 = prob_curve(ema20_gen, 0.0)
+    y_ema50 = prob_curve(ema50_gen, 0.0)
+
+    self.plot_probs.plot(x, y_ema5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name="> EMA5")
+    self.plot_probs.plot(x, y_ema10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name="> EMA10")
+    self.plot_probs.plot(x, y_ema20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name="> EMA20")
+    self.plot_probs.plot(x, y_ema50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name="> EMA50")
+
     self.plot_probs.setYRange(0, 105)
     self.plot_probs.getPlotItem().addLegend(
       offset=(10, 10),
