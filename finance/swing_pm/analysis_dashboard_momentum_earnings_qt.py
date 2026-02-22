@@ -16,8 +16,9 @@ except Exception:  # pragma: no cover
 import pyqtgraph as pg
 
 #%%
-# Keep a strong reference so the window doesn't get GC'd in IPython.
-_LAST_WINDOW: Optional["DashboardQt"] = None
+# Global cache for reusing the window and app across multiple plot calls
+_GLOBAL_QT_APP: Optional[QtWidgets.QApplication] = None
+_GLOBAL_DASHBOARD_WIN: Optional["DashboardQt"] = None
 
 
 def _in_ipython() -> bool:
@@ -181,6 +182,7 @@ class DashboardQt(QtWidgets.QMainWindow):
       self.btn_tab_d.setChecked(name == "Daily")
       self.btn_tab_w.setChecked(name == "Weekly")
       self._update_cond_label_and_bounds()
+      self.apply_filters()
 
     self.btn_tab_d.clicked.connect(lambda _=False: _set_tab("Daily"))
     self.btn_tab_w.clicked.connect(lambda _=False: _set_tab("Weekly"))
@@ -212,7 +214,6 @@ class DashboardQt(QtWidgets.QMainWindow):
     )
 
     # 4. Breakout Price
-    # Match matplotlib: min + 0.99 quantile init, with full data-derived hard range.
     self.event_price = self._add_range(
       grid, "Breakout Price", df, col="event_price", decimals=2, step=0.5,
     )
@@ -237,14 +238,13 @@ class DashboardQt(QtWidgets.QMainWindow):
         grid, f"SPY {ema_name} Dist", df, col=col, decimals=2, step=0.25,
       )
 
-    # Direction (as in matplotlib: Pos/Neg buttons; keep "Any" for convenience)
+    # Direction 
     dir_box = QtWidgets.QGroupBox("Direction")
     dir_layout = QtWidgets.QHBoxLayout(dir_box)
-    self.dir_any = QtWidgets.QRadioButton("Any")
     self.dir_pos = QtWidgets.QRadioButton("Positive")
     self.dir_neg = QtWidgets.QRadioButton("Negative")
     self.dir_pos.setChecked(True)  # match matplotlib default ("Positive")
-    for w in (self.dir_any, self.dir_pos, self.dir_neg):
+    for w in (self.dir_pos, self.dir_neg):
       dir_layout.addWidget(w)
     c_layout.addWidget(dir_box)
 
@@ -311,19 +311,6 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.slider_cond_t.valueChanged.connect(lambda _v: self._update_cond_label_and_bounds())
     c_layout.addWidget(cond_box)
 
-    # Y-Limit (new; matches matplotlib)
-    ylim_box = QtWidgets.QGroupBox("Y-Axis Limit %")
-    ylim_layout = QtWidgets.QHBoxLayout(ylim_box)
-    self.slider_ylim = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-    self.slider_ylim.setRange(10, 200)
-    self.slider_ylim.setSingleStep(5)
-    self.slider_ylim.setValue(50)
-    self.lbl_ylim = QtWidgets.QLabel("50")
-    self.slider_ylim.valueChanged.connect(lambda v: self.lbl_ylim.setText(str(int(v))))
-    ylim_layout.addWidget(self.slider_ylim, 1)
-    ylim_layout.addWidget(self.lbl_ylim)
-    c_layout.addWidget(ylim_box)
-
     # Apply button (filtering decoupled)
     btn_row = QtWidgets.QHBoxLayout()
     c_layout.addLayout(btn_row)
@@ -347,9 +334,15 @@ class DashboardQt(QtWidgets.QMainWindow):
     pg.setConfigOptions(antialias=True)
 
     self.plot_path = pg.PlotWidget()
+    self.plot_dist = pg.PlotWidget()
     self.plot_probs = pg.PlotWidget()
 
-    for pw in (self.plot_path, self.plot_probs):
+    self.plot_path.setMouseEnabled(x=False, y=True)
+    self.plot_dist.setMouseEnabled(x=False, y=True)
+    self.plot_dist.setXLink(self.plot_path)
+    self.plot_dist.setYLink(self.plot_path)
+
+    for pw in (self.plot_path, self.plot_dist, self.plot_probs):
       pw.setBackground("k")
       pw.showGrid(x=True, y=True, alpha=0.2)
       pw.getPlotItem().getAxis("left").setPen(pg.mkPen("#AAAAAA"))
@@ -357,11 +350,13 @@ class DashboardQt(QtWidgets.QMainWindow):
       pw.getPlotItem().getAxis("left").setTextPen(pg.mkPen("#AAAAAA"))
       pw.getPlotItem().getAxis("bottom").setTextPen(pg.mkPen("#AAAAAA"))
 
-    self.plot_path.setTitle("Trajectory", color="#DDDDDD", size="12pt")
+    self.plot_path.setTitle("Trajectory (Mean + Std)", color="#DDDDDD", size="12pt")
+    self.plot_dist.setTitle("Distribution of Changes", color="#DDDDDD", size="12pt")
     self.plot_probs.setTitle("Probability of Holding Levels", color="#DDDDDD", size="12pt")
 
-    p_layout.addWidget(self.plot_path, 3)
-    p_layout.addWidget(self.plot_probs, 2)
+    p_layout.addWidget(self.plot_path, 2)
+    p_layout.addWidget(self.plot_dist, 2)
+    p_layout.addWidget(self.plot_probs, 1)
 
     # Initialize conditional bounds + first draw
     self._update_cond_label_and_bounds()
@@ -395,10 +390,13 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     # Update spinbox ranges and values
     for b in (self.cond_range.min_box, self.cond_range.max_box):
+      b.blockSignals(True)
       b.setRange(vmin, vmax)
       b.setSingleStep(0.5)
     self.cond_range.min_box.setValue(vmin)
     self.cond_range.max_box.setValue(vmax)
+    for b in (self.cond_range.min_box, self.cond_range.max_box):
+      b.blockSignals(False)
 
   # ---------- Controls builders ----------
   def _add_year_range(self, grid: QtWidgets.QGridLayout, title: str, df: pd.DataFrame) -> MinMaxSpin:
@@ -462,7 +460,7 @@ class DashboardQt(QtWidgets.QMainWindow):
       b.setKeyboardTracking(False)
       b.setAccelerated(True)
 
-    # Set initial values to the calculated quantile range
+    # Set initial values to the calculated range
     min_box.setValue(hard_min)
     max_box.setValue(hard_max)
 
@@ -565,10 +563,12 @@ class DashboardQt(QtWidgets.QMainWindow):
 
   def _plot(self, sub_df: pd.DataFrame) -> None:
     self.plot_path.clear()
+    self.plot_dist.clear()
     self.plot_probs.clear()
 
     if sub_df.empty:
-      self.plot_path.addItem(pg.TextItem("No Data", color="#DDDDDD", anchor=(0.5, 0.5)))
+      for pw in (self.plot_path, self.plot_dist, self.plot_probs):
+        pw.addItem(pg.TextItem("No Data", color="#DDDDDD", anchor=(0.5, 0.5)))
       return
 
     # Use Daily or Weekly cpct columns based on view_tab (matches matplotlib idea)
@@ -600,9 +600,29 @@ class DashboardQt(QtWidgets.QMainWindow):
       self.plot_path.addItem(pg.FillBetweenItem(upper_item, lower_item, brush=pg.mkBrush(0, 255, 255, 40)))
 
       self.plot_path.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
+      self.plot_dist.addLine(y=0, pen=pg.mkPen("#888888", style=QtCore.Qt.PenStyle.DashLine))
 
-      yl = float(self.slider_ylim.value())
-      self.plot_path.setYRange(-yl, yl)
+      # Distribution (Violin-like Scatter)
+      spots = []
+      for i, col in zip(periods, cols):
+        vals = sub_df[col].dropna().to_numpy(dtype=float)
+        if vals.size > 0:
+          # Jitter X positions to show density
+          jitter = (np.random.random(vals.size) - 0.5) * 0.4
+          for v, j in zip(vals, jitter):
+            spots.append({'pos': (i + j, v), 'size': 3, 'pen': None, 'brush': pg.mkBrush(72, 219, 251, 40)})
+
+      scatter = pg.ScatterPlotItem(pxMode=True)
+      scatter.addPoints(spots)
+      self.plot_dist.addItem(scatter)
+
+      # Auto-scale Y-axis based on data range
+      all_vals = np.concatenate([upper, lower])
+      valid_vals = all_vals[np.isfinite(all_vals)]
+      if valid_vals.size:
+        v_min, v_max = np.min(valid_vals), np.max(valid_vals)
+        padding = (v_max - v_min) * 0.1 if v_max != v_min else 1.0
+        self.plot_path.setYRange(v_min - padding, v_max + padding, padding=0)
 
     def prob_curve(col_gen: Callable[[int], str], thresh: float = 0.0) -> np.ndarray:
       ys = []
@@ -643,35 +663,38 @@ def _apply_dark_palette(app: QtWidgets.QApplication) -> None:
 def main(df: pd.DataFrame, *, exec_: Optional[bool] = None) -> DashboardQt:
   """
   Create and show the dashboard.
-
-  - In a normal script run: call with exec_=True (or leave default; it'll pick True).
-  - In IPython: call with exec_=False (or leave default; it'll pick False).
   """
-  global _LAST_WINDOW
+  global _GLOBAL_QT_APP, _GLOBAL_DASHBOARD_WIN
 
-  app = QtWidgets.QApplication.instance()
-  created_app = False
-  if app is None:
-    app = QtWidgets.QApplication(sys.argv[:1])  # avoid passing IPython args into Qt
-    created_app = True
+  if _GLOBAL_QT_APP is None:
+    # Set attributes before creating the app
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+    _GLOBAL_QT_APP = pg.mkQApp()
 
-  _apply_dark_palette(app)
+  _apply_dark_palette(_GLOBAL_QT_APP)
 
-  win = DashboardQt(df)
-  win.show()
+  # Reuse or create the window
+  if _GLOBAL_DASHBOARD_WIN is None:
+    _GLOBAL_DASHBOARD_WIN = DashboardQt(df)
+  else:
+    # Update data if the window already exists
+    _GLOBAL_DASHBOARD_WIN.df = df
+    _GLOBAL_DASHBOARD_WIN.apply_filters()
 
-  # Keep it alive for interactive sessions
-  _LAST_WINDOW = win
+  _GLOBAL_DASHBOARD_WIN.show()
+  _GLOBAL_DASHBOARD_WIN.raise_()
+  _GLOBAL_DASHBOARD_WIN.activateWindow()
 
   # Decide whether to start the event loop
   if exec_ is None:
-    # If IPython is driving the GUI event loop, don't exec() here.
-    exec_ = created_app and (not _in_ipython())
+    # If we are in a normal script (not interactive), block.
+    # If in IPython, don't block so the shell stays responsive.
+    exec_ = not _in_ipython()
 
   if exec_:
-    app.exec()
+    _GLOBAL_QT_APP.exec()
 
-  return win
+  return _GLOBAL_DASHBOARD_WIN
 
 
 # %%
