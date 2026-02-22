@@ -299,31 +299,6 @@ def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
     df_stk[f'v{vol}'] = df_stk['v'].rolling(window=vol).mean()
     df_stk[f'rvol{vol}'] = df_stk['v'] / df_stk[f'v{vol}']
 
-  # # 2. Multi-Lag Autocorrelations (Legs)
-  # # Lag 1: Daily momentum/mean-reversion
-  # # Lag 5: Weekly cycle persistence
-  # # Lag 21: Monthly cycle (Institutional window)
-  # for window in [100]:
-  #   for lag in [1, 5, 10, 20]:
-  #     df_stk[f'ac{window}_lag_{lag}'] = rolling_autocorr(df_stk['c'], window=window, lag=lag)
-  #
-  # # --- Implementation on a DataFrame 'df' ---
-  # # 1. Standard Momentum (20-day, Lag-1)
-  # # Use this to confirm trend persistence.
-  # df_stk['ac_mom'] = rolling_autocorr(df_stk['c'], window=20, lag=1)
-  #
-  # # 2. Short-Term Mean Reversion (10-day, Lag-1)
-  # # Look for values < -0.2 for "snap-back" opportunities.
-  # df_stk['ac_mr'] = rolling_autocorr(df_stk['c'], window=10, lag=1)
-  #
-  # # # 3. Institutional "Hidden" Momentum (60-day, Lag-5)
-  # # # If this is higher than Lag-1, institutions are likely accumulating.
-  # df_stk['ac_inst'] = rolling_autocorr(df_stk['c'], window=50, lag=5)
-  #
-  # # 4. Composite Swing Signal (20-day, Avg Lags 1-3)
-  # # Best for general trend-following filters.
-  # df_stk['ac_comp'] = get_composite_autocorr(df_stk['c'], window=20, max_lag=3)
-
   # Historic Volatility (Annualized)
   # Standard formula: std(log_returns) * sqrt(252)
   log_ret = np.log(df_stk['c'] / df_stk['c'].shift(1))
@@ -341,6 +316,12 @@ def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
   for atr in [1, 9, 14, 20, 50]:
     df_stk[f'atr{atr}'] = tr.ewm(alpha=1/atr, adjust=False).mean()
     df_stk[f'atrp{atr}'] = (df_stk[f'atr{atr}'] / df_stk['c']) * 100
+
+  for ma in [5, 10, 20, 50, 100, 200]:
+    df_stk[f'ma{ma}'] = df_stk['c'].rolling(window=ma).mean()
+    df_stk[f'ma{ma}_slope'] = df_stk[f'ma{ma}'].diff()
+    df_stk[f'ma{ma}_dist'] = ((df_stk['c'] - df_stk[f'ma{ma}']) / df_stk[f'ma{ma}']) * 100
+    df_stk[f'ma{ma}_dist_atr'] = (df_stk['c'] - df_stk[f'ma{ma}']) / df_stk[f'atr{atr}']
 
   for ema in [5, 10, 20, 50, 100, 200]:
     df_stk[f'ema{ema}'] = df_stk['vwap3'].ewm(span=ema, adjust=False).mean()
