@@ -146,3 +146,5 @@ _backup/
 # Flask-Session
 flask_session/
 
+#AI
+.output.txt
