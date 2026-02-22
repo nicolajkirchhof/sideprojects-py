@@ -12,11 +12,11 @@ import finance.utils as utils
 # %autoreload 2
 
 # Constants from momentum.py
-INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp20', 'atrp50', 'pct', 'rvol20', 'rvol50', 'std_mv', 'iv', 'hv9', 'hv20',
-              'ema200_dist', 'ema100_dist', 'ema50_dist', 'ema20_dist', 'ema10_dist', 'ema5_dist',
-              'ema5_slope', 'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
-SPY_INDICATORS = ['hv9', 'hv20', 'ema10_dist', 'ema20_dist', 'ema50_dist', 'ema100_dist', 'ema200_dist',
-                  'ema10_slope', 'ema20_slope', 'ema50_slope', 'ema100_slope', 'ema200_slope']
+INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp20', 'pct', 'rvol20', 'std_mv', 'iv', 'hv9', 'hv20',
+              'ma200_dist', 'ma100_dist', 'ma50_dist', 'ma20_dist', 'ma10_dist', 'ma5_dist',
+              'ma5_slope', 'ma10_slope', 'ma20_slope', 'ma50_slope', 'ma100_slope', 'ma200_slope']
+SPY_INDICATORS = ['hv9', 'hv20', 'ma10_dist', 'ma20_dist', 'ma50_dist', 'ma100_dist', 'ma200_dist',
+                  'ma10_slope', 'ma20_slope', 'ma50_slope', 'ma100_slope', 'ma200_slope']
 OFFSET_DAYS = 25
 OFFSET_WEEKS = 8
 
@@ -43,10 +43,10 @@ liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
 #   'atrp1/9/14/20/50' => ATR percentage, 'pct' => Percent Change, 'rvol50' => Relative Volatility 50-day,
 #   'std_mv' => 20 day standard deviation, 'iv' => implied volatility,
 #   'hv9/14/20' => Historical Volatility 9/14/20-day,
-#   'ema10/20/50/100/200_dist' => Distance to EMA 10/20/50/100/200,
-#   'ema10/20/50/100/200_slope' => Slope of EMA 10/20/50/100/200,
+#   'ma10/20/50/100/200_dist' => Distance to MA 10/20/50/100/200,
+#   'ma10/20/50/100/200_slope' => Slope of MA 10/20/50/100/200,
 #   'cpct' => Percentage change in reference to the day before the event (c-1)
-#   'spy_{indicator}' => SPY equivalent for specific indicators (hv, ema_dist, ema_slope)
+#   'spy_{indicator}' => SPY equivalent for specific indicators (hv, ma_dist, ma_slope)
 
 def classify_market_cap(mcap_value, year, df_thresholds):
     """Classifies market cap based on historical thresholds (from reprocess.py)."""
