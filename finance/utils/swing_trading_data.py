@@ -53,8 +53,8 @@ class SwingTradingData:
                                                                              v=('v', 'sum')).copy()
 
     self.df_day = utils.indicators.swing_indicators(self.df_day)
-    self.df_week = utils.indicators.swing_indicators(self.df_week, [50, 100], timeframe=None)
-    self.df_month = utils.indicators.swing_indicators(self.df_month, [50], timeframe=None)
+    self.df_week = utils.indicators.swing_indicators(self.df_week)
+    self.df_month = utils.indicators.swing_indicators(self.df_month)
 
     if not metainfo:
       return

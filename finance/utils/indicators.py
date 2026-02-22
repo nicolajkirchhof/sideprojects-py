@@ -278,107 +278,133 @@ def get_composite_autocorr(series, window=20, max_lag=3):
   # Return the average of Lags 1, 2, and 3
   return pd.concat(corrs, axis=1).mean(axis=1)
 
-def swing_indicators(df_stk, lrc = [50, 100, 200], timeframe='D'):
+def swing_indicators(df_stk):
+  # Make a (shallow) copy to avoid carrying fragmentation forward
+  df_stk = df_stk.copy()
   df_stk.sort_index(inplace=True)
-  df_stk['gap'] = df_stk.o - df_stk.shift().c
-  df_stk['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o).fillna(0)
-  df_stk['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c).fillna(0)
-  df_stk['chg'] = (df_stk.c - df_stk.shift().c).fillna(0)
-  df_stk['vwap3'] = (df_stk['c']+df_stk['h']+df_stk['l'])/3
+
+  # Collect new columns here, then concat once (prevents fragmentation)
+  new_cols: dict[str, object] = {}
+
+  new_cols['gap'] = df_stk.o - df_stk.shift().c
+  new_cols['gappct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.o).fillna(0)
+  new_cols['pct'] = utils.pct.percentage_change_array(df_stk.shift().c, df_stk.c).fillna(0)
+  new_cols['chg'] = (df_stk.c - df_stk.shift().c).fillna(0)
+  new_cols['vwap3'] = (df_stk['c'] + df_stk['h'] + df_stk['l']) / 3
+
+  # Ensure 'iv' exists; compute iv_pct if meaningful
   if 'iv' not in df_stk.columns:
-    df_stk['iv'] = np.nan
-  elif not df_stk['iv'].isna().all():
-    df_stk['iv_pct'] = df_stk['iv'].rolling(window=252).apply(
-      lambda x: (x < x[-1]).sum() / len(x) * 100 if len(x) > 0 else np.nan,
-      raw=True
-    )
+    new_cols['iv'] = np.nan
+  else:
+    if not df_stk['iv'].isna().all():
+      new_cols['iv_pct'] = df_stk['iv'].rolling(window=252).apply(
+        lambda x: (x < x[-1]).sum() / len(x) * 100 if len(x) > 0 else np.nan,
+        raw=True
+      )
 
   # RVOL Calculation (Relative Volume)
-  # 20-day is standard for swing trading
   for vol in [9, 20, 50]:
-    df_stk[f'v{vol}'] = df_stk['v'].rolling(window=vol).mean()
-    df_stk[f'rvol{vol}'] = df_stk['v'] / df_stk[f'v{vol}']
+    vmean = df_stk['v'].rolling(window=vol).mean()
+    new_cols[f'v{vol}'] = vmean
+    new_cols[f'rvol{vol}'] = df_stk['v'] / vmean
 
   # Historic Volatility (Annualized)
-  # Standard formula: std(log_returns) * sqrt(252)
   log_ret = np.log(df_stk['c'] / df_stk['c'].shift(1))
   for days in [9, 14, 20, 50]:
-    df_stk[f'hv{days}'] = log_ret.rolling(window=days).std(ddof=0) * np.sqrt(252)
-  df_stk['std'] = df_stk['c'].rolling(window=20).std(ddof=0)
-  df_stk['std_mv'] = df_stk['chg'].abs() / df_stk['std']
+    new_cols[f'hv{days}'] = log_ret.rolling(window=days).std(ddof=0) * np.sqrt(252)
 
-    # ATR Calculation
-  df_stk['hl'] = df_stk['h'] - df_stk['l']
-  df_stk['hpc'] = np.abs(df_stk['h'] - df_stk['c'].shift())
-  df_stk['lpc'] = np.abs(df_stk['l'] - df_stk['c'].shift())
+  std20 = df_stk['c'].rolling(window=20).std(ddof=0)
+  new_cols['std'] = std20
+  new_cols['std_mv'] = new_cols['chg'].abs() / std20
 
-  tr = df_stk[['hl', 'hpc', 'lpc']].max(axis=1)
+  # ATR Calculation
+  hl = df_stk['h'] - df_stk['l']
+  hpc = np.abs(df_stk['h'] - df_stk['c'].shift())
+  lpc = np.abs(df_stk['l'] - df_stk['c'].shift())
+
+  tr = pd.concat([hl, hpc, lpc], axis=1).max(axis=1)
+  new_cols['hl'] = hl
+  new_cols['hpc'] = hpc
+  new_cols['lpc'] = lpc
+
   for atr in [1, 9, 14, 20, 50]:
-    df_stk[f'atr{atr}'] = tr.ewm(alpha=1/atr, adjust=False).mean()
-    df_stk[f'atrp{atr}'] = (df_stk[f'atr{atr}'] / df_stk['c']) * 100
+    atr_series = tr.ewm(alpha=1 / atr, adjust=False).mean()
+    new_cols[f'atr{atr}'] = atr_series
+    new_cols[f'atrp{atr}'] = (atr_series / df_stk['c']) * 100
+
+  # We'll need atr50 for *_dist_atr (matches your prior behavior where atr ends as 50)
+  atr_for_dist = new_cols['atr50']
 
   for ma in [5, 10, 20, 50, 100, 200]:
-    df_stk[f'ma{ma}'] = df_stk['c'].rolling(window=ma).mean()
-    df_stk[f'ma{ma}_slope'] = df_stk[f'ma{ma}'].diff()
-    df_stk[f'ma{ma}_dist'] = ((df_stk['c'] - df_stk[f'ma{ma}']) / df_stk[f'ma{ma}']) * 100
-    df_stk[f'ma{ma}_dist_atr'] = (df_stk['c'] - df_stk[f'ma{ma}']) / df_stk[f'atr{atr}']
+    ma_series = df_stk['c'].rolling(window=ma).mean()
+    new_cols[f'ma{ma}'] = ma_series
+    new_cols[f'ma{ma}_slope'] = ma_series.diff()
+    new_cols[f'ma{ma}_dist'] = ((df_stk['c'] - ma_series) / ma_series) * 100
+    new_cols[f'ma{ma}_dist_atr'] = (df_stk['c'] - ma_series) / atr_for_dist
 
   for ema in [5, 10, 20, 50, 100, 200]:
-    df_stk[f'ema{ema}'] = df_stk['vwap3'].ewm(span=ema, adjust=False).mean()
-    df_stk[f'ema{ema}_slope'] = df_stk[f'ema{ema}'].diff()
-    df_stk[f'ema{ema}_dist'] = ((df_stk['c'] - df_stk[f'ema{ema}']) / df_stk[f'ema{ema}']) * 100
-    df_stk[f'ema{ema}_dist_atr'] = (df_stk['c'] - df_stk[f'ema{ema}']) / df_stk[f'atr{atr}']
+    ema_series = new_cols['vwap3'].ewm(span=ema, adjust=False).mean()
+    new_cols[f'ema{ema}'] = ema_series
+    new_cols[f'ema{ema}_slope'] = ema_series.diff()
+    new_cols[f'ema{ema}_dist'] = ((df_stk['c'] - ema_series) / ema_series) * 100
+    new_cols[f'ema{ema}_dist_atr'] = (df_stk['c'] - ema_series) / atr_for_dist
 
-    # Hurst Exponent (Trend vs Mean Reversion)
-  # Calculated over a rolling 100-day window
-  # H < 0.5: Mean Reverting | H > 0.5: Trending
-  df_stk['hurst50'] = df_stk['c'].rolling(window=50).apply(hurst, raw=True)
-  df_stk['hurst100'] = df_stk['c'].rolling(window=100).apply(hurst, raw=True)
+  # Hurst Exponent
+  # new_cols['hurst50'] = df_stk['c'].rolling(window=50).apply(hurst, raw=True)
+  # new_cols['hurst100'] = df_stk['c'].rolling(window=100).apply(hurst, raw=True)
 
-  df_stk['year'] = df_stk.index.year
-  df_stk['month'] = df_stk.index.month
-  df_stk['day'] = df_stk.index.day
+  # Calendar columns
+  new_cols['year'] = df_stk.index.year
+  new_cols['month'] = df_stk.index.month
+  new_cols['day'] = df_stk.index.day
 
   # Consecutive Up/Down Days
-  # 1 if up, -1 if down, 0 if flat
-  change_sign = np.sign(df_stk['pct'].fillna(0))
-  # Create groups: a new group starts every time the sign changes
+  change_sign = np.sign(pd.Series(new_cols['pct'], index=df_stk.index).fillna(0))
   streak_groups = (change_sign != change_sign.shift()).cumsum()
-  # Cumulate the signs within each group
-  df_stk['streak'] = change_sign.groupby(streak_groups).cumsum()
+  new_cols['streak'] = change_sign.groupby(streak_groups).cumsum()
 
-  # Keltner Channels (20 EMA + 1.5 * ATR)
-  df_stk['kc_basis'] = df_stk['c'].ewm(span=20, adjust=False).mean()
-  df_stk['kc_upper'] = df_stk['kc_basis'] + (df_stk['atr20'] * 1.5)
-  df_stk['kc_lower'] = df_stk['kc_basis'] - (df_stk['atr20'] * 1.5)
+  # Attach all computed columns at once (key fragmentation fix)
+  df_stk = pd.concat([df_stk, pd.DataFrame(new_cols, index=df_stk.index)], axis=1)
+
+  # ---- Remaining dynamically-added columns: also batch them ----
+  post_cols: dict[str, object] = {}
+
+  # Keltner Channels (20 EMA + 1.5 * ATR20)
+  kc_basis = df_stk['c'].ewm(span=20, adjust=False).mean()
+  post_cols['kc_basis'] = kc_basis
+  post_cols['kc_upper'] = kc_basis + (df_stk['atr20'] * 1.5)
+  post_cols['kc_lower'] = kc_basis - (df_stk['atr20'] * 1.5)
 
   # Donchian Channel Midline (20-day High/Low Midpoint)
-  df_stk['dc_upper'] = df_stk['h'].rolling(window=20).max()
-  df_stk['dc_lower'] = df_stk['l'].rolling(window=20).min()
-  df_stk['dc_mid'] = (df_stk['dc_upper'] + df_stk['dc_lower']) / 2
+  dc_upper = df_stk['h'].rolling(window=20).max()
+  dc_lower = df_stk['l'].rolling(window=20).min()
+  post_cols['dc_upper'] = dc_upper
+  post_cols['dc_lower'] = dc_lower
+  post_cols['dc_mid'] = (dc_upper + dc_lower) / 2
 
   # Bollinger Bands (for TTM Squeeze)
-  df_stk['bb_basis'] = df_stk['c'].rolling(window=20).mean()
-  df_stk['bb_std'] = df_stk['c'].rolling(window=20).std(ddof=0)
-  df_stk['bb_upper'] = df_stk['bb_basis'] + (df_stk['bb_std'] * 2)
-  df_stk['bb_lower'] = df_stk['bb_basis'] - (df_stk['bb_std'] * 2)
+  bb_basis = df_stk['c'].rolling(window=20).mean()
+  bb_std = df_stk['c'].rolling(window=20).std(ddof=0)
+  post_cols['bb_basis'] = bb_basis
+  post_cols['bb_std'] = bb_std
+  post_cols['bb_upper'] = bb_basis + (bb_std * 2)
+  post_cols['bb_lower'] = bb_basis - (bb_std * 2)
 
   # TTM Squeeze
-  # Squeeze is ON when Bollinger Bands are inside Keltner Channels
-  df_stk['squeeze_on'] = (df_stk['bb_lower'] > df_stk['kc_lower']) & (df_stk['bb_upper'] < df_stk['kc_upper'])
+  post_cols['squeeze_on'] = (post_cols['bb_lower'] > post_cols['kc_lower']) & (post_cols['bb_upper'] < post_cols['kc_upper'])
 
   # TTM Momentum Histogram
   def ttm_mom(subset):
-    # Linear regression of Price vs Average of (High/Low midline + SMA)
     y = subset
     x = np.arange(len(y))
     slope, intercept = np.polyfit(x, y, 1)
     return slope * (len(y) - 1) + intercept
 
-  # Use a 20-period lookback for the midline
-  midline_avg = (df_stk['dc_mid'] + df_stk['bb_basis']) / 2
+  midline_avg = (post_cols['dc_mid'] + bb_basis) / 2
   mom_val = df_stk['c'] - midline_avg
-  df_stk['ttm_mom'] = mom_val.rolling(window=20).apply(ttm_mom, raw=True)
+  post_cols['ttm_mom'] = mom_val.rolling(window=20).apply(ttm_mom, raw=True)
+
+  df_stk = pd.concat([df_stk, pd.DataFrame(post_cols, index=df_stk.index)], axis=1)
 
   return df_stk
 
