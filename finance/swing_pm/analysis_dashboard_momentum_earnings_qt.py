@@ -16,6 +16,9 @@ import pyarrow.parquet as pq  # type: ignore
 
 from finance import utils
 
+%load_ext autoreload
+%autoreload 2
+
 
 #%%
 # Global cache for reusing the window and app across multiple plot calls
@@ -238,6 +241,14 @@ class DashboardQt(QtWidgets.QMainWindow):
     self._has_rendered_once = False
     self._last_sub_df: Optional[pd.DataFrame] = None
 
+    # --- Swing caches for prefilling ---
+    self._spy_swing: Optional[object] = None
+    self._spy_df_day: Optional[pd.DataFrame] = None
+    self._underlying_swing: Optional[object] = None
+    self._underlying_df_day: Optional[pd.DataFrame] = None
+    self._underlying_symbol: Optional[str] = None
+    self._underlying_market_cap: Optional[pd.DataFrame] = None
+
     self.setWindowTitle("Momentum & Earnings Dashboard (Qt)")
     self.resize(3400, 1900)
     self.setWindowState(self.windowState() | QtCore.Qt.WindowState.WindowMaximized)
@@ -302,6 +313,37 @@ class DashboardQt(QtWidgets.QMainWindow):
     load_layout.addWidget(self.lbl_data_status, 2, 0, 1, 3)
 
     c_layout.addWidget(load_box)
+
+    # ---- Swing Prefill (Underlying + SPY) ----
+    prefill_box = QtWidgets.QGroupBox("Prefill from Swing Data")
+    prefill_layout = QtWidgets.QGridLayout(prefill_box)
+    prefill_layout.setHorizontalSpacing(10)
+    prefill_layout.setVerticalSpacing(6)
+
+    self.txt_underlying = QtWidgets.QLineEdit()
+    self.txt_underlying.setPlaceholderText("Ticker (e.g. MSFT)")
+    self.txt_underlying.setMaxLength(12)
+
+    self.date_breakout = QtWidgets.QDateEdit()
+    self.date_breakout.setCalendarPopup(True)
+    self.date_breakout.setDisplayFormat("yyyy-MM-dd")
+    self.date_breakout.setDate(QtCore.QDate.currentDate())
+
+    self.btn_prefill = QtWidgets.QPushButton("Load + Prefill")
+    self.btn_prefill.setMinimumHeight(30)
+    self.btn_prefill.clicked.connect(self._prefill_from_ui)
+
+    self.lbl_prefill_status = QtWidgets.QLabel("")
+    self.lbl_prefill_status.setStyleSheet("color: #AAAAAA;")
+
+    prefill_layout.addWidget(QtWidgets.QLabel("Underlying:"), 0, 0, 1, 1)
+    prefill_layout.addWidget(self.txt_underlying, 0, 1, 1, 2)
+    prefill_layout.addWidget(QtWidgets.QLabel("Breakout Day:"), 1, 0, 1, 1)
+    prefill_layout.addWidget(self.date_breakout, 1, 1, 1, 2)
+    prefill_layout.addWidget(self.btn_prefill, 2, 0, 1, 3)
+    prefill_layout.addWidget(self.lbl_prefill_status, 3, 0, 1, 3)
+
+    c_layout.addWidget(prefill_box)
 
     title = QtWidgets.QLabel("Filters")
     title.setStyleSheet("font-size: 16px; font-weight: 600;")
@@ -470,6 +512,37 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.slider_cond_t.valueChanged.connect(lambda _v: self._update_cond_label_and_bounds())
     c_layout.addWidget(cond_box)
 
+    # ---- Breakout Day Snapshot (Underlying) ----
+    snap_box = QtWidgets.QGroupBox("Breakout Day Snapshot")
+    snap_layout = QtWidgets.QGridLayout(snap_box)
+    snap_layout.setHorizontalSpacing(10)
+    snap_layout.setVerticalSpacing(4)
+
+    self.lbl_snap_symbol = QtWidgets.QLabel("Symbol: —")
+    self.lbl_snap_date = QtWidgets.QLabel("Date: —")
+    self.lbl_snap_close = QtWidgets.QLabel("Close: —")
+    self.lbl_snap_orig = QtWidgets.QLabel("Original Price: —")
+    self.lbl_snap_mcap = QtWidgets.QLabel("Market Cap Class: —")
+    for w in (self.lbl_snap_symbol, self.lbl_snap_date, self.lbl_snap_close, self.lbl_snap_orig, self.lbl_snap_mcap):
+      w.setStyleSheet("color: #AAAAAA;")
+
+    snap_layout.addWidget(self.lbl_snap_symbol, 0, 0, 1, 3)
+    snap_layout.addWidget(self.lbl_snap_date, 1, 0, 1, 3)
+    snap_layout.addWidget(self.lbl_snap_close, 2, 0, 1, 3)
+    snap_layout.addWidget(self.lbl_snap_orig, 3, 0, 1, 3)
+    snap_layout.addWidget(self.lbl_snap_mcap, 4, 0, 1, 3)
+
+    self.lbl_snap_mas: dict[str, QtWidgets.QLabel] = {}
+    r = 5
+    for ma_name in ["ma10", "ma20", "ma50", "ma100", "ma200"]:
+      lbl = QtWidgets.QLabel(f"{ma_name}_dist: —")
+      lbl.setStyleSheet("color: #AAAAAA;")
+      self.lbl_snap_mas[ma_name] = lbl
+      snap_layout.addWidget(lbl, r, 0, 1, 3)
+      r += 1
+
+    c_layout.addWidget(snap_box)
+
     # Update button (filtering decoupled)
     btn_row = QtWidgets.QHBoxLayout()
     c_layout.addLayout(btn_row)
@@ -518,10 +591,193 @@ class DashboardQt(QtWidgets.QMainWindow):
     p_layout.addWidget(self.plot_dist, 1)
     p_layout.addWidget(self.plot_probs, 1)
 
+    # Load SPY swing data upfront so prefills are instant.
+    self._load_spy_swing_initial()
+
     # Initialize UI bounds, but DO NOT render any data yet.
     self._update_cond_label_and_bounds()
     self._show_empty_state()
     self._update_data_status()
+
+  def _load_spy_swing_initial(self) -> None:
+    try:
+      spy = utils.swing_trading_data.SwingTradingData("SPY", offline=True, metainfo=False)
+    except Exception as e:
+      self._spy_swing = None
+      self._spy_df_day = None
+      self.lbl_prefill_status.setText(f"SPY swing load failed: {e}")
+      return
+
+    if getattr(spy, "empty", True) or (getattr(spy, "df_day", None) is None) or spy.df_day.empty:
+      self._spy_swing = None
+      self._spy_df_day = None
+      self.lbl_prefill_status.setText("SPY swing data is empty.")
+      return
+
+    self._spy_swing = spy
+    self._spy_df_day = spy.df_day
+
+  def _qdate_to_ts(self, qd: QtCore.QDate) -> pd.Timestamp:
+    # Use midnight, naive timestamp; must match df_day index exactly per requirement.
+    return pd.Timestamp(year=qd.year(), month=qd.month(), day=qd.day()).normalize()
+
+  def _set_spin_band_pm25(self, w: MinMaxSpin, center: float, *, decimals: Optional[int] = None) -> None:
+    if not np.isfinite(center):
+      return
+    lo = float(center) * 0.75
+    hi = float(center) * 1.25
+    if lo > hi:
+      lo, hi = hi, lo
+
+    # Expand allowed range if needed; otherwise Qt clamps silently.
+    cur_lo = float(w.min_box.minimum())
+    cur_hi = float(w.max_box.maximum())
+    new_lo = min(cur_lo, lo)
+    new_hi = max(cur_hi, hi)
+
+    for b in (w.min_box, w.max_box):
+      b.blockSignals(True)
+      b.setRange(new_lo, new_hi)
+      if decimals is not None:
+        b.setDecimals(int(decimals))
+      b.blockSignals(False)
+
+    w.min_box.blockSignals(True)
+    w.max_box.blockSignals(True)
+    w.min_box.setValue(lo)
+    w.max_box.setValue(hi)
+    w.min_box.blockSignals(False)
+    w.max_box.blockSignals(False)
+
+  def _set_market_cap_radio(self, mcap_class: str) -> None:
+    val = str(mcap_class or "").strip()
+    if val not in self.mcap_buttons:
+      val = "All"
+    self.mcap_buttons[val].setChecked(True)
+
+  def _prefill_from_ui(self) -> None:
+    sym = (self.txt_underlying.text() or "").strip().upper()
+    if not sym:
+      QtWidgets.QMessageBox.critical(self, "Prefill Error", "Please enter an underlying ticker.")
+      return
+
+    if self._spy_df_day is None or self._spy_df_day.empty:
+      QtWidgets.QMessageBox.critical(self, "Prefill Error", "SPY swing data is not loaded.")
+      return
+
+    breakout_ts = self._qdate_to_ts(self.date_breakout.date())
+
+    # Load underlying swing with metainfo=True so market cap class is available
+    self.lbl_prefill_status.setText("Loading swing data…")
+    QtWidgets.QApplication.processEvents()
+
+    try:
+      und = utils.swing_trading_data.SwingTradingData(sym, offline=True)
+    except Exception as e:
+      QtWidgets.QMessageBox.critical(self, "Prefill Error", f"Failed to load swing data for {sym}: {e}")
+      self.lbl_prefill_status.setText("")
+      return
+
+    if getattr(und, "empty", True) or (getattr(und, "df_day", None) is None) or und.df_day.empty:
+      QtWidgets.QMessageBox.critical(self, "Prefill Error", f"Swing data is empty for {sym}.")
+      self.lbl_prefill_status.setText("")
+      return
+
+    df_u = und.df_day
+    df_spy = self._spy_df_day
+
+    # Requirement: error if the trading day does not exist (no nearest/ffill)
+    if breakout_ts not in df_u.index:
+      QtWidgets.QMessageBox.critical(
+        self,
+        "Prefill Error",
+        f"{sym} has no trading day at {breakout_ts.date()}. Pick an actual trading day.",
+      )
+      self.lbl_prefill_status.setText("")
+      return
+    if breakout_ts not in df_spy.index:
+      QtWidgets.QMessageBox.critical(
+        self,
+        "Prefill Error",
+        f"SPY has no trading day at {breakout_ts.date()}. Pick an actual trading day.",
+      )
+      self.lbl_prefill_status.setText("")
+      return
+
+    self._underlying_swing = und
+    self._underlying_df_day = df_u
+    self._underlying_symbol = sym
+    self._underlying_market_cap = getattr(und, "market_cap", None)
+
+    row_u = df_u.loc[breakout_ts]
+    row_spy = df_spy.loc[breakout_ts]
+
+    # --- Prefill breakout price (band around original_price if available else close) ---
+    px_col = "original_price" if ("original_price" in df_u.columns and np.isfinite(float(row_u.get("original_price", np.nan)))) else "c"
+    px = float(row_u.get(px_col, np.nan))
+    self._set_spin_band_pm25(self.event_price, px, decimals=2)
+
+    # --- Prefill event move (chg / ATR$20) ---
+    # ATR$20 = (atrp20% / 100) * close. Then xATR = chg / ATR$20
+    chg = float(row_u.get("chg", np.nan))
+    atrp20 = float(row_u.get("atrp20", np.nan))
+    c = float(row_u.get("c", np.nan))
+    atr20_dollars = (atrp20 / 100.0) * c if (np.isfinite(atrp20) and np.isfinite(c)) else np.nan
+    ev_move = (chg / atr20_dollars) if (np.isfinite(chg) and np.isfinite(atr20_dollars) and atr20_dollars != 0.0) else np.nan
+    self._set_spin_band_pm25(self.event_move, ev_move, decimals=3)
+
+    # --- Prefill momentum filters from df_day (1M_chg / 3M_chg / 6M_chg) ---
+    for w, col in ((self.mom_1m, "1M_chg"), (self.mom_3m, "3M_chg"), (self.mom_6m, "6M_chg")):
+      v = float(row_u.get(col, np.nan))
+      self._set_spin_band_pm25(w, v, decimals=1)
+
+    # --- Prefill MA dist0 filters from swing ma*_dist at breakout day ---
+    for ma_name in ["ma10", "ma20", "ma50", "ma100", "ma200"]:
+      swing_col = f"{ma_name}_dist"  # e.g. ma10_dist
+      ui_col_u = f"{ma_name}_dist0"
+      ui_col_spy = f"spy_{ma_name}_dist0"
+
+      if (ui_col_u in self.ma_filters) and (swing_col in df_u.columns):
+        v = float(row_u.get(swing_col, np.nan))
+        self._set_spin_band_pm25(self.ma_filters[ui_col_u], v, decimals=2)
+
+      if (ui_col_spy in self.spy_ma_filters) and (swing_col in df_spy.columns):
+        v_spy = float(row_spy.get(swing_col, np.nan))
+        self._set_spin_band_pm25(self.spy_ma_filters[ui_col_spy], v_spy, decimals=2)
+
+    # --- Prefill market cap class from underlying market_cap (nearest available fundamental record) ---
+    mcap_class = "All"
+    mc = self._underlying_market_cap
+    if isinstance(mc, pd.DataFrame) and (not mc.empty) and ("market_cap_class" in mc.columns):
+      try:
+        idx = mc.index.get_indexer([breakout_ts], method="nearest")
+        if len(idx) and idx[0] >= 0:
+          mcap_class = str(mc.iloc[int(idx[0])].get("market_cap_class", "All") or "All")
+      except Exception:
+        mcap_class = "All"
+    self._set_market_cap_radio(mcap_class)
+
+    # --- Update bottom snapshot ---
+    self._update_breakout_snapshot(sym, breakout_ts, row_u, mcap_class)
+
+    self.lbl_prefill_status.setText(f"Prefilled from {sym} @ {breakout_ts.date()}")
+
+  def _update_breakout_snapshot(self, sym: str, ts: pd.Timestamp, row_u: pd.Series, mcap_class: str) -> None:
+    self.lbl_snap_symbol.setText(f"Symbol: {sym}")
+    self.lbl_snap_date.setText(f"Date: {ts.date()}")
+
+    c = row_u.get("c", np.nan)
+    self.lbl_snap_close.setText(f"Close: {float(c):.2f}" if np.isfinite(float(c)) else "Close: —")
+
+    op = row_u.get("original_price", np.nan)
+    self.lbl_snap_orig.setText(f"Original Price: {float(op):.2f}" if np.isfinite(float(op)) else "Original Price: —")
+
+    self.lbl_snap_mcap.setText(f"Market Cap Class: {mcap_class if mcap_class else '—'}")
+
+    for ma_name, lbl in self.lbl_snap_mas.items():
+      col = f"{ma_name}_dist"
+      v = row_u.get(col, np.nan)
+      lbl.setText(f"{col}: {float(v):.2f}" if np.isfinite(float(v)) else f"{col}: —")
 
   def _update_data_status(self) -> None:
     n = 0 if self.df is None else int(len(self.df))

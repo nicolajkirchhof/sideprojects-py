@@ -342,12 +342,12 @@ def swing_indicators(df_stk):
     new_cols[f'ma{ma}_dist'] = ((df_stk['c'] - ma_series) / ma_series) * 100
     new_cols[f'ma{ma}_dist_atr'] = (df_stk['c'] - ma_series) / atr_for_dist
 
-  for ema in [5, 10, 20, 50, 100, 200]:
-    ema_series = new_cols['vwap3'].ewm(span=ema, adjust=False).mean()
-    new_cols[f'ema{ema}'] = ema_series
-    new_cols[f'ema{ema}_slope'] = ema_series.diff()
-    new_cols[f'ema{ema}_dist'] = ((df_stk['c'] - ema_series) / ema_series) * 100
-    new_cols[f'ema{ema}_dist_atr'] = (df_stk['c'] - ema_series) / atr_for_dist
+  # for ema in [5, 10, 20, 50, 100, 200]:
+  #   ema_series = new_cols['vwap3'].ewm(span=ema, adjust=False).mean()
+  #   new_cols[f'ema{ema}'] = ema_series
+  #   new_cols[f'ema{ema}_slope'] = ema_series.diff()
+  #   new_cols[f'ema{ema}_dist'] = ((df_stk['c'] - ema_series) / ema_series) * 100
+  #   new_cols[f'ema{ema}_dist_atr'] = (df_stk['c'] - ema_series) / atr_for_dist
 
   # Hurst Exponent
   # new_cols['hurst50'] = df_stk['c'].rolling(window=50).apply(hurst, raw=True)
@@ -357,6 +357,11 @@ def swing_indicators(df_stk):
   new_cols['year'] = df_stk.index.year
   new_cols['month'] = df_stk.index.month
   new_cols['day'] = df_stk.index.day
+
+  # Past performance (trading-day approximations: 1M~21, 3M~63, 6M~126, 12M~252)
+  # These match the dashboard column names so they can be read from df_day directly.
+  for name, bars in (("1M_chg", 21), ("3M_chg", 63), ("6M_chg", 126), ("12M_chg", 252)):
+    new_cols[name] = utils.pct.percentage_change_array(df_stk["c"].shift(bars), df_stk["c"])
 
   # Consecutive Up/Down Days
   change_sign = np.sign(pd.Series(new_cols['pct'], index=df_stk.index).fillna(0))
