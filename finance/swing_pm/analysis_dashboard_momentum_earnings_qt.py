@@ -263,6 +263,16 @@ class DashboardQt(QtWidgets.QMainWindow):
     self._cond_saved_ranges: dict[tuple[str, int], tuple[float, float]] = {}
     self._last_cond_key: tuple[str, int] = ("Daily", 0)
 
+    # Debounced auto-apply (no Update button)
+    self._apply_timer = QtCore.QTimer(self)
+    self._apply_timer.setSingleShot(True)
+    self._apply_timer.setInterval(1000)
+    self._apply_timer.timeout.connect(self.apply_filters)
+
+    # Store initial (q20..q80) defaults for "clear-to-reset"
+    self._initial_box_value: dict[QtWidgets.QDoubleSpinBox, float] = {}
+    self._initial_pair_value: dict[int, tuple[float, float]] = {}  # key=id(MinMaxSpin) -> (init_min, init_max)
+
     # --- Swing caches for prefilling ---
     self._spy_swing: Optional[object] = None
     self._spy_df_day: Optional[pd.DataFrame] = None
@@ -424,6 +434,7 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     self.btn_tab_d.clicked.connect(lambda _=False: _set_tab("Daily"))
     self.btn_tab_w.clicked.connect(lambda _=False: _set_tab("Weekly"))
+
     tab_row.addWidget(self.btn_tab_d)
     tab_row.addWidget(self.btn_tab_w)
 
@@ -528,9 +539,9 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     self.lbl_cond_t = QtWidgets.QLabel("Cond. Day/Wk:")
     self.slider_cond_t = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-    self.slider_cond_t.setRange(0, 24)
+    self.slider_cond_t.setRange(1, 24)
     self.slider_cond_t.setSingleStep(1)
-    self.slider_cond_t.setValue(0)
+    self.slider_cond_t.setValue(1)
 
     # Show the current slider value next to the slider
     self.lbl_cond_val = QtWidgets.QLabel("0")
@@ -564,10 +575,15 @@ class DashboardQt(QtWidgets.QMainWindow):
     # Slider handler that saves the PREVIOUS key correctly, then updates bounds/label
     self._last_cond_key = (self.view_tab, int(self.slider_cond_t.value()))
     self.slider_cond_t.valueChanged.connect(self._on_cond_t_changed)
-
     self.btn_cond_reset.clicked.connect(self._reset_current_cond_range_to_full)
 
     c_layout.addWidget(cond_box)
+
+    # ---- Status (make prominent) ----
+    self.lbl_status = QtWidgets.QLabel("")
+    self.lbl_status.setStyleSheet("color: #DDDDDD; font-size: 15px; font-weight: 700;")
+    self.lbl_status.setMinimumHeight(26)
+    c_layout.addWidget(self.lbl_status)
 
     # ---- Breakout Day Snapshot (Underlying) ----
     snap_box = QtWidgets.QGroupBox("Breakout Day Snapshot")
@@ -599,20 +615,6 @@ class DashboardQt(QtWidgets.QMainWindow):
       r += 1
 
     c_layout.addWidget(snap_box)
-
-    # Update button (filtering decoupled)
-    btn_row = QtWidgets.QHBoxLayout()
-    c_layout.addLayout(btn_row)
-
-    self.btn_apply = QtWidgets.QPushButton("Update")
-    self.btn_apply.setMinimumHeight(34)
-    self.btn_apply.clicked.connect(self.apply_filters)
-    btn_row.addWidget(self.btn_apply)
-
-    self.lbl_status = QtWidgets.QLabel("")
-    self.lbl_status.setStyleSheet("color: #AAAAAA;")
-    btn_row.addWidget(self.lbl_status, 1)
-
     c_layout.addStretch(1)
 
     # ---- Plots (pyqtgraph) ----
@@ -651,10 +653,56 @@ class DashboardQt(QtWidgets.QMainWindow):
     # Load SPY swing data upfront so prefills are instant.
     self._load_spy_swing_initial()
 
-    # Initialize UI bounds, but DO NOT render any data yet.
+    # Global filters should auto-apply on change (debounced)
+    self.cmb_dist.currentIndexChanged.connect(lambda _i: self._schedule_apply())
+    self.inst_all.toggled.connect(lambda _v: self._schedule_apply())
+    self.inst_stocks.toggled.connect(lambda _v: self._schedule_apply())
+    self.inst_etfs.toggled.connect(lambda _v: self._schedule_apply())
+
+    self.evt_earnings.toggled.connect(lambda _v: self._schedule_apply())
+    self.evt_atrp.toggled.connect(lambda _v: self._schedule_apply())
+    self.evt_green.toggled.connect(lambda _v: self._schedule_apply())
+
+    self.spy_all.toggled.connect(lambda _v: self._schedule_apply())
+    self.spy_support.toggled.connect(lambda _v: self._schedule_apply())
+    self.spy_neutral.toggled.connect(lambda _v: self._schedule_apply())
+    self.spy_nonsupport.toggled.connect(lambda _v: self._schedule_apply())
+
+    for rb in self.mcap_buttons.values():
+      rb.toggled.connect(lambda _v: self._schedule_apply())
+
+    # Initialize UI bounds and auto-render once after a short debounce
     self._update_cond_label_and_bounds()
     self._show_empty_state()
     self._update_data_status()
+    self._schedule_apply()
+
+  def _schedule_apply(self) -> None:
+    # Visual cue that a render is queued
+    self.lbl_status.setText("Rendering…")
+    self._apply_timer.start()
+
+  def _wire_clear_resets_to_initial(self, box: QtWidgets.QDoubleSpinBox, initial: float) -> None:
+    """
+    If the user clears the spinbox text, restore the initial value.
+    """
+    self._initial_box_value[box] = float(initial)
+    le = box.lineEdit()
+    if le is None:
+      return
+    le.setClearButtonEnabled(True)
+
+    def _on_text_changed(txt: str) -> None:
+      if txt.strip() == "":
+        v = self._initial_box_value.get(box, float(initial))
+        QtCore.QTimer.singleShot(0, lambda: box.setValue(float(v)))
+
+    le.textChanged.connect(_on_text_changed)
+
+  def _set_initial_pair(self, w: MinMaxSpin, init_min: float, init_max: float) -> None:
+    self._initial_pair_value[id(w)] = (float(init_min), float(init_max))
+    self._wire_clear_resets_to_initial(w.min_box, float(init_min))
+    self._wire_clear_resets_to_initial(w.max_box, float(init_max))
 
   def _load_spy_swing_initial(self) -> None:
     try:
@@ -853,36 +901,39 @@ class DashboardQt(QtWidgets.QMainWindow):
   def _refresh_filter_bounds_from_df(self) -> None:
     """
     After loading new data, refresh the spinbox ranges/values so filters match the new DF.
-    Keeps it simple: reset each filter to the full available data range.
+    Reset each filter to (q20..q80) initial, with allowed range = (min..max).
     """
     df = self.df
     if df is None or df.empty:
       return
 
-    # Clear conditional cache because ranges are tied to the loaded df
     self._cond_saved_ranges.clear()
 
-    def _reset_from_series(w: MinMaxSpin, s: pd.Series) -> None:
+    def _reset_from_series_q20_q80(w: MinMaxSpin, s: pd.Series) -> None:
       s = s.dropna()
       if s.empty:
         return
-      a = float(np.nanmin(s.to_numpy(dtype=float)))
-      b = float(np.nanmax(s.to_numpy(dtype=float)))
-      if not np.isfinite(a) or not np.isfinite(b):
-        return
-      if a > b:
-        a, b = b, a
-      for box, val in ((w.min_box, a), (w.max_box, b)):
+      hard_min = float(np.nanmin(s.to_numpy(dtype=float)))
+      hard_max = float(np.nanmax(s.to_numpy(dtype=float)))
+      init_min = float(s.quantile(0.20))
+      init_max = float(s.quantile(0.80))
+      if init_min > init_max:
+        init_min, init_max = init_max, init_min
+
+      for box in (w.min_box, w.max_box):
         box.blockSignals(True)
-        box.setRange(a, b)
-        box.setValue(val)
+        box.setRange(hard_min, hard_max)
         box.blockSignals(False)
 
-    # Simple numeric filters
+      w.min_box.setValue(init_min)
+      w.max_box.setValue(init_max)
+
+      self._set_initial_pair(w, init_min, init_max)
+
     if "event_move" in df.columns:
-      _reset_from_series(self.event_move, df["event_move"])
+      _reset_from_series_q20_q80(self.event_move, df["event_move"])
     if "event_price" in df.columns:
-      _reset_from_series(self.event_price, df["event_price"])
+      _reset_from_series_q20_q80(self.event_price, df["event_price"])
 
     for w, col in (
         (self.mom_1m, "1M_chg"),
@@ -891,15 +942,15 @@ class DashboardQt(QtWidgets.QMainWindow):
         (self.mom_12m, "12M_chg"),
     ):
       if col in df.columns:
-        _reset_from_series(w, df[col])
+        _reset_from_series_q20_q80(w, df[col])
 
     for col, w in self.ma_filters.items():
       if col in df.columns:
-        _reset_from_series(w, df[col])
+        _reset_from_series_q20_q80(w, df[col])
 
     for col, w in self.spy_ma_filters.items():
       if col in df.columns:
-        _reset_from_series(w, df[col])
+        _reset_from_series_q20_q80(w, df[col])
 
     self._update_cond_label_and_bounds()
 
@@ -935,7 +986,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.plot_dist.clear()
     self.plot_probs.clear()
 
-    msg = pg.TextItem("Click Update to render", color="#DDDDDD", anchor=(0.5, 0.5))
+    msg = pg.TextItem("Auto-rendering (debounced 1s)…", color="#DDDDDD", anchor=(0.5, 0.5))
     self.plot_path.addItem(msg)
 
     msg2 = pg.TextItem("No plot yet", color="#DDDDDD", anchor=(0.5, 0.5))
@@ -944,7 +995,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     msg3 = pg.TextItem("No plot yet", color="#DDDDDD", anchor=(0.5, 0.5))
     self.plot_probs.addItem(msg3)
 
-    self.lbl_status.setText("Idle (no render yet).")
+    self.lbl_status.setText("Idle")
 
   def closeEvent(self, event: QtGui.QCloseEvent) -> None:
     global _GLOBAL_DASHBOARD_WIN
@@ -1094,6 +1145,7 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     return MinMaxSpin(label, min_box, max_box)
 
+  # ---------- Controls builders ----------
   def _add_range(
       self,
       grid: Optional[QtWidgets.QGridLayout],
@@ -1105,15 +1157,20 @@ class DashboardQt(QtWidgets.QMainWindow):
       *,
       add_to_grid: bool = True,
   ) -> MinMaxSpin:
-    # Data-derived bounds (available range)
     series = df[col].dropna() if (col in df.columns) else pd.Series([], dtype=float)
     if not series.empty:
       hard_min = float(series.min())
       hard_max = float(series.max())
+      q20 = float(series.quantile(0.20))
+      q80 = float(series.quantile(0.80))
+      init_min = q20
+      init_max = q80
+      if init_min > init_max:
+        init_min, init_max = init_max, init_min
     else:
       hard_min, hard_max = -1e9, 1e9
+      init_min, init_max = hard_min, hard_max
 
-    # Show static data bounds behind the label
     if np.isfinite(hard_min) and np.isfinite(hard_max):
       label_txt = f"{title}  [{hard_min:.{decimals}f} … {hard_max:.{decimals}f}]:"
     else:
@@ -1125,7 +1182,6 @@ class DashboardQt(QtWidgets.QMainWindow):
     min_box = QtWidgets.QDoubleSpinBox()
     max_box = QtWidgets.QDoubleSpinBox()
 
-    # Smaller inputs
     for b in (min_box, max_box):
       b.setDecimals(decimals)
       b.setRange(hard_min, hard_max)
@@ -1136,9 +1192,9 @@ class DashboardQt(QtWidgets.QMainWindow):
       b.setMinimumHeight(22)
       b.setStyleSheet("font-size: 11px; padding: 1px 4px;")
 
-    # Set initial values to the calculated range
-    min_box.setValue(hard_min)
-    max_box.setValue(hard_max)
+    # Initial values: q20..q80 (requested)
+    min_box.setValue(init_min)
+    max_box.setValue(init_max)
 
     if add_to_grid:
       if grid is None:
@@ -1148,7 +1204,16 @@ class DashboardQt(QtWidgets.QMainWindow):
       grid.addWidget(max_box, self._row, 2)
       self._row += 1
 
-    return MinMaxSpin(label, min_box, max_box)
+    w = MinMaxSpin(label, min_box, max_box)
+
+    # Clear-to-reset uses this initial q20/q80
+    self._set_initial_pair(w, init_min, init_max)
+
+    # Auto-apply on change (debounced)
+    min_box.valueChanged.connect(lambda _v: self._schedule_apply())
+    max_box.valueChanged.connect(lambda _v: self._schedule_apply())
+
+    return w
 
   # ---------- Filtering + plotting ----------
   def apply_filters(self) -> None:
@@ -1246,7 +1311,9 @@ class DashboardQt(QtWidgets.QMainWindow):
     self._has_rendered_once = True
 
     dt = (time.perf_counter() - t0) * 1000.0
-    self.lbl_status.setText(f"N={len(sub):,}   render={dt:.0f}ms")
+
+    # Make render stats prominent
+    self.lbl_status.setText(f"N={len(sub):,}    render={dt:.0f}ms")
 
   def _plot(self, sub_df: pd.DataFrame) -> None:
     # ... keep your existing _plot implementation, including the scatter downsampling caps ...
