@@ -48,32 +48,6 @@ liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
 #   'cpct' => Percentage change in reference to the day before the event (c-1)
 #   'spy_{indicator}' => SPY equivalent for specific indicators (hv, ma_dist, ma_slope)
 
-def classify_market_cap(mcap_value, year, df_thresholds):
-    """Classifies market cap based on historical thresholds (from reprocess.py)."""
-    if mcap_value is None or np.isnan(mcap_value):
-        return "Unknown"
-
-    # Get thresholds for the closest available year
-    year_idx = df_thresholds['Year'].sub(year).abs().idxmin()
-    row = df_thresholds.loc[year_idx]
-
-    if mcap_value >= row['Large-Cap Entry (S&P 500)']:
-        return "Large"
-    elif mcap_value >= row['Mid-Cap Entry (S&P 400)']:
-        return "Mid"
-    elif mcap_value >= row['Small-Cap Entry (Russell 2000)']:
-        return "Small"
-    else:
-        return "Micro"
-
-def calculate_performance(df_ticker, df_day, length_days):
-  df_c = df_day.iloc[df_day.index.get_indexer(df_ticker.date - timedelta(days=length_days), method='ffill')]['c']
-  df_diff = df_ticker.date - df_c.index
-  df_c[(df_diff.abs() > timedelta(days=length_days + 5)).values] = np.nan
-
-  return df_c
-
-
 #%%
 
 print("Loading core data...")
@@ -195,6 +169,53 @@ for i, ticker in enumerate(symbols_to_process):
 
             events_map[reaction_date] = meta
 
+        # --- 3. Identify Green Line Breakouts (New ATH after consolidation) ---
+        # Definition (confirmed ATH level):
+        # - ath_high is the last confirmed ATH level (defined by highs)
+        # - We ONLY advance ath_high on a day where the CLOSE finishes above the current ath_high
+        # - Consolidation requires >= 5 trading days since the last confirmed ATH advance
+        if ('h' in df_day.columns) and ('c' in df_day.columns) and (not df_day.empty):
+            ath_high = float(df_day['h'].iloc[0])
+            last_ath_idx = 0
+
+            for idx in range(1, len(df_day)):
+                current_h = df_day['h'].iloc[idx]
+                current_c = df_day['c'].iloc[idx]
+                if (not np.isfinite(current_h)) or (not np.isfinite(current_c)):
+                    continue
+
+                # Breakout trigger: close must clear the last confirmed ATH-high level
+                if float(current_c) <= ath_high:
+                    continue
+
+                consolidation_days = idx - last_ath_idx
+                reaction_idx = idx
+
+                # Only count as a green line breakout if consolidation was long enough
+                if consolidation_days >= 5:
+                    if reaction_idx >= OFFSET_DAYS and reaction_idx < len(df_day) - OFFSET_DAYS:
+                        reaction_date = df_day.index[reaction_idx]
+
+                        meta = events_map.get(reaction_date, {
+                            'reaction_idx': reaction_idx,
+                            'eps': np.nan,
+                            'eps_est': np.nan,
+                            'earnings_when': np.nan,
+                            'event_types': set(),
+                            'consolidation_days': np.nan,
+                        })
+
+                        meta['reaction_idx'] = reaction_idx
+                        meta['event_types'].add('green_line_breakout')
+                        meta['consolidation_days'] = float(consolidation_days)
+
+                        events_map[reaction_date] = meta
+
+                # Confirm/advance ATH ONLY AFTER a close above it.
+                # Use today's high as the new ATH level baseline going forward.
+                ath_high = max(ath_high, float(current_h))
+                last_ath_idx = idx
+
     if not events_map:
         continue
 
@@ -278,9 +299,18 @@ for i, ticker in enumerate(symbols_to_process):
         event_row = {
             'symbol': ticker,
             'date': reaction_date,
-            'event_types': event_types,          # NEW: multiple types per event
-            'event_type': event_type,            # convenience / backward readability
+
+            # Keep both if you want
+            'event_types': event_types,
+
+            # Existing
             'is_earnings': is_earnings,
+
+            # NEW: flat flags for fast filtering
+            'evt_atrp_breakout': ('atrp_breakout' in event_types),
+            'evt_green_line_breakout': ('green_line_breakout' in event_types),
+
+            # ... existing fields ...
             'is_etf': is_etf,
             'eps': meta.get('eps', np.nan),
             'eps_est': meta.get('eps_est', np.nan),
@@ -319,15 +349,12 @@ for i, ticker in enumerate(symbols_to_process):
 
     df_ticker_events = pd.DataFrame(events_data)
 
-    # NOTE: past-performance columns are already provided by df_day (computed by indicators.py),
-    # so we do NOT recompute 1M/3M/6M/12M here.
-
     # Save Parquet Data
     ticker_file = f'{data_path}/{ticker}.parquet'
     df_ticker_events.to_parquet(ticker_file, index=False)
 
     total_time = time.time() - ticker_start
-    print(f"  [Time] Earnings: {t_earnings:.3f}s, MCap: {t_mcap:.3f}s, Detect: {t_detection:.3f}s, Process: {t_process:.3f}s | Total: {total_time:.3f}s")
+    print(f"  [Time] Earnings: {t_earnings:.3f}s, MCap: {t_mcap:.3f}s, Detect: {t_detection:.3f}s, | Total: {total_time:.3f}s")
 
 #%%
 # --- 4. Final Aggregation ---

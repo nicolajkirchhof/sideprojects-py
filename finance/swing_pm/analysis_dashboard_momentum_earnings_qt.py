@@ -16,8 +16,8 @@ import pyarrow.parquet as pq  # type: ignore
 
 from finance import utils
 
-%load_ext autoreload
-%autoreload 2
+# %load_ext autoreload
+# %autoreload 2
 
 
 #%%
@@ -107,13 +107,18 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
       "cpct0",
       "atrp200",
       "is_earnings",
+      "is_etf",
       "spy0",
       "spy5",
       "market_cap_class",
+      # event types (new tracking)
+      "evt_atrp_breakout",
+      "evt_green_line_breakout",
       # filters
       "1M_chg",
       "3M_chg",
       "6M_chg",
+      "12M_chg",
       "ma10_dist0",
       "ma20_dist0",
       "ma50_dist0",
@@ -217,6 +222,18 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
   else:
     df["is_earnings"] = False
 
+  if "is_etf" in df.columns:
+    df["is_etf"] = df["is_etf"].fillna(False).astype(bool)
+  else:
+    df["is_etf"] = False
+
+  # New event flags may be absent in older files; default them to False
+  for col in ("evt_atrp_breakout", "evt_green_line_breakout"):
+    if col in df.columns:
+      df[col] = df[col].fillna(False).astype(bool)
+    else:
+      df[col] = False
+
   # SPY Context (Simple alignment check over 5 days): match matplotlib dashboard
   if "spy0" in df.columns and "spy5" in df.columns:
     spy_change = df["spy5"] - df["spy0"]
@@ -240,6 +257,11 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.df = df
     self._has_rendered_once = False
     self._last_sub_df: Optional[pd.DataFrame] = None
+
+    # Persist conditional ranges per (tab, t)
+    # key: ("Daily"|"Weekly", int t) -> (min_val, max_val)
+    self._cond_saved_ranges: dict[tuple[str, int], tuple[float, float]] = {}
+    self._last_cond_key: tuple[str, int] = ("Daily", 0)
 
     # --- Swing caches for prefilling ---
     self._spy_swing: Optional[object] = None
@@ -386,9 +408,16 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.btn_tab_d.setChecked(True)
 
     def _set_tab(name: str) -> None:
+      # Save current conditional edits under the old key before switching tab
+      self._save_cond_range_for_key(self._last_cond_key)
+
       self.view_tab = name
       self.btn_tab_d.setChecked(name == "Daily")
       self.btn_tab_w.setChecked(name == "Weekly")
+
+      # New active key after tab switch
+      self._last_cond_key = (self.view_tab, int(self.slider_cond_t.value()))
+
       self._update_cond_label_and_bounds()
       # IMPORTANT: do NOT auto-render on tab change.
       # User wants the dashboard to stay empty until Update is clicked.
@@ -414,19 +443,17 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     self._row = 1
 
-    # 2. Year Range
-    self.year = self._add_year_range(grid, "Year Range", df)
-
-    # 3. Event Move (signed)
+    # Event Move (signed)
     self.event_move = self._add_range(grid, "Event Move (Signed)", df, col="event_move", decimals=3, step=0.25)
 
-    # 4. Breakout Price
+    # Breakout Price
     self.event_price = self._add_range(grid, "Breakout Price", df, col="event_price", decimals=2, step=0.5)
 
-    # 6-8. Momentum Filters
+    # Momentum Filters (added 12M_chg)
     self.mom_1m = self._add_range(grid, "1M_chg", df, col="1M_chg", decimals=1, step=1.0)
     self.mom_3m = self._add_range(grid, "3M_chg", df, col="3M_chg", decimals=1, step=1.0)
     self.mom_6m = self._add_range(grid, "6M_chg", df, col="6M_chg", decimals=1, step=1.0)
+    self.mom_12m = self._add_range(grid, "12M_chg", df, col="12M_chg", decimals=1, step=1.0)
 
     # 9-13. Underlying ma dist0 filters
     self.ma_filters: dict[str, MinMaxSpin] = {}
@@ -440,26 +467,33 @@ class DashboardQt(QtWidgets.QMainWindow):
       col = f"spy_{ma_name}_dist0"
       self.spy_ma_filters[col] = self._add_range(grid, f"SPY {ma_name} Dist", df, col=col, decimals=2, step=0.25)
 
-    # Direction
-    dir_box = QtWidgets.QGroupBox("Direction")
-    dir_layout = QtWidgets.QHBoxLayout(dir_box)
-    self.dir_pos = QtWidgets.QRadioButton("Positive")
-    self.dir_neg = QtWidgets.QRadioButton("Negative")
-    self.dir_pos.setChecked(True)
-    for w in (self.dir_pos, self.dir_neg):
-      dir_layout.addWidget(w)
-    c_layout.addWidget(dir_box)
+    # Instrument Type (NEW): ETFs vs Stocks
+    inst_box = QtWidgets.QGroupBox("Instrument")
+    inst_layout = QtWidgets.QHBoxLayout(inst_box)
+    self.inst_all = QtWidgets.QRadioButton("Both")
+    self.inst_stocks = QtWidgets.QRadioButton("Stocks")
+    self.inst_etfs = QtWidgets.QRadioButton("ETFs")
+    self.inst_all.setChecked(True)
+    for w in (self.inst_all, self.inst_stocks, self.inst_etfs):
+      inst_layout.addWidget(w)
+    c_layout.addWidget(inst_box)
 
-    # Earnings
-    earn_box = QtWidgets.QGroupBox("Event Type")
-    earn_layout = QtWidgets.QHBoxLayout(earn_box)
-    self.earn_all = QtWidgets.QRadioButton("All")
-    self.earn_e = QtWidgets.QRadioButton("Earnings Only")
-    self.earn_ne = QtWidgets.QRadioButton("Non-Earnings")
-    self.earn_all.setChecked(True)
-    for w in (self.earn_all, self.earn_e, self.earn_ne):
-      earn_layout.addWidget(w)
-    c_layout.addWidget(earn_box)
+    # Event Types (NEW): individual toggles
+    evt_box = QtWidgets.QGroupBox("Events")
+    evt_layout = QtWidgets.QHBoxLayout(evt_box)
+    self.evt_earnings = QtWidgets.QCheckBox("Earnings")
+    self.evt_atrp = QtWidgets.QCheckBox("ATRP")
+    self.evt_green = QtWidgets.QCheckBox("GreenLine")
+
+    # Default: ATRP checked (requested)
+    self.evt_atrp.setChecked(True)
+
+    # Default: none checked = no event-type filtering (show all)
+    for w in (self.evt_earnings, self.evt_atrp, self.evt_green):
+      evt_layout.addWidget(w)
+    evt_layout.addStretch(1)
+    c_layout.addWidget(evt_box)
+
 
     # SPY Context
     spy_box = QtWidgets.QGroupBox("SPY Context")
@@ -498,6 +532,17 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.slider_cond_t.setSingleStep(1)
     self.slider_cond_t.setValue(0)
 
+    # Show the current slider value next to the slider
+    self.lbl_cond_val = QtWidgets.QLabel("0")
+    self.lbl_cond_val.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+    self.lbl_cond_val.setFixedWidth(34)
+    self.lbl_cond_val.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+
+    self.btn_cond_reset = QtWidgets.QPushButton("Reset")
+    self.btn_cond_reset.setToolTip("Reset conditional range for the selected period to the full data range")
+    self.btn_cond_reset.setMinimumHeight(22)
+    self.btn_cond_reset.setFixedWidth(70)
+
     self.cond_range = self._add_range(
       grid=None, title="Cond. Range", df=df, col="__cond_placeholder__", decimals=1, step=0.5,
       add_to_grid=False
@@ -505,11 +550,23 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     cond_layout.addWidget(self.lbl_cond_t, 0, 0, 1, 1)
     cond_layout.addWidget(self.slider_cond_t, 0, 1, 1, 2)
+    cond_layout.addWidget(self.lbl_cond_val, 0, 3, 1, 1)
+    cond_layout.addWidget(self.btn_cond_reset, 0, 4, 1, 1)
+
     cond_layout.addWidget(self.cond_range.label, 1, 0, 1, 1)
     cond_layout.addWidget(self.cond_range.min_box, 1, 1, 1, 1)
     cond_layout.addWidget(self.cond_range.max_box, 1, 2, 1, 1)
 
-    self.slider_cond_t.valueChanged.connect(lambda _v: self._update_cond_label_and_bounds())
+    # Keep saved conditional values in sync when user edits min/max
+    self.cond_range.min_box.valueChanged.connect(lambda _v: self._save_current_cond_range())
+    self.cond_range.max_box.valueChanged.connect(lambda _v: self._save_current_cond_range())
+
+    # Slider handler that saves the PREVIOUS key correctly, then updates bounds/label
+    self._last_cond_key = (self.view_tab, int(self.slider_cond_t.value()))
+    self.slider_cond_t.valueChanged.connect(self._on_cond_t_changed)
+
+    self.btn_cond_reset.clicked.connect(self._reset_current_cond_range_to_full)
+
     c_layout.addWidget(cond_box)
 
     # ---- Breakout Day Snapshot (Underlying) ----
@@ -726,8 +783,13 @@ class DashboardQt(QtWidgets.QMainWindow):
     ev_move = (chg / atr20_dollars) if (np.isfinite(chg) and np.isfinite(atr20_dollars) and atr20_dollars != 0.0) else np.nan
     self._set_spin_band_pm25(self.event_move, ev_move, decimals=3)
 
-    # --- Prefill momentum filters from df_day (1M_chg / 3M_chg / 6M_chg) ---
-    for w, col in ((self.mom_1m, "1M_chg"), (self.mom_3m, "3M_chg"), (self.mom_6m, "6M_chg")):
+    # --- Prefill momentum filters from df_day (1M_chg / 3M_chg / 6M_chg / 12M_chg) ---
+    for w, col in (
+      (self.mom_1m, "1M_chg"),
+      (self.mom_3m, "3M_chg"),
+      (self.mom_6m, "6M_chg"),
+      (self.mom_12m, "12M_chg"),
+    ):
       v = float(row_u.get(col, np.nan))
       self._set_spin_band_pm25(w, v, decimals=1)
 
@@ -797,6 +859,9 @@ class DashboardQt(QtWidgets.QMainWindow):
     if df is None or df.empty:
       return
 
+    # Clear conditional cache because ranges are tied to the loaded df
+    self._cond_saved_ranges.clear()
+
     def _reset_from_series(w: MinMaxSpin, s: pd.Series) -> None:
       s = s.dropna()
       if s.empty:
@@ -813,24 +878,18 @@ class DashboardQt(QtWidgets.QMainWindow):
         box.setValue(val)
         box.blockSignals(False)
 
-    # Year filter from date
-    if "date" in df.columns:
-      yy = df["date"].dt.year.dropna()
-      if not yy.empty:
-        y0, y1 = int(yy.min()), int(yy.max())
-        for box, val in ((self.year.min_box, y0), (self.year.max_box, y1)):
-          box.blockSignals(True)
-          box.setRange(1900, 2100)
-          box.setValue(val)
-          box.blockSignals(False)
-
     # Simple numeric filters
     if "event_move" in df.columns:
       _reset_from_series(self.event_move, df["event_move"])
     if "event_price" in df.columns:
       _reset_from_series(self.event_price, df["event_price"])
 
-    for w, col in ((self.mom_1m, "1M_chg"), (self.mom_3m, "3M_chg"), (self.mom_6m, "6M_chg")):
+    for w, col in (
+        (self.mom_1m, "1M_chg"),
+        (self.mom_3m, "3M_chg"),
+        (self.mom_6m, "6M_chg"),
+        (self.mom_12m, "12M_chg"),
+    ):
       if col in df.columns:
         _reset_from_series(w, df[col])
 
@@ -894,39 +953,113 @@ class DashboardQt(QtWidgets.QMainWindow):
     finally:
       super().closeEvent(event)
 
+  def _cond_col_name_for(self, tab: str, t: int) -> str:
+    return (f"cpct{t}" if tab == "Daily" else f"w_cpct{t}")
+
+  def _cond_col_name(self, t: int) -> str:
+    return self._cond_col_name_for(self.view_tab, t)
+
+  def _save_cond_range_for_key(self, key: tuple[str, int]) -> None:
+    tab, t = key
+    if t <= 0:
+      return
+    a, b = self.cond_range.value()
+    self._cond_saved_ranges[(tab, t)] = (float(a), float(b))
+
+  def _save_current_cond_range(self) -> None:
+    self._save_cond_range_for_key((self.view_tab, int(self.slider_cond_t.value())))
+
+  def _on_cond_t_changed(self, new_t: int) -> None:
+    # Save edits for the previous (tab, t) before switching to new_t
+    self._save_cond_range_for_key(self._last_cond_key)
+
+    self._last_cond_key = (self.view_tab, int(new_t))
+    self._update_cond_label_and_bounds()
+
+  def _reset_current_cond_range_to_full(self) -> None:
+    t = int(self.slider_cond_t.value())
+    if t <= 0:
+      return
+    col = self._cond_col_name_for(self.view_tab, t)
+    if col not in self.df.columns:
+      return
+
+    vals = self.df[col].dropna()
+    if vals.empty:
+      return
+
+    vmin = float(vals.min())
+    vmax = float(vals.max())
+    if vmin >= vmax:
+      vmax = vmin + 1.0
+
+    for b in (self.cond_range.min_box, self.cond_range.max_box):
+      b.blockSignals(True)
+      b.setRange(vmin, vmax)
+      b.setSingleStep(0.5)
+
+    self.cond_range.min_box.setValue(vmin)
+    self.cond_range.max_box.setValue(vmax)
+
+    for b in (self.cond_range.min_box, self.cond_range.max_box):
+      b.blockSignals(False)
+
+    self._cond_saved_ranges[(self.view_tab, t)] = (vmin, vmax)
+    self._update_cond_label_and_bounds()
+
   def _update_cond_label_and_bounds(self) -> None:
     # Label and maximum depend on tab (Daily: 24, Weekly: 8)
     max_t = 24 if self.view_tab == "Daily" else 8
     self.slider_cond_t.setMaximum(max_t)
 
     t = int(self.slider_cond_t.value())
-    self.lbl_cond_t.setText("Cond. Day:" if self.view_tab == "Daily" else "Cond. Wk:")
 
-    # Update Cond. Range allowed bounds based on data distribution (like matplotlib)
+    # Show current slider value in UI
+    self.lbl_cond_val.setText(str(t))
+    self.lbl_cond_t.setText(("Cond. Day:" if self.view_tab == "Daily" else "Cond. Wk:") + f"  (0–{max_t})")
+
     if t <= 0:
-      vmin, vmax = -20.0, 50.0
-    else:
-      col = f"cpct{t}" if self.view_tab == "Daily" else f"w_cpct{t}"
-      if col in self.df.columns:
-        vals = self.df[col].dropna()
-        if not vals.empty:
-          vmin = float(vals.quantile(0.01))
-          vmax = float(vals.quantile(0.99))
-        else:
-          vmin, vmax = -20.0, 50.0
+      # Keep label informative even when disabled
+      self.cond_range.label.setText("Cond. Range (disabled):")
+      return
+
+    col = self._cond_col_name_for(self.view_tab, t)
+    if col in self.df.columns:
+      vals = self.df[col].dropna()
+      if not vals.empty:
+        vmin = float(vals.min())
+        vmax = float(vals.max())
       else:
         vmin, vmax = -20.0, 50.0
+    else:
+      vmin, vmax = -20.0, 50.0
 
     if vmin >= vmax:
       vmax = vmin + 1.0
 
-    # Update spinbox ranges and values
+    # Update the Cond. Range label on EVERY slider change
+    self.cond_range.label.setText(f"Cond. Range  [{vmin:.1f} … {vmax:.1f}]:")
+
+    saved = self._cond_saved_ranges.get((self.view_tab, t), None)
+    if saved is not None:
+      cur_min, cur_max = saved
+      cur_min = float(np.clip(cur_min, vmin, vmax))
+      cur_max = float(np.clip(cur_max, vmin, vmax))
+      if cur_min > cur_max:
+        cur_min, cur_max = cur_max, cur_min
+    else:
+      cur_min, cur_max = vmin, vmax
+      self._cond_saved_ranges[(self.view_tab, t)] = (cur_min, cur_max)
+
+    # Update allowed bounds always, but restore saved/current values
     for b in (self.cond_range.min_box, self.cond_range.max_box):
       b.blockSignals(True)
       b.setRange(vmin, vmax)
       b.setSingleStep(0.5)
-    self.cond_range.min_box.setValue(vmin)
-    self.cond_range.max_box.setValue(vmax)
+
+    self.cond_range.min_box.setValue(cur_min)
+    self.cond_range.max_box.setValue(cur_max)
+
     for b in (self.cond_range.min_box, self.cond_range.max_box):
       b.blockSignals(False)
 
@@ -972,10 +1105,6 @@ class DashboardQt(QtWidgets.QMainWindow):
       *,
       add_to_grid: bool = True,
   ) -> MinMaxSpin:
-    label = QtWidgets.QLabel(f"{title}:")
-    min_box = QtWidgets.QDoubleSpinBox()
-    max_box = QtWidgets.QDoubleSpinBox()
-
     # Data-derived bounds (available range)
     series = df[col].dropna() if (col in df.columns) else pd.Series([], dtype=float)
     if not series.empty:
@@ -984,13 +1113,28 @@ class DashboardQt(QtWidgets.QMainWindow):
     else:
       hard_min, hard_max = -1e9, 1e9
 
+    # Show static data bounds behind the label
+    if np.isfinite(hard_min) and np.isfinite(hard_max):
+      label_txt = f"{title}  [{hard_min:.{decimals}f} … {hard_max:.{decimals}f}]:"
+    else:
+      label_txt = f"{title}:"
+
+    label = QtWidgets.QLabel(label_txt)
+    label.setStyleSheet("color: #DDDDDD; font-size: 11px;")
+
+    min_box = QtWidgets.QDoubleSpinBox()
+    max_box = QtWidgets.QDoubleSpinBox()
+
+    # Smaller inputs
     for b in (min_box, max_box):
       b.setDecimals(decimals)
-      # Set the range of the spinbox to the actual data boundaries
       b.setRange(hard_min, hard_max)
       b.setSingleStep(step)
       b.setKeyboardTracking(False)
       b.setAccelerated(True)
+      b.setFixedWidth(140)
+      b.setMinimumHeight(22)
+      b.setStyleSheet("font-size: 11px; padding: 1px 4px;")
 
     # Set initial values to the calculated range
     min_box.setValue(hard_min)
@@ -1018,12 +1162,6 @@ class DashboardQt(QtWidgets.QMainWindow):
 
     mask = pd.Series(True, index=df.index)
 
-    # Year
-    y_min, y_max = self.year.value()
-    if "date" in df.columns:
-      yy = df["date"].dt.year
-      mask &= (yy >= int(y_min)) & (yy <= int(y_max))
-
     # Event move + price
     ev_min, ev_max = self.event_move.value()
     if "event_move" in df.columns:
@@ -1033,8 +1171,13 @@ class DashboardQt(QtWidgets.QMainWindow):
     if "event_price" in df.columns:
       mask &= (df["event_price"] >= p_min) & (df["event_price"] <= p_max)
 
-    # Momentum
-    for w, col in [(self.mom_1m, "1M_chg"), (self.mom_3m, "3M_chg"), (self.mom_6m, "6M_chg")]:
+    # Momentum (include 12M)
+    for w, col in (
+        (self.mom_1m, "1M_chg"),
+        (self.mom_3m, "3M_chg"),
+        (self.mom_6m, "6M_chg"),
+        (self.mom_12m, "12M_chg"),
+    ):
       a, b = w.value()
       if col in df.columns:
         mask &= (df[col] >= a) & (df[col] <= b)
@@ -1051,17 +1194,28 @@ class DashboardQt(QtWidgets.QMainWindow):
       if col in df.columns:
         mask &= (df[col] >= a) & (df[col] <= b)
 
-    # Direction
-    if self.dir_pos.isChecked():
-      mask &= (df["event_move"] > 0)
-    elif self.dir_neg.isChecked():
-      mask &= (df["event_move"] < 0)
+    # Instrument type (ETFs vs Stocks)
+    if "is_etf" in df.columns:
+      if self.inst_stocks.isChecked():
+        mask &= (df["is_etf"] == False)
+      elif self.inst_etfs.isChecked():
+        mask &= (df["is_etf"] == True)
 
-    # Earnings
-    if self.earn_e.isChecked() and "is_earnings" in df.columns:
-      mask &= (df["is_earnings"] == True)
-    elif self.earn_ne.isChecked() and "is_earnings" in df.columns:
-      mask &= (df["is_earnings"] == False)
+    # Event types: if none checked => no filtering; else OR together selected event types
+    selected_cols: list[str] = []
+    if self.evt_earnings.isChecked():
+      selected_cols.append("is_earnings")
+    if self.evt_atrp.isChecked():
+      selected_cols.append("evt_atrp_breakout")
+    if self.evt_green.isChecked():
+      selected_cols.append("evt_green_line_breakout")
+
+    if selected_cols:
+      evt_mask = pd.Series(False, index=df.index)
+      for c in selected_cols:
+        if c in df.columns:
+          evt_mask |= df[c].fillna(False).astype(bool)
+      mask &= evt_mask
 
     # SPY context
     if "spy_class" in df.columns:
@@ -1229,9 +1383,6 @@ class DashboardQt(QtWidgets.QMainWindow):
       )
 
     # ---- Probability plot (bottom) ----
-    dir_sign = 1.0 if self.dir_pos.isChecked() else -1.0
-    dir_prefix = ">" if dir_sign > 0 else "<"
-
     def prob_curve(col_gen: Callable[[int], str], thresh: float = 0.0) -> np.ndarray:
       ys = []
       for i in range(1, max_n + 1):
@@ -1242,7 +1393,7 @@ class DashboardQt(QtWidgets.QMainWindow):
         v = sub_df[col].to_numpy(dtype=float)
         v = v[np.isfinite(v)]
         if v.size:
-          ys.append(float(np.mean((dir_sign * v) > thresh) * 100.0))
+          ys.append(float(np.mean(v >= thresh) * 100.0))
         else:
           ys.append(np.nan)
       return np.array(ys, dtype=float)
@@ -1255,7 +1406,7 @@ class DashboardQt(QtWidgets.QMainWindow):
       x, y_entry,
       pen=pg.mkPen("#ff6b6b", width=2),
       symbol="o", symbolSize=5,
-      name=f"{dir_prefix} Entry",
+      name=f"> Entry",
     )
 
     if self.view_tab == "Daily":
@@ -1274,19 +1425,12 @@ class DashboardQt(QtWidgets.QMainWindow):
     y_ma20 = prob_curve(ma20_gen, 0.0)
     y_ma50 = prob_curve(ma50_gen, 0.0)
 
-    self.plot_probs.plot(x, y_ma5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma5")
-    self.plot_probs.plot(x, y_ma10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma10")
-    self.plot_probs.plot(x, y_ma20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma20")
-    self.plot_probs.plot(x, y_ma50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name=f"{dir_prefix} ma50")
+    self.plot_probs.plot(x, y_ma5, pen=pg.mkPen("#c8d6e5", width=2), symbol="o", symbolSize=5, name=f"> ma5")
+    self.plot_probs.plot(x, y_ma10, pen=pg.mkPen("#feca57", width=2), symbol="o", symbolSize=5, name=f"> ma10")
+    self.plot_probs.plot(x, y_ma20, pen=pg.mkPen("#48dbfb", width=2), symbol="o", symbolSize=5, name=f"> ma20")
+    self.plot_probs.plot(x, y_ma50, pen=pg.mkPen("#1dd1a1", width=2), symbol="o", symbolSize=5, name=f"> ma50")
 
     self.plot_probs.setYRange(0, 105)
-    self.plot_probs.getPlotItem().addLegend(
-      offset=(10, 10),
-      labelTextColor="#DDDDDD",
-      brush=pg.mkBrush(0, 0, 0, 120),
-      pen=pg.mkPen("#666666"),
-    )
-
 
 def _apply_dark_palette(app: QtWidgets.QApplication) -> None:
   """Safe to call repeatedly; keeps styling consistent."""
@@ -1358,10 +1502,7 @@ def main(start_year, *, exec_: Optional[bool] = None) -> DashboardQt:
 
 
 # %%
-# Only run automatically when executed as a script, not when imported into IPython.
+# Only run automatically when executed as a script, not when imported.
 if __name__ == "__main__":
+  #%%
   main(start_year=2022, exec_=True)
-
-# %%
-# main(df)   # returns immediately in IPython; window stays open
-main(start_year=2022, exec_=True)
