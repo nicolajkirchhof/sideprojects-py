@@ -139,61 +139,63 @@ for i, ticker in enumerate(symbols_to_process):
             continue
 
         # Determine Reaction Date
-        # Use get_indexer for safe lookup
         idx_arr = df_day.index.get_indexer([earnings_event.date], method='nearest')
         if len(idx_arr) == 0:
             print(f"  Could not find nearest date for earnings on {earnings_event.date.date()}, skipping.")
             continue
         idx = idx_arr[0]
-    
+
         reaction_idx = idx + 1 if earnings_event.when == 'post' else idx
 
         # Boundary Check
         if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
-            # print(f"  Earnings reaction index {reaction_idx} out of bounds for {ticker}, skipping.")
             continue
 
         reaction_date = df_day.iloc[reaction_idx].name
-    
-        # Store in map (Earnings take priority)
-        events_map[reaction_date] = {
+
+        meta = events_map.get(reaction_date, {
             'reaction_idx': reaction_idx,
-            'eps': earnings_event.eps,
-            'eps_est': earnings_event.eps_est,
-            'earnings_when': earnings_event.when,
-            'is_earnings': True,
-            'event_type': 'earnings'
-        }
+            'eps': np.nan,
+            'eps_est': np.nan,
+            'earnings_when': np.nan,
+            'event_types': set(),
+        })
+
+        # If we already had the date (e.g. from ATRP), keep reaction_idx consistent with the date.
+        meta['reaction_idx'] = reaction_idx
+        meta['eps'] = earnings_event.eps
+        meta['eps_est'] = earnings_event.eps_est
+        meta['earnings_when'] = earnings_event.when
+        meta['event_types'].add('earnings')
+
+        events_map[reaction_date] = meta
 
     # --- 2. Identify ATRP Breakout Events ---
     # Condition: 1.5 * ATRP20 < |PCT|
     if 'atrp20' in df_day.columns and 'pct' in df_day.columns:
-        # Create a mask for the condition
         atrp_condition = (1.5 * df_day['atrp20'] < df_day['pct'].abs())
-    
-        # Iterate through breakout dates
-        for reaction_date in df_day.index[atrp_condition]:
-            # If date already exists as an earnings event, skip (Earnings priority)
-            if reaction_date in events_map:
-                continue
 
+        for reaction_date in df_day.index[atrp_condition]:
             reaction_idx = df_day.index.get_loc(reaction_date)
 
             # Boundary Check
             if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
                 continue
 
-            events_map[reaction_date] = {
+            meta = events_map.get(reaction_date, {
                 'reaction_idx': reaction_idx,
                 'eps': np.nan,
                 'eps_est': np.nan,
                 'earnings_when': np.nan,
-                'is_earnings': False,
-                'event_type': 'atrp_breakout'
-            }
+                'event_types': set(),
+            })
+
+            meta['reaction_idx'] = reaction_idx
+            meta['event_types'].add('atrp_breakout')
+
+            events_map[reaction_date] = meta
 
     if not events_map:
-        # print(f"  No valid events found for {ticker}, skipping.")
         continue
 
     events_data = []
@@ -202,7 +204,6 @@ for i, ticker in enumerate(symbols_to_process):
     # Time: Processing Loop
     t0 = time.time()
     # --- 3. Unified Processing Loop ---
-    # Process events in chronological order
     for reaction_date in sorted(events_map.keys()):
         meta = events_map[reaction_date]
         reaction_idx = meta['reaction_idx']
@@ -210,9 +211,8 @@ for i, ticker in enumerate(symbols_to_process):
         # Slice DataFrames
         df_slice_day = df_day.iloc[reaction_idx - OFFSET_DAYS : reaction_idx + OFFSET_DAYS]
         df_tracking_day = df_slice_day[INDICATORS]
-    
+
         if len(df_tracking_day) < 2 * OFFSET_DAYS or df_slice_day.c.isna().all():
-            # print(f"  Insufficient tracking data ({len(df_tracking_day)} rows) for {ticker} at {reaction_date.date()}, skipping.")
             continue
 
         # Normalized close percentage
@@ -221,16 +221,14 @@ for i, ticker in enumerate(symbols_to_process):
 
         # Weekly Logic
         idx_week = df_week.index.get_indexer([reaction_date], method='nearest')[0]
-        idx_week_offset = OFFSET_WEEKS if idx_week >= OFFSET_WEEKS else idx_week
         idx_start_week = max(0, idx_week - OFFSET_WEEKS)
         idx_end_week = min(len(df_week) - 1, idx_week + OFFSET_WEEKS)
-    
-        # Adjust offset if near start/end of data
+
         effective_week_offset = idx_week - idx_start_week
 
         df_slice_week = df_week.iloc[idx_start_week : idx_end_week]
         df_tracking_week = df_slice_week[INDICATORS]
-    
+
         if not df_tracking_week.empty:
             ref_c_week = df_tracking_week['c'].iloc[effective_week_offset-1] if effective_week_offset > 0 else df_tracking_week['c'].iloc[0]
             df_tracking_week['cpct'] = (df_tracking_week['c'] - ref_c_week) / ref_c_week * 100
@@ -238,9 +236,8 @@ for i, ticker in enumerate(symbols_to_process):
 
         # SPY Comparison Logic
         if not any(df_spy_day.index == reaction_date):
-            # print(f"  No SPY data for {ticker} at {reaction_date.date()}, skipping.")
             continue
-    
+
         idx_spy = df_spy_day.index.get_loc(reaction_date)
         spy_ref_val = df_spy_day['c'].iloc[idx_spy - OFFSET_DAYS]
         spy_slice = (df_spy_day['c'].iloc[idx_spy - OFFSET_DAYS : idx_spy + OFFSET_DAYS] - spy_ref_val) / spy_ref_val * 100
@@ -258,101 +255,94 @@ for i, ticker in enumerate(symbols_to_process):
         idx_spy_week = df_spy_week.index.get_indexer([df_week.index[idx_week]], method='nearest')[0]
         spy_week_start = max(0, idx_spy_week - effective_week_offset)
         spy_week_end = min(len(df_spy_week), spy_week_start + len(df_tracking_week))
-    
+
         spy_ref_week = df_spy_week['c'].iloc[idx_spy_week]
         spy_slice_week = (df_spy_week['c'].iloc[spy_week_start:spy_week_end] - spy_ref_week) / spy_ref_week * 100
-    
-        # Handle slight length mismatches in weekly data
+
         if len(spy_slice_week) == len(df_tracking_week):
              df_tracking_week['w_spy'] = spy_slice_week.values
         else:
              df_tracking_week['w_spy'] = np.nan
 
-        # --- Flattening (Elegant approach from momentum.py) ---
-        # 1. Reindex to relative integers (-25 to +25)
+        # --- Flattening ---
         df_tracking_day.index = np.arange(len(df_tracking_day)) - OFFSET_DAYS
         df_tracking_week.index = np.arange(len(df_tracking_week)) - effective_week_offset
 
-        # 2. Unstack to dictionary
         flat_day = {f"{col}{idx}": val for (col, idx), val in df_tracking_day.unstack().items()}
         flat_week = {f"{col}{idx}": val for (col, idx), val in df_tracking_week.unstack().items()}
-    
-        # Base Event Data
+
+        event_types = sorted(list(meta.get('event_types', set())))
+        is_earnings = ('earnings' in event_types)
+        event_type = "|".join(event_types) if event_types else "unknown"
+
         event_row = {
             'symbol': ticker,
             'date': reaction_date,
-            'is_earnings': meta['is_earnings'],
+            'event_types': event_types,          # NEW: multiple types per event
+            'event_type': event_type,            # convenience / backward readability
+            'is_earnings': is_earnings,
             'is_etf': is_etf,
-            'event_type': meta['event_type'],
-            'eps': meta['eps'],
-            'eps_est': meta['eps_est'],
-            'earnings_when': meta['earnings_when'],
+            'eps': meta.get('eps', np.nan),
+            'eps_est': meta.get('eps_est', np.nan),
+            'earnings_when': meta.get('earnings_when', np.nan),
             'gappct': df_day.iloc[reaction_idx].gappct,
-            'market_cap': np.nan, # To be filled
+            'market_cap': np.nan,
             'market_cap_date': pd.NaT,
             'market_cap_class': 'Unknown',
-            'original_price': df_day.iloc[reaction_idx].original_price if 'original_price' in df_day.columns else np.nan
+            'original_price': df_day.iloc[reaction_idx].original_price if 'original_price' in df_day.columns else np.nan,
+
+            # Performance: use values computed in indicators.py (df_day) instead of recomputing here
+            '1M_chg': df_day.iloc[reaction_idx]['1M_chg'] if '1M_chg' in df_day.columns else np.nan,
+            '3M_chg': df_day.iloc[reaction_idx]['3M_chg'] if '3M_chg' in df_day.columns else np.nan,
+            '6M_chg': df_day.iloc[reaction_idx]['6M_chg'] if '6M_chg' in df_day.columns else np.nan,
+            '12M_chg': df_day.iloc[reaction_idx]['12M_chg'] if '12M_chg' in df_day.columns else np.nan,
         }
 
         # Market Cap Lookup
         if ts_market_cap is not None and not ts_market_cap.empty:
             mkp_idx = ts_market_cap.index.get_indexer([reaction_date], method="nearest")[0]
             mc_row = ts_market_cap.iloc[mkp_idx]
-            
-            # Check if market cap data is too stale (e.g. > 24 months)
+
             mcap_date = mc_row.name
             if abs((reaction_date - mcap_date).days) <= 730:
                 event_row['market_cap'] = mc_row['market_cap']
                 event_row['market_cap_date'] = mcap_date
                 event_row['market_cap_class'] = mc_row['market_cap_class']
             else:
-                # Explicitly set to Unknown if too far away
                 event_row['market_cap_class'] = 'Unknown'
 
-        # Merge all data
         full_row = {**event_row, **flat_day, **flat_week}
         events_data.append(full_row)
 
     if not events_data:
-        # print(f"  No valid events processed for {ticker}, skipping.")
         continue
 
     df_ticker_events = pd.DataFrame(events_data)
 
-    # --- 2. Reprocess Logic: Performance & Classification ---
+    # NOTE: past-performance columns are already provided by df_day (computed by indicators.py),
+    # so we do NOT recompute 1M/3M/6M/12M here.
 
-    # Calculate Past Performance (1M, 3M, 6M, 12M)
-    for tf_name, tf_days in [('1M', 30), ('3M', 90), ('6M', 180), ('12M', 360)]:
-        # Note: calculate_performance returns a Series aligned to df_ticker_events
-        future_c = calculate_performance(df_ticker_events, df_day, tf_days)
-        df_ticker_events[tf_name] = future_c.values
-        # Calculate % Change: (Future - Current) / Current
-        # using 'c-1' (day before reaction) or 'c0' (reaction day) as base?
-        # reprocess.py uses 'c-1' as base.
-        df_ticker_events[tf_name + '_chg'] = utils.pct.percentage_change_array(
-            df_ticker_events['c-1'], future_c.values
-        )
-
-    # Save Pickled Data
-    ticker_file = f'{data_path}/{ticker}.pkl'
-    df_ticker_events.to_pickle(ticker_file)
-    t_process = time.time() - t0
+    # Save Parquet Data
+    ticker_file = f'{data_path}/{ticker}.parquet'
+    df_ticker_events.to_parquet(ticker_file, index=False)
 
     total_time = time.time() - ticker_start
     print(f"  [Time] Earnings: {t_earnings:.3f}s, MCap: {t_mcap:.3f}s, Detect: {t_detection:.3f}s, Process: {t_process:.3f}s | Total: {total_time:.3f}s")
+
 #%%
 # --- 4. Final Aggregation ---
 print("Aggregating all files...")
 all_data = []
 all_data_filename = f'finance/_data/{output_name}/all.parquet'
 for ticker in liquid_symbols:
-    filename = f'{data_path}/{ticker}.pkl'
+    filename = f'{data_path}/{ticker}.parquet'
     if os.path.exists(filename):
-        all_data.append(pd.read_pickle(filename))
+        all_data.append(pd.read_parquet(filename))
+
 #%%
 if all_data:
-    df_all = pd.concat(all_data)
-    df_all.to_parquet(all_data_filename)
+    df_all = pd.concat(all_data, ignore_index=True)
+    df_all.to_parquet(all_data_filename, index=False)
     print(f"Complete. Saved to {all_data_filename}")
 
 #%% Split file into chunks by year starting from < 2010, 2011, ... 2025
@@ -360,6 +350,6 @@ previous_year = 1900
 for year in range(2010, 2026):
     filename = f'finance/_data/{output_name}/all_{year}.parquet'
     df_year = df_all[(df_all.date.dt.year > previous_year) & (df_all.date.dt.year <= year)]
-    df_year.to_parquet(filename)
+    df_year.to_parquet(filename, index=False)
     print(f"Complete. Saved to {filename}")
     previous_year = year
