@@ -3,11 +3,11 @@ import pandas as pd
 
 from finance import utils
 
-DATASOURCES = ['dolt', 'barchart', 'ibkr']
-
+DATASOURCES = ['dolt', 'ibkr']
+CACHE_DIR = 'finance/_data/swing_data'
 
 class SwingTradingData:
-  def __init__(self, symbol: string, is_etf=False, datasource='auto', offline=False, metainfo=True, api='api_paper'):
+  def __init__(self, symbol: string, is_etf=False, datasource='auto', api='api_paper'):
     """
     Initialize trading day data with start time and exchange settings
 
@@ -25,16 +25,14 @@ class SwingTradingData:
     match datasource:
       case 'auto':
         self.datasource = 'ibkr'
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline, api=api)
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=True, api=api)
         if self.df_day is None or self.df_day.empty or 'c' not in self.df_day.columns:
           self.df_day = utils.dolt_data.daily_w_volatility(symbol)
           self.datasource = 'dolt'
       case 'dolt':
         self.df_day = utils.dolt_data.daily_w_volatility(symbol)
-      case 'barchart':
-        self.df_day = utils.barchart_data.daily_w_volatility(symbol)
       case 'ibkr':
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline, api=api)
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=True, api=api)
       case _:
         raise ValueError(f'Invalid datasource: {datasource}')
 
@@ -54,9 +52,6 @@ class SwingTradingData:
     self.df_week = utils.indicators.swing_indicators(self.df_week)
     self.df_month = utils.indicators.swing_indicators(self.df_month)
     self.is_etf = is_etf
-
-    if not metainfo:
-      return
 
     # Calculate Original Price (Unadjusted for Splits)
     self.df_day['original_price'] = self.df_day['c']

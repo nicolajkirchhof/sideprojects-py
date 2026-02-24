@@ -12,13 +12,14 @@ import finance.utils as utils
 # %autoreload 2
 
 # Constants from momentum.py
-INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp20', 'pct', 'rvol20', 'std_mv', 'iv', 'hv9', 'hv20',
+INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp14', 'atrp20', 'atrp50', 'pct', 'rvol20', 'rvol50', 'std_mv', 'iv', 'hv9', 'hv14', 'hv20', 'hv50',
               'ma200_dist', 'ma100_dist', 'ma50_dist', 'ma20_dist', 'ma10_dist', 'ma5_dist',
               'ma5_slope', 'ma10_slope', 'ma20_slope', 'ma50_slope', 'ma100_slope', 'ma200_slope']
-SPY_INDICATORS = ['hv9', 'hv20', 'ma10_dist', 'ma20_dist', 'ma50_dist', 'ma100_dist', 'ma200_dist',
+SPY_INDICATORS = ['hv9', 'hv14', 'hv20', 'hv50', 'ma10_dist', 'ma20_dist', 'ma50_dist', 'ma100_dist', 'ma200_dist',
                   'ma10_slope', 'ma20_slope', 'ma50_slope', 'ma100_slope', 'ma200_slope']
 OFFSET_DAYS = 25
 OFFSET_WEEKS = 8
+MIN_VOLUME = 750000
 
 # Setup Paths
 output_name = 'momentum_earnings'
@@ -27,25 +28,26 @@ data_path = f'{base_path}/ticker'
 os.makedirs(data_path, exist_ok=True)
 
 # Load Core Data
-liquid_etfs = pickle.load(open('finance/_data/liquid_etfs.pkl', 'rb'))
-liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
-liquid_symbols = list(liquid_stocks | liquid_etfs)
+liquid_stocks = utils.underlyings.get_liquid_stocks()
+liquid_etfs = utils.underlyings.get_liquid_etfs()
+liquid_symbols = liquid_stocks + liquid_etfs
 
 #%%
-# The dataset has the following columns 'symbol', 'date', 'is_earnings', 'event_type', 'eps', 'eps_est',
-#   'earnings_when', 'gappct', 'market_cap', 'market_cap_date', 'market_cap_class'
-#   '1M', '1M_chg', '3M', '3M_chg', '6M', '6M_chg', '12M', '12M_chg'
+# The dataset has the following columns 'symbol', 'date', 'is_earnings', 'event_types', 'eps', 'eps_est',
+#   'earnings_when', 'gappct', 'market_cap', 'market_cap_date', 'market_cap_class', 'original_price',
+#   '1M_chg', '3M_chg', '6M_chg', '12M_chg'
+#   'evt_atrp_breakout', 'evt_green_line_breakout'
 # In addition, the following columns track changes before and after the event they are tracked
 # as {name}XX and w_{name}XX for daily and weekly values before and after the event.
-#   Daily columns are from -25 to 24 whereas 0 is the event day
-#   Weekly columns are from -8 to 8 whereas 0 is the event week
+#   Daily columns are from -25 to 25 whereas 0 is the event day (Total: 51 days)
+#   Weekly columns are from -8 to 8 whereas 0 is the event week (Total: 17 weeks)
 # Tracked names
 #   'c' => close, 'spy' => spy changes (relative to window start), 'v' => volume,
-#   'atrp1/9/14/20/50' => ATR percentage, 'pct' => Percent Change, 'rvol50' => Relative Volatility 50-day,
+#   'atrp1/9/14/20/50' => ATR percentage, 'pct' => Percent Change, 'rvol20/50' => Relative Volatility 20/50-day,
 #   'std_mv' => 20 day standard deviation, 'iv' => implied volatility,
-#   'hv9/14/20' => Historical Volatility 9/14/20-day,
-#   'ma10/20/50/100/200_dist' => Distance to MA 10/20/50/100/200,
-#   'ma10/20/50/100/200_slope' => Slope of MA 10/20/50/100/200,
+#   'hv9/14/20/50' => Historical Volatility 9/14/20/50-day,
+#   'ma5/10/20/50/100/200_dist' => Distance to MA 5/10/20/50/100/200,
+#   'ma5/10/20/50/100/200_slope' => Slope of MA 5/10/20/50/100/200,
 #   'cpct' => Percentage change in reference to the day before the event (c-1)
 #   'spy_{indicator}' => SPY equivalent for specific indicators (hv, ma_dist, ma_slope)
 
@@ -71,13 +73,11 @@ total_symbols = len(symbols_to_process)
 #%%
 for i, ticker in enumerate(symbols_to_process):
     ticker_start = time.time()
-    print(f'[{datetime.now().strftime("%H:%M:%S")}] Processing {i+1}/{total_symbols}: {ticker}...')
 
     # Time: Earnings Load
     t0 = time.time()
     earnings_path = f'finance/_data/earnings_cleaned/{ticker}.csv'
     if not os.path.exists(earnings_path):
-        print(f"  No earnings data for {ticker}.")
         df_earnings = pd.DataFrame(columns=['date', 'eps', 'eps_est', 'when'])
     else:
         df_earnings = pd.read_csv(earnings_path)
@@ -91,7 +91,7 @@ for i, ticker in enumerate(symbols_to_process):
     is_etf = ticker in liquid_etfs
     swing_data_full = utils.swing_trading_data.SwingTradingData(ticker, is_etf=is_etf, offline=False)
     if swing_data_full.empty:
-        print(f"  No data for {ticker}, skipping.")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | SKIP: No data")
         continue
 
     ts_market_cap = swing_data_full.market_cap
@@ -100,6 +100,7 @@ for i, ticker in enumerate(symbols_to_process):
     t_mcap = time.time() - t0
 
     events_map = {}
+    disregarded_count = 0
 
     # Time: Event Detection
     t0 = time.time()
@@ -125,6 +126,11 @@ for i, ticker in enumerate(symbols_to_process):
             continue
 
         reaction_date = df_day.iloc[reaction_idx].name
+        reaction_volume = df_day.iloc[reaction_idx].v
+
+        if reaction_volume < MIN_VOLUME:
+            disregarded_count += 1
+            continue
 
         meta = events_map.get(reaction_date, {
             'reaction_idx': reaction_idx,
@@ -153,6 +159,11 @@ for i, ticker in enumerate(symbols_to_process):
 
             # Boundary Check
             if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
+                continue
+
+            reaction_volume = df_day.iloc[reaction_idx].v
+            if reaction_volume < MIN_VOLUME:
+                disregarded_count += 1
                 continue
 
             meta = events_map.get(reaction_date, {
@@ -194,21 +205,25 @@ for i, ticker in enumerate(symbols_to_process):
                 if consolidation_days >= 5:
                     if reaction_idx >= OFFSET_DAYS and reaction_idx < len(df_day) - OFFSET_DAYS:
                         reaction_date = df_day.index[reaction_idx]
+                        reaction_volume = df_day.iloc[reaction_idx].v
 
-                        meta = events_map.get(reaction_date, {
-                            'reaction_idx': reaction_idx,
-                            'eps': np.nan,
-                            'eps_est': np.nan,
-                            'earnings_when': np.nan,
-                            'event_types': set(),
-                            'consolidation_days': np.nan,
-                        })
+                        if reaction_volume >= MIN_VOLUME:
+                            meta = events_map.get(reaction_date, {
+                                'reaction_idx': reaction_idx,
+                                'eps': np.nan,
+                                'eps_est': np.nan,
+                                'earnings_when': np.nan,
+                                'event_types': set(),
+                                'consolidation_days': np.nan,
+                            })
 
-                        meta['reaction_idx'] = reaction_idx
-                        meta['event_types'].add('green_line_breakout')
-                        meta['consolidation_days'] = float(consolidation_days)
+                            meta['reaction_idx'] = reaction_idx
+                            meta['event_types'].add('green_line_breakout')
+                            meta['consolidation_days'] = float(consolidation_days)
 
-                        events_map[reaction_date] = meta
+                            events_map[reaction_date] = meta
+                        else:
+                            disregarded_count += 1
 
                 # Confirm/advance ATH ONLY AFTER a close above it.
                 # Use today's high as the new ATH level baseline going forward.
@@ -216,6 +231,10 @@ for i, ticker in enumerate(symbols_to_process):
                 last_ath_idx = idx
 
     if not events_map:
+        if disregarded_count > 0:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | NO EVENTS ({disregarded_count} disregarded due to volume)")
+        else:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | NO EVENTS")
         continue
 
     events_data = []
@@ -229,10 +248,10 @@ for i, ticker in enumerate(symbols_to_process):
         reaction_idx = meta['reaction_idx']
 
         # Slice DataFrames
-        df_slice_day = df_day.iloc[reaction_idx - OFFSET_DAYS : reaction_idx + OFFSET_DAYS]
-        df_tracking_day = df_slice_day[INDICATORS]
+        df_slice_day = df_day.iloc[reaction_idx - OFFSET_DAYS : reaction_idx + OFFSET_DAYS + 1]
+        df_tracking_day = df_slice_day[INDICATORS].copy()
 
-        if len(df_tracking_day) < 2 * OFFSET_DAYS or df_slice_day.c.isna().all():
+        if len(df_tracking_day) < 2 * OFFSET_DAYS + 1 or df_slice_day.c.isna().all():
             continue
 
         # Normalized close percentage
@@ -242,12 +261,12 @@ for i, ticker in enumerate(symbols_to_process):
         # Weekly Logic
         idx_week = df_week.index.get_indexer([reaction_date], method='nearest')[0]
         idx_start_week = max(0, idx_week - OFFSET_WEEKS)
-        idx_end_week = min(len(df_week) - 1, idx_week + OFFSET_WEEKS)
+        idx_end_week = min(len(df_week), idx_week + OFFSET_WEEKS + 1)
 
         effective_week_offset = idx_week - idx_start_week
 
         df_slice_week = df_week.iloc[idx_start_week : idx_end_week]
-        df_tracking_week = df_slice_week[INDICATORS]
+        df_tracking_week = df_slice_week[INDICATORS].copy()
 
         if not df_tracking_week.empty:
             ref_c_week = df_tracking_week['c'].iloc[effective_week_offset-1] if effective_week_offset > 0 else df_tracking_week['c'].iloc[0]
@@ -260,11 +279,11 @@ for i, ticker in enumerate(symbols_to_process):
 
         idx_spy = df_spy_day.index.get_loc(reaction_date)
         spy_ref_val = df_spy_day['c'].iloc[idx_spy - OFFSET_DAYS]
-        spy_slice = (df_spy_day['c'].iloc[idx_spy - OFFSET_DAYS : idx_spy + OFFSET_DAYS] - spy_ref_val) / spy_ref_val * 100
+        spy_slice = (df_spy_day['c'].iloc[idx_spy - OFFSET_DAYS : idx_spy + OFFSET_DAYS + 1] - spy_ref_val) / spy_ref_val * 100
         df_tracking_day['spy'] = spy_slice.values if len(spy_slice) == len(df_tracking_day) else np.nan
 
         # SPY Indicators
-        spy_slice_ind = df_spy_day.iloc[idx_spy - OFFSET_DAYS : idx_spy + OFFSET_DAYS]
+        spy_slice_ind = df_spy_day.iloc[idx_spy - OFFSET_DAYS : idx_spy + OFFSET_DAYS + 1]
         if len(spy_slice_ind) == len(df_tracking_day):
             for col in SPY_INDICATORS:
                 if col in spy_slice_ind.columns:
@@ -298,6 +317,7 @@ for i, ticker in enumerate(symbols_to_process):
         event_row = {
             'symbol': ticker,
             'date': reaction_date,
+            'datasource': swing_data_full.datasource,
 
             # Keep both if you want
             'event_types': event_types,
@@ -344,6 +364,9 @@ for i, ticker in enumerate(symbols_to_process):
         events_data.append(full_row)
 
     if not events_data:
+        # This case should be rare if events_map had items, but possible due to inner loop skips
+        disregarded_str = f" ({disregarded_count} disregarded due to volume)" if disregarded_count > 0 else ""
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | NO EVENTS{disregarded_str}")
         continue
 
     df_ticker_events = pd.DataFrame(events_data)
@@ -353,7 +376,10 @@ for i, ticker in enumerate(symbols_to_process):
     df_ticker_events.to_parquet(ticker_file, index=False)
 
     total_time = time.time() - ticker_start
-    print(f"  [Time] Earnings: {t_earnings:.3f}s, MCap: {t_mcap:.3f}s, Detect: {t_detection:.3f}s, | Total: {total_time:.3f}s")
+    evt_types = df_ticker_events['event_types'].explode().value_counts().to_dict()
+    evt_str = ", ".join([f"{k}: {v}" for k, v in evt_types.items()])
+    disregarded_str = f" | Disregarded: {disregarded_count}" if disregarded_count > 0 else ""
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | Found {len(df_ticker_events)} events ({evt_str}){disregarded_str} | Total: {total_time:.2f}s")
 
 #%%
 # --- 4. Final Aggregation ---

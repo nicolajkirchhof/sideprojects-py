@@ -5,9 +5,6 @@ import glob
 
 from sqlalchemy import create_engine, text
 
-from finance import utils
-from finance.swing_pm.create_data_momentum_earnings_analysis import liquid_stocks
-
 %load_ext autoreload
 %autoreload 2
 

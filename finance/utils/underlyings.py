@@ -1,3 +1,5 @@
+import pickle
+
 from finance import utils
 
 us_stock_symbols = [
@@ -43,3 +45,13 @@ DAILY_SYMBOLS = {**{symbol: {'EX': utils.exchanges.US_EXCHANGE} for symbol in
                     forex_etf_symbols + metals_etf_symbols + energy_etf_symbols + agriculture_etf_symbols + cboe_volatility_indices},
                  **{f: {'EX': utils.exchanges.US_NY_EXCHANGE} for f in forex},
                  **{e: {'EX': utils.exchanges.DE_EXCHANGE} for e in eu_indices + eu_index_future + eu_volatility_indices}, }
+
+
+def get_liquid_stocks():
+  return list(pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb')))
+
+def get_liquid_etfs():
+  return list(pickle.load(open('finance/_data/liquid_etfs.pkl', 'rb')))
+
+def get_liquid_underlyings():
+  return get_liquid_stocks() + get_liquid_etfs()
