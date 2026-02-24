@@ -27,8 +27,9 @@ data_path = f'{base_path}/ticker'
 os.makedirs(data_path, exist_ok=True)
 
 # Load Core Data
-liquid_symbols = pickle.load(open('finance/_data/liquid_symbols.pkl', 'rb'))
+liquid_etfs = pickle.load(open('finance/_data/liquid_etfs.pkl', 'rb'))
 liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
+liquid_symbols = list(liquid_stocks | liquid_etfs)
 
 #%%
 # The dataset has the following columns 'symbol', 'date', 'is_earnings', 'event_type', 'eps', 'eps_est',
@@ -51,7 +52,7 @@ liquid_stocks = pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb'))
 #%%
 
 print("Loading core data...")
-spy_data = utils.swing_trading_data.SwingTradingData('SPY', offline=True)
+spy_data = utils.swing_trading_data.SwingTradingData('SPY', is_etf=True, offline=False)
 df_spy_day = spy_data.df_day
 df_spy_week = spy_data.df_week
 
@@ -68,8 +69,6 @@ start_at = 0
 symbols_to_process = liquid_symbols[start_at::SKIP]
 total_symbols = len(symbols_to_process)
 #%%
-# symbols_to_process = ['PKX']
-#%%
 for i, ticker in enumerate(symbols_to_process):
     ticker_start = time.time()
     print(f'[{datetime.now().strftime("%H:%M:%S")}] Processing {i+1}/{total_symbols}: {ticker}...')
@@ -78,23 +77,23 @@ for i, ticker in enumerate(symbols_to_process):
     t0 = time.time()
     earnings_path = f'finance/_data/earnings_cleaned/{ticker}.csv'
     if not os.path.exists(earnings_path):
-        print(f"  No earnings data for {ticker}, skipping.")
-        continue
-
-    df_earnings = pd.read_csv(earnings_path)
-    df_earnings['date'] = pd.to_datetime(df_earnings['date'], format='%Y-%m-%d')
+        print(f"  No earnings data for {ticker}.")
+        df_earnings = pd.DataFrame(columns=['date', 'eps', 'eps_est', 'when'])
+    else:
+        df_earnings = pd.read_csv(earnings_path)
+        df_earnings['date'] = pd.to_datetime(df_earnings['date'], format='%Y-%m-%d')
     t_earnings = time.time() - t0
 
     # Time: Market Cap Load
     t0 = time.time()
     # Load Market Cap History for Lookups
     # Note: Creating SwingTradingData again without metainfo=False triggers full DB load if not cached/offline
-    swing_data_full = utils.swing_trading_data.SwingTradingData(ticker, offline=True)
+    is_etf = ticker in liquid_etfs
+    swing_data_full = utils.swing_trading_data.SwingTradingData(ticker, is_etf=is_etf, offline=False)
     if swing_data_full.empty:
         print(f"  No data for {ticker}, skipping.")
         continue
 
-    is_etf = bool(swing_data_full.info.is_etf) if swing_data_full.info is not None else ticker not in liquid_stocks
     ts_market_cap = swing_data_full.market_cap
     df_day = swing_data_full.df_day
     df_week = swing_data_full.df_week

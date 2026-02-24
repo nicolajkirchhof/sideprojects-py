@@ -1,6 +1,4 @@
 import string
-from datetime import datetime, timedelta
-import numpy as np
 import pandas as pd
 
 from finance import utils
@@ -9,7 +7,7 @@ DATASOURCES = ['dolt', 'barchart', 'ibkr']
 
 
 class SwingTradingData:
-  def __init__(self, symbol: string, datasource='auto', offline=False, metainfo=True):
+  def __init__(self, symbol: string, is_etf=False, datasource='auto', offline=False, metainfo=True, api='api_paper'):
     """
     Initialize trading day data with start time and exchange settings
 
@@ -27,7 +25,7 @@ class SwingTradingData:
     match datasource:
       case 'auto':
         self.datasource = 'ibkr'
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline)
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline, api=api)
         if self.df_day is None or self.df_day.empty or 'c' not in self.df_day.columns:
           self.df_day = utils.dolt_data.daily_w_volatility(symbol)
           self.datasource = 'dolt'
@@ -36,7 +34,7 @@ class SwingTradingData:
       case 'barchart':
         self.df_day = utils.barchart_data.daily_w_volatility(symbol)
       case 'ibkr':
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline)
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline, api=api)
       case _:
         raise ValueError(f'Invalid datasource: {datasource}')
 
@@ -55,6 +53,7 @@ class SwingTradingData:
     self.df_day = utils.indicators.swing_indicators(self.df_day)
     self.df_week = utils.indicators.swing_indicators(self.df_week)
     self.df_month = utils.indicators.swing_indicators(self.df_month)
+    self.is_etf = is_etf
 
     if not metainfo:
       return
@@ -80,7 +79,7 @@ class SwingTradingData:
 
       self.df_day['original_price'] = self.df_day['c'] * cum_factor
 
-    self.info = utils.dolt_data.symbol_info(symbol)
+    # self.info = utils.dolt_data.symbol_info(symbol)
     self.market_cap = None
     self.df_shares_outstanding = None
     self.df_shares_outstanding = utils.dolt_data.financial_info(symbol)

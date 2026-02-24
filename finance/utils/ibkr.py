@@ -121,24 +121,26 @@ def contract_to_fieldname(contract):
 
 def daily_w_volatility(symbol, type='stk', api='api_paper', offline=False):
   #%%
-  contract_filename = f'finance/_data/ibkr/{type}/{symbol}_contract.csv'
+  contract_filename = f'finance/_data/ibkr/{symbol}_contract.pkl'
   df_existing = None
   if os.path.exists(contract_filename):
-    df_existing = pd.read_csv(contract_filename, index_col='date', parse_dates=True)
+    df_existing = pd.read_pickle(contract_filename)
     df_existing.sort_index(inplace=True)
 
   if df_existing is not None and not df_existing.empty:
-    start_date = df_existing.index[-1] + pd.Timedelta(days=1)
+    # start from the day after the last cached candle
+    cursor = df_existing.index[-1].date() + timedelta(days=1)
   else:
-    start_date = None
-#%%
-  if offline or (start_date is not None and start_date.date() >= datetime.now().date()):
+    cursor = None
+
+  if offline or (cursor is not None and cursor > datetime.now().date() - timedelta(days=1)):
     return df_existing
-#%%
+
   ib_con = None
   try:
     print(f"{symbol} not found locally, requesting from IBKR...")
     ib_con = utils.ibkr.connect(api, 17, 1)
+
     contract = ib.Stock(symbol=symbol, exchange='SMART', currency='USD')
     ib_con.qualifyContracts(contract)
     details = ib_con.reqContractDetails(contract)
@@ -150,55 +152,80 @@ def daily_w_volatility(symbol, type='stk', api='api_paper', offline=False):
     duration = '10 Y'
     barSize = '1 day'
     offset_days = 5
-    max_days = 1
-    end_date = datetime.now().date() if start_date is None or start_date.date() + timedelta(days=max_days) > datetime.now().date() else start_date + pd.Timedelta(days=max_days)
 
-  # %%
-    if start_date is None:
-      start_date = ib_con.reqHeadTimeStamp(contract, whatToShow="TRADES", useRTH=rth, formatDate=True).date()
+    # Always try to catch up to "today"
+    target_end = datetime.now().date()
 
-    def get_request_string(days):
+    if cursor is None:
+      cursor = ib_con.reqHeadTimeStamp(contract, whatToShow="TRADES", useRTH=rth, formatDate=True).date()
+
+    # If already up-to-date, just return cache
+    if cursor >= target_end:
+      return df_existing
+
+    def get_request_string(days: int) -> str:
+      # IBKR durationStr is inclusive-ish; add a small cushion
+      days = max(int(days), 1)
       if days < 365:
-        return f'{days+offset_days} D'
+        return f'{days + offset_days} D'
       if days < 3650:
-        return f'{(days // 365)+1} Y'
+        return f'{(days // 365) + 1} Y'
       return f'{days // 365} Y'
 
-  #%%
+    # Request in chunks to avoid giant single calls
+    max_chunk_days = 365  # tune if you want (e.g. 180 or 730)
+
     dfs = [df_existing.copy() if df_existing is not None else pd.DataFrame()]
-    while start_date < end_date:
-      missing_days = (end_date - start_date).days
-      num_days_to_request = 3650 if missing_days > 3650 else missing_days
-      start_date = start_date + pd.Timedelta(days=num_days_to_request)
+
+    while cursor <= target_end:
+      request_end = min(cursor + timedelta(days=max_chunk_days), target_end)
+      days_to_request = (request_end - cursor).days + 1  # include end day
+
       dfs_types = []
-      #%%
       for typ in utils.ibkr.TYPES_OF_DATA[contract.secType]:
-        end_date_time_str = start_date.strftime('%Y%m%d %H:%M:%S')
-        duration = get_request_string(num_days_to_request)
-        data = ib_con.reqHistoricalData(contract, endDateTime=end_date_time_str, durationStr=duration,
-                                        barSizeSetting=barSize, whatToShow=typ, useRTH=rth)
-        ##%%
-        print(f'{datetime.now()} : {utils.ibkr.contract_to_fieldname(contract)} => {typ} {start_date} #{len(data)}')
+        end_date_time_str = request_end.strftime('%Y%m%d %H:%M:%S')
+        duration = get_request_string(days_to_request)
+
+        data = ib_con.reqHistoricalData(
+          contract,
+          endDateTime=end_date_time_str,
+          durationStr=duration,
+          barSizeSetting=barSize,
+          whatToShow=typ,
+          useRTH=rth
+        )
+
+        print(f'{datetime.now()} : {utils.ibkr.contract_to_fieldname(contract)} => {typ} {cursor}..{request_end} #{len(data)}')
         if not data:
           print(f'No data for {typ} {contract.symbol}')
           continue
+
         dfs_type = ib.util.df(data).rename(columns=utils.ibkr.FIELD_NAME_LU[typ])
         dfs_type['date'] = pd.to_datetime(dfs_type['date'])
         dfs_type.set_index('date', inplace=True)
         dfs_types.append(dfs_type)
-      dfs_types_merged = pd.concat(dfs_types, axis=1, join='outer')
-      for col in ['iv', 'hv']:
-        if f'{col}c' in dfs_types_merged.columns:
-          dfs_types_merged.drop([f'{col}v', f'{col}bc'], axis=1, inplace=True)
-          dfs_types_merged[col] = dfs_types_merged[f'{col}c']
-      dfs.append(dfs_types_merged)
+
+      if dfs_types:
+        dfs_types_merged = pd.concat(dfs_types, axis=1, join='outer')
+        for col in ['iv', 'hv']:
+          if f'{col}c' in dfs_types_merged.columns:
+            dfs_types_merged.drop([f'{col}v', f'{col}bc'], axis=1, inplace=True)
+            dfs_types_merged[col] = dfs_types_merged[f'{col}c']
+        dfs.append(dfs_types_merged)
+
+      # advance cursor to the day after request_end
+      cursor = request_end + timedelta(days=1)
+
     dfs_merged = pd.concat(dfs)
     dfs_merged.sort_index(inplace=True)
     dfs_merged = dfs_merged.loc[~dfs_merged.index.duplicated(keep='last')]
+
     os.makedirs(os.path.dirname(contract_filename), exist_ok=True)
-    dfs_merged.to_csv(contract_filename)
+    dfs_merged.to_pickle(contract_filename)
+
     ib_con.disconnect()
     return dfs_merged
+
   except Exception as e:
     print(f'Error requesting data for {symbol}: {e}')
     if ib_con is not None and ib_con.isConnected():

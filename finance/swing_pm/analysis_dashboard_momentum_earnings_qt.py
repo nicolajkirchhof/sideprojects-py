@@ -16,8 +16,6 @@ import pyarrow.parquet as pq  # type: ignore
 
 from finance import utils
 
-# %load_ext autoreload
-# %autoreload 2
 
 
 #%%
@@ -78,87 +76,42 @@ class MinMaxSpin:
     return (a, b) if a <= b else (b, a)
 
 
-@dataclass
-class MinMaxIntSpin:
-  label: QtWidgets.QLabel
-  min_box: QtWidgets.QSpinBox
-  max_box: QtWidgets.QSpinBox
-
-  def value(self) -> tuple[int, int]:
-    a = int(self.min_box.value())
-    b = int(self.max_box.value())
-    return (a, b) if a <= b else (b, a)
 
 
 def load_and_prep_data(years: range) -> pd.DataFrame:
   """
   Loads and standardizes the momentum/earnings dataset for the dashboard.
-
-  Important: keep this function aligned with analysis_dashboard_momentum_earnings.py
-  so that filters/plots behave the same across both UIs.
   """
 
   def _required_columns() -> list[str]:
     cols: set[str] = {
       # core
-      "date",
-      "original_price",
-      "c0",
-      "cpct0",
-      "atrp200",
-      "is_earnings",
-      "is_etf",
-      "spy0",
-      "spy5",
-      "market_cap_class",
+      "date", "original_price", "c0", "cpct0", "atrp200", "is_earnings", "is_etf",
+      "spy0", "spy5", "market_cap_class",
       # event types (new tracking)
-      "evt_atrp_breakout",
-      "evt_green_line_breakout",
+      "evt_atrp_breakout", "evt_green_line_breakout",
       # filters
-      "1M_chg",
-      "3M_chg",
-      "6M_chg",
-      "12M_chg",
-      "ma10_dist0",
-      "ma20_dist0",
-      "ma50_dist0",
-      "ma100_dist0",
-      "ma200_dist0",
-      "spy_ma10_dist0",
-      "spy_ma20_dist0",
-      "spy_ma50_dist0",
-      "spy_ma100_dist0",
-      "spy_ma200_dist0",
+      "1M_chg", "3M_chg", "6M_chg", "12M_chg",
+      "ma10_dist0", "ma20_dist0", "ma50_dist0", "ma100_dist0", "ma200_dist0",
+      "spy_ma10_dist0", "spy_ma20_dist0", "spy_ma50_dist0", "spy_ma100_dist0", "spy_ma200_dist0",
     }
 
     # Trajectory / dist / cond filter (daily + weekly)
     for i in range(1, 25):
       cols.add(f"cpct{i}")
-    for i in range(1, 9):
-      cols.add(f"w_cpct{i}")
-
-    # Probability lines (daily + weekly)
-    for i in range(1, 25):
       cols.add(f"ma5_dist{i}")
       cols.add(f"ma10_dist{i}")
       cols.add(f"ma20_dist{i}")
       cols.add(f"ma50_dist{i}")
     for i in range(1, 9):
+      cols.add(f"w_cpct{i}")
       cols.add(f"w_ma5_dist{i}")
       cols.add(f"w_ma10_dist{i}")
       cols.add(f"w_ma20_dist{i}")
       cols.add(f"w_ma50_dist{i}")
 
     # Distribution-over-time options (daily + weekly)
-    dist_metrics = [
-      "ma5_slope",
-      "ma10_slope",
-      "ma20_slope",
-      "ma50_slope",
-      "rvol20",
-      "hv20",
-      "atrp20",
-    ]
+    dist_metrics = ["ma5_slope", "ma10_slope", "ma20_slope", "ma50_slope", "rvol20", "hv20", "atrp20"]
     for m in dist_metrics:
       for i in range(1, 25):
         cols.add(f"{m}{i}")
@@ -168,24 +121,21 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
     return sorted(cols)
 
   required_cols = _required_columns()
-
   dfs: list[pd.DataFrame] = []
   for year in years:
-    parquet_path = f"finance/_data/momentum_earnings/all_{year}.parquet"
-
-    if not os.path.exists(parquet_path):
-      print(f"WARNING: {parquet_path} not found. Skipping.")
+    path = f"finance/_data/momentum_earnings/all_{year}.parquet"
+    if not os.path.exists(path):
       continue
-    available = set(pq.ParquetFile(parquet_path).schema.names)
+    available = set(pq.ParquetFile(path).schema.names)
     cols_to_read = [c for c in required_cols if c in available]
-    dfs.append(pd.read_parquet(parquet_path, columns=cols_to_read))
+    dfs.append(pd.read_parquet(path, columns=cols_to_read))
 
   if not dfs:
     return pd.DataFrame()
 
   df = pd.concat(dfs, ignore_index=True)
 
-  # Match matplotlib dashboard: basic cleanup + safety caps
+  # Cleanup + safety caps
   if "original_price" in df.columns:
     df = df[df["original_price"] < 10e5]
 
@@ -194,11 +144,10 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
   if "date" in df.columns:
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
 
-  # Match matplotlib dashboard: require c0 if present
   if "c0" in df.columns:
     df = df.dropna(subset=["c0"])
 
-  # Prefer original_price for event_price when present; fallback to c0
+  # event_price
   if "original_price" in df.columns and "c0" in df.columns:
     df["event_price"] = df["original_price"].where(df["original_price"].notna(), df["c0"])
   elif "c0" in df.columns:
@@ -206,45 +155,23 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
   else:
     df["event_price"] = np.nan
 
-  # Event move (signed): match matplotlib dashboard fallback behavior
+  # event_move
   if "cpct0" in df.columns and "atrp200" in df.columns:
     df["event_move"] = df["cpct0"] / df["atrp200"]
   else:
     df["event_move"] = 0.0
 
-  # Direction: match matplotlib dashboard
-  df["direction"] = np.sign(df["event_move"])
-  df["direction"] = df["direction"].replace(0, 1)
+  df["direction"] = np.sign(df["event_move"]).replace(0, 1)
 
-  # Basic booleans
-  if "is_earnings" in df.columns:
-    df["is_earnings"] = df["is_earnings"].fillna(False).astype(bool)
-  else:
-    df["is_earnings"] = False
+  for c in ("is_earnings", "is_etf", "evt_atrp_breakout", "evt_green_line_breakout"):
+    df[c] = df[c].fillna(False).astype(bool) if c in df.columns else False
 
-  if "is_etf" in df.columns:
-    df["is_etf"] = df["is_etf"].fillna(False).astype(bool)
-  else:
-    df["is_etf"] = False
-
-  # New event flags may be absent in older files; default them to False
-  for col in ("evt_atrp_breakout", "evt_green_line_breakout"):
-    if col in df.columns:
-      df[col] = df[col].fillna(False).astype(bool)
-    else:
-      df[col] = False
-
-  # SPY Context (Simple alignment check over 5 days): match matplotlib dashboard
+  # SPY Context
   if "spy0" in df.columns and "spy5" in df.columns:
     spy_change = df["spy5"] - df["spy0"]
     aligned_spy = spy_change * df["direction"]
-
-    conditions = [
-      aligned_spy > 0.5,  # Supporting
-      aligned_spy < -0.5,  # Non-Supporting
-    ]
-    choices = ["Supporting", "Non-Supporting"]
-    df["spy_class"] = np.select(conditions, choices, default="Neutral")
+    conditions = [aligned_spy > 0.5, aligned_spy < -0.5]
+    df["spy_class"] = np.select(conditions, ["Supporting", "Non-Supporting"], default="Neutral")
   else:
     df["spy_class"] = "Unknown"
 
@@ -635,12 +562,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.plot_dist.setYLink(self.plot_path)
 
     for pw in (self.plot_path, self.plot_dist, self.plot_probs):
-      pw.setBackground("k")
-      pw.showGrid(x=True, y=True, alpha=0.2)
-      pw.getPlotItem().getAxis("left").setPen(pg.mkPen("#AAAAAA"))
-      pw.getPlotItem().getAxis("bottom").setPen(pg.mkPen("#AAAAAA"))
-      pw.getPlotItem().getAxis("left").setTextPen(pg.mkPen("#AAAAAA"))
-      pw.getPlotItem().getAxis("bottom").setTextPen(pg.mkPen("#AAAAAA"))
+      self._style_plot(pw)
 
     self.plot_path.setTitle("Trajectory (5th/50th/95th Quantiles)", color="#DDDDDD", size="12pt")
     self.plot_dist.setTitle("Distribution of Changes", color="#DDDDDD", size="12pt")
@@ -676,6 +598,15 @@ class DashboardQt(QtWidgets.QMainWindow):
     self._show_empty_state()
     self._update_data_status()
     self._schedule_apply()
+
+  def _style_plot(self, pw: pg.PlotWidget) -> None:
+    pw.setBackground("k")
+    pw.showGrid(x=True, y=True, alpha=0.2)
+    plot_item = pw.getPlotItem()
+    plot_item.getAxis("left").setPen(pg.mkPen("#AAAAAA"))
+    plot_item.getAxis("bottom").setPen(pg.mkPen("#AAAAAA"))
+    plot_item.getAxis("left").setTextPen(pg.mkPen("#AAAAAA"))
+    plot_item.getAxis("bottom").setTextPen(pg.mkPen("#AAAAAA"))
 
   def _schedule_apply(self) -> None:
     # Visual cue that a render is queued
