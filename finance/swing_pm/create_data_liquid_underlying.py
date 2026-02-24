@@ -21,11 +21,14 @@ db_connection = create_engine(db_connection_str)
 
 #%% SQL-side Quantile Calculation for ALL tickers
 # Using Window Functions partitioned by symbol to get stats for everyone at once
-min_vol_stocks = text("""SELECT DISTINCT o.act_symbol
-                          FROM ohlcv o
-                                   left join symbol s on o.act_symbol = s.act_symbol
-                          WHERE volume > 750000
-                            and s.is_etf = 0""")
+min_vol_stocks = text("""
+                    SELECT o.act_symbol
+                    FROM ohlcv o
+                             LEFT JOIN symbol s ON o.act_symbol = s.act_symbol
+                    WHERE s.is_etf = 0
+                    GROUP BY o.act_symbol
+                    HAVING MAX(o.volume) > 750000 AND MAX(o.close) < 5000
+                    """)
 
 df_min_vol_stocks = pd.read_sql(min_vol_stocks, db_connection)
 
@@ -38,7 +41,7 @@ min_vol_etfs = text("""
                              LEFT JOIN symbol s ON o.act_symbol = s.act_symbol
                     WHERE s.is_etf = 1
                     GROUP BY o.act_symbol
-                    HAVING AVG(o.volume) > 2000000
+                    HAVING AVG(o.volume) > 2000000 AND MAX(o.close) < 5000
                     """)
 
 df_min_vol_etfs = pd.read_sql(min_vol_etfs, db_connection)

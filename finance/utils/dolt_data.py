@@ -89,9 +89,6 @@ def symbol_info(symbol):
 
 @time_db_call
 def financial_info(symbol):
-  if os.path.exists(f'finance/_data/financials/{symbol}.csv'):
-    df_financial = pd.read_csv(f'finance/_data/financials/{symbol}.csv', index_col='date', parse_dates=True)
-    return df_financial
   query = """select date, shares_outstanding from balance_sheet_equity where act_symbol = :symbol"""
   df = pd.read_sql(text(query), db_earnings_connection, params={'symbol': symbol})
   df['date'] = pd.to_datetime(df.date)

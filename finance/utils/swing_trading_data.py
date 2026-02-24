@@ -25,14 +25,14 @@ class SwingTradingData:
     match datasource:
       case 'auto':
         self.datasource = 'ibkr'
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=True, api=api)
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=False, api=api)
         if self.df_day is None or self.df_day.empty or 'c' not in self.df_day.columns:
           self.df_day = utils.dolt_data.daily_w_volatility(symbol)
           self.datasource = 'dolt'
       case 'dolt':
         self.df_day = utils.dolt_data.daily_w_volatility(symbol)
       case 'ibkr':
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=True, api=api)
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=False, api=api)
       case _:
         raise ValueError(f'Invalid datasource: {datasource}')
 

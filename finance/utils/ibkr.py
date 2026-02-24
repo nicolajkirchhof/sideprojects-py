@@ -11,7 +11,7 @@ import pandas as pd
 from finance import utils
 
 AVAILABLE_TYPES_OF_DATA = ['TRADES', 'MIDPOINT', 'BID', 'ASK', 'BID_ASK', 'HISTORICAL_VOLATILITY',
-                           'OPTION_IMPLIED_VOLATILITY']
+                           'OPTION_IMPLIED_VOLATILITY', 'ADJUSTED_LAST']
 TYPES_OF_DATA = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY', 'OPTION_IMPLIED_VOLATILITY'], 'CFD': ['MIDPOINT'],
                  'FUT': ['TRADES'],
                  'STK': ['TRADES', 'HISTORICAL_VOLATILITY', 'OPTION_IMPLIED_VOLATILITY'], 'CONTFUT': ['TRADES'],
@@ -19,6 +19,7 @@ TYPES_OF_DATA = {'IND': ['TRADES', 'HISTORICAL_VOLATILITY', 'OPTION_IMPLIED_VOLA
 
 FIELD_NAME_LU = {
   'TRADES': {'open': 'o', 'high': 'h', 'low': 'l', 'close': 'c', 'volume': 'v', 'average': 'a', 'barCount': 'bc'},
+  'ADJUSTED_LAST': {'open': 'ao', 'high': 'ah', 'low': 'al', 'close': 'ac', 'volume': 'av', 'average': 'aa', 'barCount': 'abc'},
   'MIDPOINT': {'open': 'o', 'high': 'h', 'low': 'l', 'close': 'c', 'volume': 'v', 'average': 'a', 'barCount': 'bc'},
   'HISTORICAL_VOLATILITY': {'open': 'hvo', 'high': 'hvh', 'low': 'hvl', 'close': 'hvc', 'volume': 'hvv',
                             'average': 'hva', 'barCount': 'hvbc'},
@@ -119,7 +120,7 @@ def contract_to_fieldname(contract):
   if contract.secType == 'CASH':
     return contract.symbol + contract.currency
 
-def daily_w_volatility(symbol, type='stk', api='api_paper', offline=False):
+def daily_w_volatility(symbol, api='api_paper', offline=False):
   #%%
   contract_filename = f'finance/_data/ibkr/{symbol}_contract.pkl'
   df_existing = None
