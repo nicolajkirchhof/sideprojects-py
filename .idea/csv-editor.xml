@@ -24,6 +24,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\finance\_data\delisted.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value=";" />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\finance\_data\earnings_cleaned\A.csv">
           <value>
             <Attribute>
@@ -73,20 +80,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\ibkr\stk\QQQ_contract.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\ibkr\stk\SPY_contract.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\finance\_data\optionsomega\SPY-NP-Delta-Band-45DTE-25D-50D-5D-PM.csv">
           <value>
             <Attribute>
@@ -94,7 +87,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\stocks-screener-eval-stocks-etfs-01-07-2026.csv">
+        <entry key="\finance\_data\stocks-screener-eval-stocks-03-08-2026.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -249,6 +242,13 @@
           </value>
         </entry>
         <entry key="\finance\ibkr\paused\predefined_options.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\finance\intraday_pm\backtester\etf_symbols.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

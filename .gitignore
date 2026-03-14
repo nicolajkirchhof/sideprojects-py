@@ -139,6 +139,7 @@ tasks.xml
 tmp/
 _data/
 _backup/
+_analysis/
 
 # Pickle files
 *.pkl
@@ -148,3 +149,8 @@ flask_session/
 
 #AI
 .output.txt
+
+#NET
+obj/
+bin/
+

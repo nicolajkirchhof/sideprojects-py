@@ -155,7 +155,12 @@ option_portfolio_positions.sort(key=lambda x: x.contract.conId)
 for option_portfolio_position in option_portfolio_positions:
   log_position(option_portfolio_position)
 
-
+#%%
+# stock_portfolio_positions = [position for position in portfolio if position.contract.secType in ['STK', 'FUT', 'CFD', 'CRYPTO', 'CASH']]
+# pos=stock_portfolio_positions[0]
+# end_date_time_str = datetime.now().strftime('%Y%m%d %H:%M:%S')
+# ib_con.qualifyContracts(pos.contract)
+# last = ib_con.reqHistoricalData(pos.contract, end_date_time_str, durationStr='1 D', barSizeSetting='1 day', whatToShow='MIDPOINT', useRTH=False)
 
   # #%%
   # print(f"---------------------------------------------------------------------\n\n")

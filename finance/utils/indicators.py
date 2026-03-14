@@ -280,7 +280,7 @@ def get_composite_autocorr(series, window=20, max_lag=3):
 
 def swing_indicators(df_stk):
   # Make a (shallow) copy to avoid carrying fragmentation forward
-  df_stk = df_stk.copy()
+  df_stk = df_stk[df_stk['c']>0].copy()
   df_stk.sort_index(inplace=True)
 
   # Collect new columns here, then concat once (prevents fragmentation)
@@ -333,7 +333,7 @@ def swing_indicators(df_stk):
     new_cols[f'atrp{atr}'] = (atr_series / df_stk['c']) * 100
 
   # We'll need atr50 for *_dist_atr (matches your prior behavior where atr ends as 50)
-  atr_for_dist = new_cols['atr50']
+  atr_for_dist = new_cols['atr20']
 
   for ma in [5, 10, 20, 50, 100, 200]:
     ma_series = df_stk['c'].rolling(window=ma).mean()

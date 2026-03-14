@@ -1,4 +1,5 @@
 import os.path
+import pickle
 import time
 import functools
 from pathlib import Path
@@ -10,12 +11,16 @@ from sqlalchemy import create_engine, text
 
 from finance import utils
 
+
+DELISTED = None
+
 #%%
 # MySQL connection setup (localhost:3306)
 DB_URL = 'mysql+pymysql://root:@localhost:3306/'
 db_stocks_connection = None
 db_options_connection = None
 db_earnings_connection = None
+
 
 def init_engines():
   global db_stocks_connection, db_options_connection, db_earnings_connection
@@ -60,8 +65,7 @@ def time_db_call(func):
         start_time = time.time()
         result = func(*args, **kwargs)
         duration = time.time() - start_time
-        if duration > 0.05:
-            print(f"  [DB] {func.__name__} took {duration:.4f}s")
+        print(f"  [DB] {func.__name__} took {duration:.4f}s")
         return result
     return wrapper
 
@@ -88,47 +92,73 @@ def symbol_info(symbol):
   return df.iloc[0]
 
 @time_db_call
-def financial_info(symbol):
+def financial_info(symbol, offline=False):
+  cache_path = _cache_file("financial_info", symbol)
+  if offline:
+    cached = _read_cache(cache_path)
+    return cached if cached is not None else pd.DataFrame()
+
   query = """select date, shares_outstanding from balance_sheet_equity where act_symbol = :symbol"""
   df = pd.read_sql(text(query), db_earnings_connection, params={'symbol': symbol})
   df['date'] = pd.to_datetime(df.date)
   df.set_index('date', inplace=True)
+  
+  if not df.empty:
+    _write_cache(cache_path, df)
+    
   return df
 
-def splits(symbol):
+@time_db_call
+def splits(symbol, offline=False):
+  cache_path = _cache_file("splits", symbol)
+  if offline:
+    cached = _read_cache(cache_path)
+    return cached if cached is not None else pd.DataFrame()
+
   query = """select act_symbol, ex_date, to_factor, for_factor from split where act_symbol = :symbol"""
   df = pd.read_sql(text(query), db_stocks_connection, params={'symbol': symbol})
   df.rename(columns={'act_symbol':'symbol', 'ex_date': 'date'}, inplace=True)
   df['date'] = pd.to_datetime(df.date)
   df.set_index('date', inplace=True)
+
+  if not df.empty:
+    _write_cache(cache_path, df)
+
   return df
+
+#%%
+def load_delisted():
+  global DELISTED
+  if DELISTED is not None: return DELISTED
+
+  if os.path.exists('finance/_data/delisted.pkl'):
+    DELISTED = pickle.load(open('finance/_data/delisted.pkl', 'rb'))
+  else:
+    print("No delisted.pkl found. DOLT will not work correctly")
+  return DELISTED
 #%%
 @time_db_call
 def daily_w_volatility(
     symbol: str,
-    *,
-    use_cache: bool = True,
-    max_age_days: float | None = 365.0,
-    force_refresh: bool = False,
+    offline: bool = False,
 ) -> pd.DataFrame:
   """
   Load daily OHLCV and merge volatility history, with optional PKL caching.
 
   Parameters
   ----------
-  use_cache:
-      If True, load from local .pkl when available.
   max_age_days:
       Cache freshness window. None = never expires.
-  force_refresh:
-      If True, ignore cache and rebuild from DB.
+  offline:
+      If True, only load from cache, do not hit DB.
   """
+  delisted = load_delisted()
   cache_path = _cache_file("daily_w_volatility", symbol)
+  cached = _read_cache(cache_path)
 
-  if use_cache and (not force_refresh) and _cache_is_fresh(cache_path, max_age_days=max_age_days):
-    cached = _read_cache(cache_path)
-    if cached is not None and (not cached.empty):
-      return cached
+  if offline or (symbol in delisted and cached is not None):
+    print(f"{symbol} is delisted, returning cached data.")
+    return cached
 
   ohclv_query = """select * from ohlcv where act_symbol = :symbol"""
   df_stk = pd.read_sql(text(ohclv_query), db_stocks_connection, params={'symbol': symbol})
@@ -140,6 +170,7 @@ def daily_w_volatility(
 
   volatility_query = """select act_symbol, date, hv_current, iv_current, iv_year_high, iv_year_low from volatility_history where act_symbol = :symbol"""
   df_vol = pd.read_sql(text(volatility_query), db_options_connection, params={'symbol': symbol})
+  df_vol.dropna(subset=['iv_current'], inplace=True)
   if not df_vol.empty:
     df_vol = df_vol.rename(columns={'act_symbol':'symbol', 'iv_current':'iv', 'hv_current':'hv'})
     df_vol['date'] = pd.to_datetime(df_vol.date)
@@ -168,8 +199,7 @@ def daily_w_volatility(
   df_stk_vol[utils.definitions.OHLCLV + utils.definitions.IV] = df_stk_vol[utils.definitions.OHLCLV + utils.definitions.IV].interpolate()
   df_stk_vol['symbol'] = symbol
 
-  if use_cache:
-    _write_cache(cache_path, df_stk_vol)
+  _write_cache(cache_path, df_stk_vol)
 
   return df_stk_vol
 

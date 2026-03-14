@@ -54,7 +54,7 @@ liquid_symbols = liquid_stocks + liquid_etfs
 #%%
 
 print("Loading core data...")
-spy_data = utils.swing_trading_data.SwingTradingData('SPY', is_etf=True, offline=False)
+spy_data = utils.SwingTradingData('SPY', datasource='offline')
 df_spy_day = spy_data.df_day
 df_spy_week = spy_data.df_week
 
@@ -89,7 +89,7 @@ for i, ticker in enumerate(symbols_to_process):
     # Load Market Cap History for Lookups
     # Note: Creating SwingTradingData again without metainfo=False triggers full DB load if not cached/offline
     is_etf = ticker in liquid_etfs
-    swing_data_full = utils.swing_trading_data.SwingTradingData(ticker, is_etf=is_etf, offline=False)
+    swing_data_full = utils.SwingTradingData(ticker, datasource='offline')
     if swing_data_full.empty:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | SKIP: No data")
         continue

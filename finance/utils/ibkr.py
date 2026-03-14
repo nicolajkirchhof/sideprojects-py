@@ -27,6 +27,19 @@ FIELD_NAME_LU = {
                                 'average': 'iva', 'barCount': 'ivbc'},
 }
 
+NO_OOI_INDICES = ['V2TX', 'V1X', 'VXN', 'RVX', 'VXSLV', 'GVZ', 'OVX']
+NO_HV_INDICES = ['VXSLV']
+EU_INDICES = [ib.Index(x, 'EUREX', 'EUR') for x in ['DAX', 'ESTX50', 'V2TX', 'V1X']]
+US_INDICES = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX', 'VXN', 'RVX', 'VXSLV', 'GVZ', 'OVX']],
+              ib.Index('SPX', 'CBOE', 'USD'),
+              ib.Index('NDX', 'NASDAQ', 'USD'), ib.Index('RUT', 'RUSSELL', 'USD'),
+              ib.Index('INDU', 'CME', 'USD')]
+FR_INDEX = ib.Index('CAC40', 'MONEP', 'EUR')
+# es_index = ib.Index('IBEX35', 'MEFFRV', 'EUR')
+JP_INDEX = ib.Index('N225', 'OSE.JPN', 'JPY')
+HK_INDEX = ib.Index('HSI', 'HKFE', 'HKD')
+INDICES = [*EU_INDICES, *US_INDICES, JP_INDEX, FR_INDEX, HK_INDEX]
+
 #%%
 def get_options_price(market_data, type):
   return getattr(market_data, type) if getattr(market_data, type) > 0 else getattr(market_data, 'prev'+type.capitalize())
@@ -120,9 +133,11 @@ def contract_to_fieldname(contract):
   if contract.secType == 'CASH':
     return contract.symbol + contract.currency
 
-def daily_w_volatility(symbol, api='api_paper', offline=False):
+def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refresh_offset_days=5):
   #%%
-  contract_filename = f'finance/_data/ibkr/{symbol}_contract.pkl'
+  if '.' in symbol:
+    symbol = symbol.replace('.', ' ')
+  contract_filename = f'finance/_data/ibkr/{symbol.replace(" ", "_")}_contract.pkl'
   df_existing = None
   if os.path.exists(contract_filename):
     df_existing = pd.read_pickle(contract_filename)
@@ -134,16 +149,25 @@ def daily_w_volatility(symbol, api='api_paper', offline=False):
   else:
     cursor = None
 
-  if offline or (cursor is not None and cursor > datetime.now().date() - timedelta(days=1)):
+  if offline or (cursor is not None and cursor > datetime.now().date() - timedelta(days=refresh_offset_days)):
     return df_existing
 
-  ib_con = None
+  disconnect = False
   try:
-    print(f"{symbol} not found locally, requesting from IBKR...")
-    ib_con = utils.ibkr.connect(api, 17, 1)
+    if ib_con is None:
+      print(f"{symbol} not found locally, requesting from IBKR...")
+      ib_con = utils.ibkr.connect(api, 17, 1)
+      disconnect = True
 
-    contract = ib.Stock(symbol=symbol, exchange='SMART', currency='USD')
-    ib_con.qualifyContracts(contract)
+    if symbol.startswith('^'):
+      contract = ib.Forex(symbol=symbol[1:4], exchange='IDEALPRO', currency=symbol[4:])
+    if symbol.startswith('$$'):
+      contract = ib.CFD(symbol=symbol.replace('$$', ''), exchange='SMART')
+    if symbol.startswith('$'):
+      contract = [x for x in INDICES if x.symbol == symbol[1:]][0]
+    else:
+      contract = ib.Stock(symbol=symbol, exchange='SMART', currency='USD')
+    ib_con.qualifyContracts(contract  )
     details = ib_con.reqContractDetails(contract)
     print(f"Contract details for {symbol}: {details[0].longName}")
 
@@ -158,7 +182,9 @@ def daily_w_volatility(symbol, api='api_paper', offline=False):
     target_end = datetime.now().date()
 
     if cursor is None:
-      cursor = ib_con.reqHeadTimeStamp(contract, whatToShow="TRADES", useRTH=rth, formatDate=True).date()
+     cursor = ib_con.reqHeadTimeStamp(contract, whatToShow="TRADES", useRTH=rth, formatDate=True)
+     if cursor is None or cursor is not datetime:
+       cursor = dateutil.parser.parse("2000-01-01").date()
 
     # If already up-to-date, just return cache
     if cursor >= target_end:
@@ -184,6 +210,10 @@ def daily_w_volatility(symbol, api='api_paper', offline=False):
 
       dfs_types = []
       for typ in utils.ibkr.TYPES_OF_DATA[contract.secType]:
+        if typ == 'OPTION_IMPLIED_VOLATILITY' and contract.symbol in NO_OOI_INDICES \
+            or typ == 'HISTORICAL_VOLATILITY' and contract.symbol in NO_HV_INDICES:
+          continue
+
         end_date_time_str = request_end.strftime('%Y%m%d %H:%M:%S')
         duration = get_request_string(days_to_request)
 
@@ -224,11 +254,12 @@ def daily_w_volatility(symbol, api='api_paper', offline=False):
     os.makedirs(os.path.dirname(contract_filename), exist_ok=True)
     dfs_merged.to_pickle(contract_filename)
 
-    ib_con.disconnect()
+    if disconnect:
+      ib_con.disconnect()
     return dfs_merged
 
   except Exception as e:
-    print(f'Error requesting data for {symbol}: {e}')
-    if ib_con is not None and ib_con.isConnected():
+    print(f'IBKR: Error requesting data for {symbol}: {e}')
+    if ib_con is not None and disconnect and ib_con.isConnected():
       ib_con.disconnect()
     return None

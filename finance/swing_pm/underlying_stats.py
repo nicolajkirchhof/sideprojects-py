@@ -22,63 +22,60 @@ mpl.use('QtAgg')
 #%%
 symbol = 'QQQ'
 
-df_barchart = utils.swing_trading_data.SwingTradingData(symbol, datasource='barchart')
+data = utils.SwingTradingData(symbol, datasource='offline')
 # df_dolt = utils.swing_trading_data.SwingTradingData(symbol)
 
 #%%
 
 fig, axs = plt.subplots(3, 3, figsize=(24, 14))
 # Average daily stats
-df = df_barchart.df_day[['gappct', 'pct']].copy().reset_index(drop=True)
-df['pct_week'] = df_barchart.df_week['pct'].copy().reset_index(drop=True)
-df['pct_month'] = df_barchart.df_month['pct'].copy().reset_index(drop=True)
+df = data.df_day[['gappct', 'pct']].copy().reset_index(drop=True)
+df['pct_week'] = data.df_week['pct'].copy().reset_index(drop=True)
+df['pct_month'] = data.df_month['pct'].copy().reset_index(drop=True)
 utils.plots.violinplot_columns_with_labels(df, ax=axs[0, 0])
 
 # Dist from MAs
-df = df_barchart.df_day[utils.definitions.EMA_DISTS]
+df = data.df_day[utils.definitions.MA_DISTS]
 utils.plots.violinplot_columns_with_labels(df, ax=axs[0, 1])
 
 # ATRps
-df = df_barchart.df_day[utils.definitions.ATRPs]
+df = data.df_day[utils.definitions.ATRPs]
 utils.plots.violinplot_columns_with_labels(df, ax=axs[1, 0])
 
 # HVs
-df = df_barchart.df_day[utils.definitions.HVs]
+df = data.df_day[utils.definitions.HVs]
 utils.plots.violinplot_columns_with_labels(df, ax=axs[1, 1])
 
 # IVs
-df = df_barchart.df_day[['iv', 'iv_pct', 'iv_rank']]
+data.df_day['iv100'] = data.df_day['iv'] * 100
+df = data.df_day[['iv100', 'iv_pct']]
 utils.plots.violinplot_columns_with_labels(df, ax=axs[2, 0])
 
 # Vols
-df_barchart.df_day['v10'] = df_barchart.df_day['v'] / 10
-df = df_barchart.df_day[['v10', 'tot_oi', 'opt_vol']]
+data.df_day['v10'] = data.df_day['v'] / 10
+df = data.df_day[['v10']]
 utils.plots.violinplot_columns_with_labels(df, ax=axs[2, 1])
 
-df = df_barchart.df_day[['streak']].copy().reset_index(drop=True).rename(columns={'streak': 'streak_day'})
-df['streak_week'] = df_barchart.df_week['streak'].copy().reset_index(drop=True)
-df['streak_month'] = df_barchart.df_month['streak'].copy().reset_index(drop=True)
+df = data.df_day[['streak']].copy().reset_index(drop=True).rename(columns={'streak': 'streak_day'})
+df['streak_week'] = data.df_week['streak'].copy().reset_index(drop=True)
+df['streak_month'] = data.df_month['streak'].copy().reset_index(drop=True)
 utils.plots.violinplot_columns_with_labels(df, ax=axs[0, 2])
 
-# P/C interest/volume
-df = df_barchart.df_day[['pc_oi', 'pc_vol']]
-utils.plots.violinplot_columns_with_labels(df, ax=axs[1, 2])
-
 # Slopes
-df = df_barchart.df_day[utils.definitions.EMA_SLOPES]
+df = data.df_day[utils.definitions.MA_SLOPES]
 utils.plots.violinplot_columns_with_labels(df, ax=axs[2, 2])
 
 plt.show()
 
 #%% Consecutive Up-Down days/weeks/month
-utils.plots.plot_probability_tree(df_barchart.df_day['pct'], depth=6, title='SPY Daily Moves')
-utils.plots.plot_probability_tree(df_barchart.df_week['pct'], depth=6, title='SPY Weekly Moves')
-utils.plots.plot_probability_tree(df_barchart.df_month['pct'], depth=6, title='SPY Month Moves')
+utils.plots.plot_probability_tree(data.df_day['pct'], depth=6, title='Daily Moves')
+utils.plots.plot_probability_tree(data.df_week['pct'], depth=6, title='Weekly Moves')
+utils.plots.plot_probability_tree(data.df_month['pct'], depth=6, title='Month Moves')
 
 #%% Plot the percentage violins per month over the last 20 years
 step = 4
-start_year = df_barchart.df_day.year.min()
-end_year = df_barchart.df_day.year.max()
+start_year = data.df_day.year.min()
+end_year = data.df_day.year.max()
 total_range = range(start_year, end_year+1, step)
 for year in total_range:
   year_range = range(year, year+step)
@@ -87,15 +84,15 @@ for year in total_range:
   for nax, year in enumerate(year_range):
     df = pd.DataFrame()
     for i in range(1, 13):
-      df[f'{calendar.month_name[i]}'] = df_barchart.df_day[(df_barchart.df_day.month == i) & (df_barchart.df_day.year == year)]['pct'].reset_index(drop=True)
+      df[f'{calendar.month_name[i]}'] = data.df_day[(data.df_day.month == i) & (data.df_day.year == year)]['pct'].reset_index(drop=True)
     utils.plots.violinplot_columns_with_labels(df, ax=axs[nax], title=f'{year}')
 
 plt.show()
 
 #%% Plot the percentage violins per day of the week over the last 20 years
 step = 8
-start_year = df_barchart.df_day.year.min()
-end_year = df_barchart.df_day.year.max()
+start_year = data.df_day.year.min()
+end_year = data.df_day.year.max()
 total_range = range(start_year, end_year+1, step)
 
 for start_range_year in total_range:
@@ -108,7 +105,7 @@ for start_range_year in total_range:
     df_day_plot = pd.DataFrame()
     # pandas .dt.dayofweek is 0=Mon, 6=Sun
     # Assuming df_day index is datetime, otherwise we use the 'dayofweek' column if available
-    df_year = df_barchart.df_day[df_barchart.df_day.year == year]
+    df_year = data.df_day[data.df_day.year == year]
     day_names = list(calendar.day_abbr) # Mon..Sun
 
     for i in range(5): # Trading days Mon-Fri
@@ -130,14 +127,14 @@ day_names = list(calendar.day_abbr) # Mon..Sun
 
 for i in range(5): # Trading days Mon-Fri
   # Use index.dayofweek if index is datetime, else adapt to your column
-  df_day_plot[day_names[i]] = df_barchart.df_day[df_barchart.df_day.index.dayofweek == i]['pct'].reset_index(drop=True)
+  df_day_plot[day_names[i]] = data.df_day[data.df_day.index.dayofweek == i]['pct'].reset_index(drop=True)
 
 utils.plots.violinplot_columns_with_labels(df_day_plot, title=f'Daily Returns')
 
 plt.show()
 
 #%% Analyze the drawdowns from ATH with severity, duration, iv expansion in percentage
-df_dd = df_barchart.df_day.copy()
+df_dd = data.df_day.copy()
 if 'vwap3' not in df_dd.columns:
   df_dd['vwap3'] = (df_dd['h'] + df_dd['l'] + df_dd['c']) / 3
 
@@ -224,7 +221,7 @@ plt.tight_layout()
 plt.show()
 
 #%% Analyze abnormal IV behavior and IV/HV relationships
-df_vol = df_barchart.df_day.copy()
+df_vol = data.df_day.copy()
     
 # Calculate daily changes and filter for available IV
 df_vol = df_vol.dropna(subset=['iv']).copy()
@@ -283,7 +280,7 @@ plt.show()
 
 #%% Analyze abnormal IV behavior and IV/HV relationships
 from scipy.stats import linregress
-df_vol = df_barchart.df_day.copy()
+df_vol = data.df_day.copy()
 
 # Filter for available IV and calculate dynamics
 df_vol = df_vol[df_vol.iv > 0].dropna(subset=['iv', 'pct']).copy()
@@ -350,7 +347,7 @@ plt.tight_layout()
 plt.show()
 
 #%% Hurst Exponent, Autocorrelation, and Turn-of-the-Month Effect
-df_stats = df_barchart.df_day.copy()
+df_stats = data.df_day.copy()
 
 # 1. Calculate Rolling Hurst and Autocorrelation
 # Hurst helper is already defined in indicators.py, using it here via apply
@@ -419,7 +416,7 @@ plt.tight_layout()
 plt.show()
 
 #%% Hurst Exponent, Multi-Lag Autocorrelation, and 5-Day Monthly Windows
-df_stats = df_barchart.df_day.copy()
+df_stats = data.df_day.copy()
 
 # 1. Rolling Hurst
 df_stats['hurst_100'] = df_stats['c'].rolling(window=100).apply(utils.indicators.hurst, raw=True)

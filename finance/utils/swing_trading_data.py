@@ -1,46 +1,77 @@
 import string
 import pandas as pd
+from pathlib import Path
 
 from finance import utils
 
-DATASOURCES = ['dolt', 'ibkr']
-CACHE_DIR = 'finance/_data/swing_data'
+DATASOURCES = ['dolt', 'ibkr', 'offline', 'update']
+CACHE_DIR = Path('finance/_data/swing_data')
 
 class SwingTradingData:
-  def __init__(self, symbol: string, is_etf=False, datasource='auto', api='api_paper'):
+  def __init__(self, symbol: string, datasource='auto', api='api_paper'):
     """
     Initialize trading day data with start time and exchange settings
 
     Parameters:
     -----------
-    day_start : datetime
-        The starting day timestamp
     symbol: string
-        The sybol to analyze
+        The symbol to analyze
+    is_etf: bool
+        If True, the symbol is an ETF
+    datasource: string
+        The datasource to use (auto, dolt, ibkr, offline, update)
+    api: string
+        The IBKR API instance to use
+    offline_metadata: bool
+        If True, only load splits and shares outstanding from cache.
+        Defaults to True if datasource is 'auto' or 'offline'.
+        Defaults to False if datasource is 'update'.
     """
     self.symbol = symbol
     self.df_day = pd.DataFrame()
     self.datasource = datasource
+    self.original_datasource = None
+    self.df_splits = pd.DataFrame()
+    self.df_shares_outstanding = pd.DataFrame()
+    self.market_cap = None
+
+    offline_flag = (datasource == 'offline')
+
+    # If offline_metadata is not provided, default based on datasource
+    offline_metadata = (datasource != 'update')
 
     match datasource:
-      case 'auto':
-        self.datasource = 'ibkr'
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=False, api=api)
+      case 'auto' | 'offline' | 'update':
+        self.original_datasource = 'ibkr'
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=offline_flag, api=api)
         if self.df_day is None or self.df_day.empty or 'c' not in self.df_day.columns:
-          self.df_day = utils.dolt_data.daily_w_volatility(symbol)
-          self.datasource = 'dolt'
+          self.df_day = utils.dolt_data.daily_w_volatility(symbol, offline=offline_flag)
+          self.original_datasource = 'dolt'
       case 'dolt':
         self.df_day = utils.dolt_data.daily_w_volatility(symbol)
+        self.original_datasource = 'dolt'
       case 'ibkr':
-        self.df_day = utils.ibkr.daily_w_volatility(symbol, offline=False, api=api)
+        self.df_day = utils.ibkr.daily_w_volatility(symbol, api=api)
+        self.original_datasource = 'ibkr'
       case _:
         raise ValueError(f'Invalid datasource: {datasource}')
 
-    if self.df_day is None or self.df_day.empty or 'c' not in self.df_day.columns:
+    if self.df_day is not None and not self.df_day.empty and 'c' in self.df_day.columns:
+      self.df_splits = utils.dolt_data.splits(symbol, offline=offline_metadata)
+      self.df_shares_outstanding = utils.dolt_data.financial_info(symbol, offline=offline_metadata)
+    elif not symbol.startswith('$'):
+      self.df_splits = pd.DataFrame()
+      self.df_shares_outstanding = pd.DataFrame()
+    else:
       self.empty = True
       return
-    self.empty = False
 
+    self.empty = False
+    self._calculate_indicators()
+
+  def _calculate_indicators(self):
+    symbol = self.symbol
+    # Resample
     self.df_week = self.df_day[utils.definitions.OHLCLV].resample('1W').agg(o=('o', 'first'), h=('h', 'max'),
                                                                             l=('l', 'min'), c=('c', 'last'),
                                                                             v=('v', 'sum')).copy()
@@ -51,13 +82,11 @@ class SwingTradingData:
     self.df_day = utils.indicators.swing_indicators(self.df_day)
     self.df_week = utils.indicators.swing_indicators(self.df_week)
     self.df_month = utils.indicators.swing_indicators(self.df_month)
-    self.is_etf = is_etf
 
     # Calculate Original Price (Unadjusted for Splits)
     self.df_day['original_price'] = self.df_day['c']
-    df_splits = utils.dolt_data.splits(symbol)
-    if not df_splits.empty:
-      df_splits = df_splits.sort_index()
+    if not self.df_splits.empty:
+      df_splits = self.df_splits.sort_index()
       # Initialize cumulative factor to 1.0
       cum_factor = pd.Series(1.0, index=self.df_day.index)
 
@@ -74,10 +103,6 @@ class SwingTradingData:
 
       self.df_day['original_price'] = self.df_day['c'] * cum_factor
 
-    # self.info = utils.dolt_data.symbol_info(symbol)
-    self.market_cap = None
-    self.df_shares_outstanding = None
-    self.df_shares_outstanding = utils.dolt_data.financial_info(symbol)
     if not self.df_shares_outstanding.empty:
       df_market_cap = self.df_shares_outstanding.copy()
       df_market_cap = df_market_cap[~df_market_cap.index.duplicated(keep='first')]
