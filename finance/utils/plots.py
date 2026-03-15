@@ -433,13 +433,21 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
   else:
     fig = ax.get_figure()
 
-  ax.set_title(f"Transition Probabilities - {title}", fontsize=15, pad=20)
-
   # Use background color to determine node and edge colors
-  is_dark = plt.rcParams['axes.facecolor'] in ['black', '#111111', '#1c1c1c'] or plt.style.library.get('dark_background') is not None
+  face_color = ax.get_facecolor()
+  # Convert face_color to a comparable format if it's a tuple (RGBA)
+  if isinstance(face_color, tuple):
+    from matplotlib.colors import to_hex
+    face_color_hex = to_hex(face_color)
+  else:
+    face_color_hex = face_color
+
+  is_dark = face_color_hex in ['black', '#111111', '#1c1c1c'] or plt.style.library.get('dark_background') is not None
   edge_default_color = '#aaaaaa' if is_dark else 'gray'
   label_color = 'white' if is_dark else 'black'
   start_node_color = 'skyblue' if is_dark else 'lightblue'
+
+  ax.set_title(f"Transition Probabilities - {title}", fontsize=15, pad=20, color=label_color)
 
   # Determine edge colors and widths based on limits
   edge_colors = []
@@ -460,9 +468,9 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
   for n, data in G.nodes(data=True):
     label = data.get('label', '')
     if label == "U":
-      node_colors.append('green')
+      node_colors.append('#228B22') # ForestGreen
     elif label == "D":
-      node_colors.append('red')
+      node_colors.append('#B22222') # FireBrick
     else:
       node_colors.append(start_node_color)
 
@@ -476,7 +484,7 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
   # Draw edge labels (Probabilities)
   edge_labels = nx.get_edge_attributes(G, 'label')
   nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6, ax=ax, font_color=label_color,
-                               bbox=dict(facecolor=plt.rcParams['axes.facecolor'], edgecolor='none', alpha=0.6))
+                               bbox=dict(facecolor=ax.get_facecolor(), edgecolor='none', alpha=0.6))
 
   return fig, ax
 

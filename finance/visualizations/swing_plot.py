@@ -1,3 +1,10 @@
+import sys
+import os
+# Ensure the project root is in sys.path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
@@ -5,7 +12,6 @@ from pyqtgraph import QtCore, QtGui
 from pyqtgraph.Qt import QtWidgets
 from datetime import datetime
 from finance import utils
-import sys
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -618,19 +624,28 @@ def interactive():
         stats_tab = QtWidgets.QWidget()
         stats_layout = QtWidgets.QVBoxLayout(stats_tab)
         
-        # We need three trees: Daily, Weekly, Monthly
-        # Using a scroll area in case they are large
+        # Timeframe selector for trees
+        tree_tf_layout = QtWidgets.QHBoxLayout()
+        tree_tf_label = QtWidgets.QLabel("Timeframe:")
+        tree_tf_combo = QtWidgets.QComboBox()
+        tree_tf_combo.addItems(["Daily", "Weekly", "Monthly"])
+        tree_tf_layout.addWidget(tree_tf_label)
+        tree_tf_layout.addWidget(tree_tf_combo)
+        tree_tf_layout.addStretch()
+        stats_layout.addLayout(tree_tf_layout)
+        
+        # We need a single canvas for the selected tree
+        # Using a scroll area in case it is large
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll_content = QtWidgets.QWidget()
         scroll_layout = QtWidgets.QVBoxLayout(scroll_content)
         
-        stats_canvases = []
-        for i in range(3):
-            fig = Figure(figsize=(10, 8))
-            canvas = FigureCanvas(fig)
-            scroll_layout.addWidget(canvas)
-            stats_canvases.append(canvas)
+        fig = Figure(figsize=(10, 8))
+        fig.patch.set_facecolor('#111111')
+        canvas = FigureCanvas(fig)
+        scroll_layout.addWidget(canvas)
+        stats_canvas = canvas
             
         scroll.setWidget(scroll_content)
         stats_layout.addWidget(scroll)
@@ -660,6 +675,7 @@ def interactive():
         monthly_scroll_layout = QtWidgets.QVBoxLayout(monthly_scroll_content)
         
         fig_monthly = Figure(figsize=(12, 18))
+        fig_monthly.patch.set_facecolor('#111111')
         canvas_monthly = FigureCanvas(fig_monthly)
         monthly_scroll_layout.addWidget(canvas_monthly)
         
@@ -675,7 +691,8 @@ def interactive():
         _GLOBAL_MAIN_WIN._ticker_input = ticker_input
         _GLOBAL_MAIN_WIN._ds_combo = ds_combo
         _GLOBAL_MAIN_WIN._load_btn = load_btn
-        _GLOBAL_MAIN_WIN._stats_canvases = stats_canvases
+        _GLOBAL_MAIN_WIN._stats_canvas = stats_canvas
+        _GLOBAL_MAIN_WIN._tree_tf_combo = tree_tf_combo
         _GLOBAL_MAIN_WIN._canvas_monthly = canvas_monthly
         _GLOBAL_MAIN_WIN._start_year_cb = start_year_cb
         _GLOBAL_MAIN_WIN._end_year_cb = end_year_cb
@@ -684,6 +701,7 @@ def interactive():
     main_win, win = _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET
     year_cb, month_cb, day_cb = main_win._year_cb, main_win._month_cb, main_win._day_cb
     ticker_input, ds_combo, load_btn = main_win._ticker_input, main_win._ds_combo, main_win._load_btn
+    tree_tf_combo = main_win._tree_tf_combo
     start_year_cb, end_year_cb = main_win._start_year_cb, main_win._end_year_cb
 
     # Helper to update monthly violins
@@ -702,6 +720,7 @@ def interactive():
             
         canvas = main_win._canvas_monthly
         canvas.figure.clear()
+        canvas.figure.patch.set_facecolor('#111111')
         
         import calendar
         from finance.utils.plots import violinplot_columns_with_labels
@@ -711,6 +730,7 @@ def interactive():
         
         if df_range.empty:
             ax = canvas.figure.add_subplot(111)
+            ax.set_facecolor('#111111')
             ax.set_title(f"No Data for {start_year}-{end_year}")
             canvas.draw()
             return
@@ -724,9 +744,11 @@ def interactive():
         
         if not plot_df.empty:
             ax = canvas.figure.add_subplot(111)
+            ax.set_facecolor('#111111')
             violinplot_columns_with_labels(plot_df, ax=ax, title=f'Monthly Returns ({start_year}-{end_year})')
         else:
             ax = canvas.figure.add_subplot(111)
+            ax.set_facecolor('#111111')
             ax.set_title(f"No Data for {start_year}-{end_year}")
 
         canvas.figure.tight_layout()
@@ -780,6 +802,12 @@ def interactive():
     except:
         pass
     load_btn.clicked.connect(load_data_from_ui)
+    
+    try:
+        tree_tf_combo.currentIndexChanged.disconnect()
+    except:
+        pass
+    tree_tf_combo.currentIndexChanged.connect(lambda: update_plot())
     
     try:
         start_year_cb.currentIndexChanged.disconnect()
@@ -882,41 +910,26 @@ def interactive():
         _add_plot_content(plots, df, vlines=None)
 
         # Update Probability Trees
-        if hasattr(main_win, '_stats_canvases'):
-            # We need the full SwingTradingData object if possible, 
-            # but we only have the dataframes here.
-            # However, plot_probability_tree only needs a series of pct changes.
-            # We need pct for daily, weekly, monthly.
-            # In interactive(full_df), full_df is usually df_day.
-            # To get week/month, we might need to resample or have them passed in.
-            
-            # Let's try to get symbol from title or assume it's available.
-            # Actually, we can just resample df here for weekly/monthly.
-            
+        if hasattr(main_win, '_stats_canvas'):
             from finance.utils.plots import plot_probability_tree
             
-            # Daily
-            canv_d = main_win._stats_canvases[0]
-            canv_d.figure.clear()
-            ax_d = canv_d.figure.add_subplot(111)
-            plot_probability_tree(df['pct'], depth=6, title='Daily Moves', ax=ax_d)
-            canv_d.draw()
+            canv = main_win._stats_canvas
+            canv.figure.clear()
+            canv.figure.patch.set_facecolor('#111111')
+            ax = canv.figure.add_subplot(111)
+            ax.set_facecolor('#111111')
             
-            # Weekly (resample)
-            df_w = df['c'].resample('1W').last().pct_change() * 100
-            canv_w = main_win._stats_canvases[1]
-            canv_w.figure.clear()
-            ax_w = canv_w.figure.add_subplot(111)
-            plot_probability_tree(df_w.dropna(), depth=6, title='Weekly Moves', ax=ax_w)
-            canv_w.draw()
+            tf = tree_tf_combo.currentText()
+            if tf == "Daily":
+                plot_probability_tree(df['pct'], depth=6, title='Daily Moves', ax=ax)
+            elif tf == "Weekly":
+                df_w = df['c'].resample('1W').last().pct_change() * 100
+                plot_probability_tree(df_w.dropna(), depth=6, title='Weekly Moves', ax=ax)
+            elif tf == "Monthly":
+                df_m = df['c'].resample('1ME').last().pct_change() * 100
+                plot_probability_tree(df_m.dropna(), depth=6, title='Monthly Moves', ax=ax)
             
-            # Monthly (resample)
-            df_m = df['c'].resample('1ME').last().pct_change() * 100
-            canv_m = main_win._stats_canvases[2]
-            canv_m.figure.clear()
-            ax_m = canv_m.figure.add_subplot(111)
-            plot_probability_tree(df_m.dropna(), depth=6, title='Monthly Moves', ax=ax_m)
-            canv_m.draw()
+            canv.draw()
 
         # Crosshair Logic (keep strong references!)
         v_lines, h_lines = [], []
