@@ -335,15 +335,21 @@ def violinplot_columns_with_labels(
   for i, s in enumerate(stats, start=1):
     if s is None: continue
 
-    x, bbox = i, dict(facecolor="white", edgecolor="none", alpha=0.75)
-    ax.hlines(s['med'], x - 0.1, x + 0.1, color='black', lw=2)
-    ax.hlines([s['q1'], s['q3']], x - 0.1, x + 0.1, color='black', lw=1, linestyle='-', alpha=0.6, zorder=3)
+    # Use background color to determine text and bbox colors
+    is_dark = plt.rcParams['axes.facecolor'] in ['black', '#111111', '#1c1c1c'] or plt.style.library.get('dark_background') is not None
+    bg_color = "black" if is_dark else "white"
+    text_color = "white" if is_dark else "black"
+    box_alpha = 0.85 if is_dark else 0.75
+    
+    x, bbox = i, dict(facecolor=bg_color, edgecolor="none", alpha=box_alpha)
+    ax.hlines(s['med'], x - 0.1, x + 0.1, color=text_color, lw=2)
+    ax.hlines([s['q1'], s['q3']], x - 0.1, x + 0.1, color=text_color, lw=1, linestyle='-', alpha=0.6, zorder=3)
 
-    ax.text(x, s['whi'], f"whi={fmt.format(s['whi'])}", va="bottom", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, s['q3'], f"q3={fmt.format(s['q3'])}", va="bottom", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, s['med'], f"m ={fmt.format(s['med'])}", va="center", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, s['q1'], f"q1={fmt.format(s['q1'])}", va="top", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, s['wlo'], f"wlo={fmt.format(s['wlo'])}", va="top", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
+    ax.text(x, s['whi'], f"whi={fmt.format(s['whi'])}", va="bottom", ha="left", fontsize=8, bbox=bbox, color=text_color, **text_kwargs)
+    ax.text(x, s['q3'], f"q3={fmt.format(s['q3'])}", va="bottom", ha="left", fontsize=8, bbox=bbox, color=text_color, **text_kwargs)
+    ax.text(x, s['med'], f"m ={fmt.format(s['med'])}", va="center", ha="left", fontsize=8, bbox=bbox, color=text_color, **text_kwargs)
+    ax.text(x, s['q1'], f"q1={fmt.format(s['q1'])}", va="top", ha="left", fontsize=8, bbox=bbox, color=text_color, **text_kwargs)
+    ax.text(x, s['wlo'], f"wlo={fmt.format(s['wlo'])}", va="top", ha="left", fontsize=8, bbox=bbox, color=text_color, **text_kwargs)
 
   plt.tight_layout()
   return fig, ax
@@ -429,6 +435,12 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
 
   ax.set_title(f"Transition Probabilities - {title}", fontsize=15, pad=20)
 
+  # Use background color to determine node and edge colors
+  is_dark = plt.rcParams['axes.facecolor'] in ['black', '#111111', '#1c1c1c'] or plt.style.library.get('dark_background') is not None
+  edge_default_color = '#aaaaaa' if is_dark else 'gray'
+  label_color = 'white' if is_dark else 'black'
+  start_node_color = 'skyblue' if is_dark else 'lightblue'
+
   # Determine edge colors and widths based on limits
   edge_colors = []
   edge_widths = []
@@ -440,7 +452,7 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
     if upper_limit is not None and prob >= upper_limit:
       highlight = True
 
-    edge_colors.append('magenta' if highlight else 'gray')
+    edge_colors.append('magenta' if highlight else edge_default_color)
     edge_widths.append(3.0 if highlight else 1.0)
 
   # Determine node colors: Start=lightblue, U=green, D=red
@@ -452,18 +464,19 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
     elif label == "D":
       node_colors.append('red')
     else:
-      node_colors.append('lightblue')
+      node_colors.append(start_node_color)
 
   nx.draw(G, pos, with_labels=False, node_size=50, node_color=node_colors, arrows=True, edge_color=edge_colors,
           width=edge_widths, ax=ax)
 
   # Draw node labels (Up/Down)
   node_labels = nx.get_node_attributes(G, 'label')
-  nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10, ax=ax)
+  nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10, ax=ax, font_color=label_color)
 
   # Draw edge labels (Probabilities)
   edge_labels = nx.get_edge_attributes(G, 'label')
-  nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6, ax=ax)
+  nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6, ax=ax, font_color=label_color,
+                               bbox=dict(facecolor=plt.rcParams['axes.facecolor'], edgecolor='none', alpha=0.6))
 
   return fig, ax
 
