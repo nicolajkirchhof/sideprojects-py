@@ -681,7 +681,7 @@ def interactive():
         
         monthly_scroll.setWidget(monthly_scroll_content)
         monthly_stats_layout.addWidget(monthly_scroll)
-        tabs.addTab(monthly_stats_tab, "Monthly Stats")
+        tabs.addTab(monthly_stats_tab, "Daily/Monthly Stats")
 
         # Prevent "min-size" starts
         _GLOBAL_MAIN_WIN.setMinimumSize(1200, 700)
@@ -704,8 +704,8 @@ def interactive():
     tree_tf_combo = main_win._tree_tf_combo
     start_year_cb, end_year_cb = main_win._start_year_cb, main_win._end_year_cb
 
-    # Helper to update monthly violins
-    def update_monthly_violins():
+    # Helper to update monthly and daily violins
+    def update_stats_violins():
         if full_df.empty or not isinstance(full_df.index, pd.DatetimeIndex):
             return
             
@@ -735,21 +735,36 @@ def interactive():
             canvas.draw()
             return
             
-        plot_df = pd.DataFrame()
+        # 1. Daily Returns (Monday to Friday)
+        df_day_plot = pd.DataFrame()
+        day_names = list(calendar.day_abbr) # Mon..Sun
+        for i in range(5): # Mon-Fri
+            d_data = df_range[df_range.index.dayofweek == i]['pct']
+            if not d_data.empty:
+                df_day_plot[day_names[i]] = d_data.reset_index(drop=True)
+
+        # 2. Monthly Returns
+        df_month_plot = pd.DataFrame()
         for i in range(1, 13):
             m_name = calendar.month_name[i]
             m_data = df_range[df_range.index.month == i]['pct']
             if not m_data.empty:
-                plot_df[m_name] = m_data.reset_index(drop=True)
+                df_month_plot[m_name] = m_data.reset_index(drop=True)
         
-        if not plot_df.empty:
-            ax = canvas.figure.add_subplot(111)
+        # Create subplots
+        axs = canvas.figure.subplots(nrows=2, ncols=1)
+        for ax in axs:
             ax.set_facecolor('#111111')
-            violinplot_columns_with_labels(plot_df, ax=ax, title=f'Monthly Returns ({start_year}-{end_year})')
+
+        if not df_day_plot.empty:
+            violinplot_columns_with_labels(df_day_plot, ax=axs[0], title=f'Daily Returns ({start_year}-{end_year})')
         else:
-            ax = canvas.figure.add_subplot(111)
-            ax.set_facecolor('#111111')
-            ax.set_title(f"No Data for {start_year}-{end_year}")
+            axs[0].set_title(f"No Daily Data for {start_year}-{end_year}")
+
+        if not df_month_plot.empty:
+            violinplot_columns_with_labels(df_month_plot, ax=axs[1], title=f'Monthly Returns ({start_year}-{end_year})')
+        else:
+            axs[1].set_title(f"No Monthly Data for {start_year}-{end_year}")
 
         canvas.figure.tight_layout()
         canvas.draw()
@@ -792,7 +807,7 @@ def interactive():
             start_year_cb.blockSignals(False); end_year_cb.blockSignals(False)
 
             update_plot()
-            update_monthly_violins()
+            update_stats_violins()
         except Exception as e:
             QtWidgets.QMessageBox.critical(main_win, "Error", f"Failed to load {symbol}: {str(e)}")
 
@@ -813,13 +828,13 @@ def interactive():
         start_year_cb.currentIndexChanged.disconnect()
     except:
         pass
-    start_year_cb.currentIndexChanged.connect(lambda: update_monthly_violins())
+    start_year_cb.currentIndexChanged.connect(lambda: update_stats_violins())
     
     try:
         end_year_cb.currentIndexChanged.disconnect()
     except:
         pass
-    end_year_cb.currentIndexChanged.connect(lambda: update_monthly_violins())
+    end_year_cb.currentIndexChanged.connect(lambda: update_stats_violins())
     
     try:
         ticker_input.returnPressed.disconnect()
@@ -1114,7 +1129,7 @@ def interactive():
     day_cb.blockSignals(False)
 
     update_plot()
-    update_monthly_violins()
+    update_stats_violins()
     main_win.showNormal()
 
     # Force layout AFTER the window is actually shown
