@@ -332,6 +332,8 @@ def swing_indicators(df_stk):
     new_cols[f'atr{atr}'] = atr_series
     new_cols[f'atrp{atr}'] = (atr_series / df_stk['c']) * 100
 
+  new_cols['cotr'] = new_cols['chg'] / new_cols['atrp20']
+
   # We'll need atr50 for *_dist_atr (matches your prior behavior where atr ends as 50)
   atr_for_dist = new_cols['atr20']
 

@@ -3,9 +3,10 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph import QtCore, QtGui
 from pyqtgraph.Qt import QtWidgets
-import pyqtgraph.exporters
 from datetime import datetime
 import sys
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 # %% Global Plot Configurations
 MA_CONFIGS = {
@@ -19,39 +20,17 @@ MA_CONFIGS = {
 }
 
 ATR_CONFIGS = {
-    'atrp1': {'color': '#f5a1df', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Steel Blue
-    # 'atrp9': {'color': '#f81cfc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine},  # Light Steel Blue
+    'atrp1': {'color': '#f5a1df', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DotLine},  # Steel Blue
     'atrp20': {'color': '#b72494', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},  # Navy
-    # 'atrp50': {'color': '#6b1255', 'width': 1.0, 'style': QtCore.Qt.PenStyle.DashLine}  # Navy
 }
 
-# STD_CONFIGS = {
-#     'std': {'color': '#ba68c8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Blue
-# }
-#
-# AC_CONFIGS = {
-#     'ac100_lag_1': {'color': '#e0ffff', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Cyan
-#     'ac100_lag_5': {'color': '#00ced1', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Dark Turquoise
-#     'ac100_lag_10': {'color': '#00bfff', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Sky Blue
-#     'ac100_lag_20': {'color': '#008080', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine}  # Teal
-# }
-
-# New configuration for the Autocorrelation Regime pane
-# AC_REGIME_CONFIGS = {
-#     'ac_mom': {'color': '#e1bee7', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Light Purple (Momentum)
-#     'ac_mr': {'color': '#ba68c8', 'width': 1.5, 'style': QtCore.Qt.PenStyle.SolidLine},
-#     # Medium Purple (Mean Reversion)
-#     'ac_comp': {'color': '#4a148c', 'width': 2.2, 'style': QtCore.Qt.PenStyle.SolidLine}
-#     # Indigo/Darkest (Composite)
-# }
-
 SLOPE_CONFIGS = {
-    'ema5_slope': {'color': '#ffccbc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
-    'ema10_slope': {'color': '#ffccbc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
-    'ema20_slope': {'color': '#ff8a65', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema50_slope': {'color': '#ff5722', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma5_slope': {'color': '#ffccbc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
+    'ma10_slope': {'color': '#ffccbc', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},  # Deep Orange Light
+    'ma20_slope': {'color': '#ff8a65', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
+    'ma50_slope': {'color': '#ff5722', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
     # 'ema100_slope': {'color': '#e64a19', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine},
-    'ema200_slope': {'color': '#bf360c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Deep Orange Dark
+    'ma200_slope': {'color': '#bf360c', 'width': 1.0, 'style': QtCore.Qt.PenStyle.SolidLine}  # Deep Orange Dark
 }
 
 VOL_CONFIGS = {
@@ -327,13 +306,6 @@ _GLOBAL_MAIN_WIN = None
 _GLOBAL_LAYOUT_WIDGET = None
 _ACTIVE_PLOTS = []
 
-# Persistent context for exports to prevent memory fragmentation
-_EXPORT_WIN = None
-_EXPORT_PLOTS = []
-_EXPORT_TITLE_ITEM = None
-_EXPORT_LAYOUT_VERSION = 2  # bump this when you change export layout structure
-
-
 # %% Helpers
 def _finite_min_max(values):
     """Return (mn, mx) from finite values or (None, None) if none exist."""
@@ -382,8 +354,7 @@ def _auto_scale_panes(plots, df, x_min, x_max):
             item.setViewRange(x_min, x_max)
 
     # Also handle export mode if this function is called from there (it is)
-    if hasattr(_EXPORT_WIN, '_export_state') and _EXPORT_WIN._export_state.get('vp'):
-         _EXPORT_WIN._export_state['vp'].setViewRange(x_min, x_max)
+    # _EXPORT_WIN removed
 
     # --- Main OHLC pane scaling (guard against all-NaN) ---
     mn, mx = _finite_min_max(np.r_[chunk.get('l', pd.Series(dtype=float)).to_numpy(),
@@ -459,26 +430,6 @@ def _setup_plot_panes(win, x_dates, row_offset=0):
     return plots
 
 
-def _force_export_layout_sync(glw: pg.GraphicsLayoutWidget, width: int, height: int):
-    """
-    Faster export-only layout sync.
-    Assumes widget is off-screen; avoids show() and minimizes event processing.
-    """
-    last_size = getattr(glw, "_last_export_size", None)
-    if last_size != (width, height):
-        glw.setFixedSize(width, height)
-        glw.setGeometry(0, 0, width, height)
-        glw._last_export_size = (width, height)
-
-    glw.ci.layout.activate()
-    _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
-
-    # Make scene rect match viewport for the exporter
-    vp_rect = glw.viewport().rect()
-    glw.scene().setSceneRect(QtCore.QRectF(vp_rect))
-    glw.update()
-
-
 def _force_layout_and_scene_sync(glw: pg.GraphicsLayoutWidget, width: int | None = None, height: int | None = None):
     """
     Force GraphicsLayoutWidget to honor a target size and update its QGraphicsScene/viewport geometry.
@@ -503,197 +454,6 @@ def _force_layout_and_scene_sync(glw: pg.GraphicsLayoutWidget, width: int | None
     glw.update()
     glw.repaint()
     QtWidgets.QApplication.processEvents()
-
-
-def _get_export_context(width, height):
-    """Singleton-style helper to maintain one hidden export window."""
-    global _EXPORT_WIN, _EXPORT_PLOTS, _GLOBAL_QT_APP, _EXPORT_TITLE_ITEM, _EXPORT_LAYOUT_VERSION
-    if _GLOBAL_QT_APP is None:
-        _GLOBAL_QT_APP = pg.mkQApp()
-
-    # If the export widget was created under an older layout, rebuild it.
-    if _EXPORT_WIN is not None:
-        current_ver = getattr(_EXPORT_WIN, "_layout_version", None)
-        if current_ver != _EXPORT_LAYOUT_VERSION:
-            try:
-                _EXPORT_WIN.close()
-            except:
-                pass
-            _EXPORT_WIN = None
-            _EXPORT_PLOTS = []
-            _EXPORT_TITLE_ITEM = None
-
-    if _EXPORT_WIN is None:
-        _EXPORT_WIN = pg.GraphicsLayoutWidget()
-        _EXPORT_WIN._layout_version = _EXPORT_LAYOUT_VERSION
-        _EXPORT_WIN.setAttribute(QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen)
-
-        _EXPORT_WIN.setFixedSize(width, height)
-        _EXPORT_WIN.setGeometry(0, 0, width, height)  # Force initial geometry
-
-        _EXPORT_TITLE_ITEM = pg.LabelItem(justify='center', size='14pt')
-        _EXPORT_WIN.addItem(_EXPORT_TITLE_ITEM, row=0, col=0)
-        _EXPORT_WIN.ci.layout.setRowStretchFactor(0, 3)
-
-        _EXPORT_PLOTS = _setup_plot_panes(_EXPORT_WIN, [datetime.now()], row_offset=1)
-
-        p1, p7, p3, p4, p5, p6, p8 = _EXPORT_PLOTS
-
-        ohlc_item = OHLCItem([])
-        p1.addItem(ohlc_item)
-
-        # Persistent TTM items
-        ttm_item = TTMSqueezeItem([])
-        p8.addItem(ttm_item)
-
-        ttm_dots = pg.ScatterPlotItem(pxMode=True)
-        p8.addItem(ttm_dots)
-            
-        # Volume Profile Item
-        vp_item = VolumeProfileItem(pd.DataFrame(), width_fraction=0.75, bins=100)
-        # Add to background (z-value < 0) so candles draw on top
-        vp_item.setZValue(-10) 
-        p1.addItem(vp_item)
-
-        def _mk_series_items(plot, cfg_dict):
-            items = {}
-            for col, cfg in cfg_dict.items():
-                items[col] = plot.plot(
-                    x=[],
-                    y=[],
-                    pen=pg.mkPen(cfg['color'], width=cfg['width'], style=cfg['style']),
-                    connect='finite'
-                )
-            return items
-
-        export_state = {
-            'ohlc': ohlc_item,
-            'vp': vp_item, # Store ref
-            'ema': _mk_series_items(p1, MA_CONFIGS),
-            'bb': _mk_series_items(p1, BB_CONFIGS),  # Add Bollinger Bands
-            'vol': _mk_series_items(p7, VOL_CONFIGS),
-            'dist': _mk_series_items(p3, DIST_CONFIGS),
-            'atr': _mk_series_items(p4, ATR_CONFIGS),
-            'hv': _mk_series_items(p5, HV_CONFIGS),
-            'ivpct': _mk_series_items(p6, IVPCT_CONFIGS),
-            'ttm': ttm_item,
-            'ttm_dots': ttm_dots,
-            'vlines': [],
-        }
-
-        p7.addLine(y=0, pen=pg.mkPen('#666', width=1))
-        p3.addLine(y=1.2, pen=pg.mkPen('#666', width=1))
-        p4.addLine(y=0, pen=pg.mkPen('#666', width=1))
-        p5.addLine(y=0, pen=pg.mkPen('#666', width=1))
-        p6.addLine(y=0.5, pen=pg.mkPen('#666', style=QtCore.Qt.PenStyle.DashLine))
-        p8.addLine(y=0, pen=pg.mkPen('#666', width=1))
-
-        _EXPORT_WIN._export_state = export_state
-
-        _force_layout_and_scene_sync(_EXPORT_WIN, width, height)
-
-    return _EXPORT_WIN, _EXPORT_PLOTS, _EXPORT_TITLE_ITEM
-
-
-def _update_export_content(plots, df, vlines):
-    """Update persistent export plot items in-place (no clears, no reallocation)."""
-    export_state = getattr(_EXPORT_WIN, "_export_state", None)
-    if export_state is None:
-        return
-
-    # Update Volume Profile data reference
-    export_state['vp'].df = df
-    # Reset range logic so it recomputes next scaling
-    export_state['vp'].current_range = None 
-
-    x = np.arange(len(df), dtype=float)
-
-    # OHLC
-    if len(df) > 0 and all(c in df.columns for c in ('o', 'h', 'l', 'c')):
-        o = df['o'].to_numpy(dtype=float, copy=False)
-        h = df['h'].to_numpy(dtype=float, copy=False)
-        l = df['l'].to_numpy(dtype=float, copy=False)
-        c = df['c'].to_numpy(dtype=float, copy=False)
-        export_state['ohlc'].setData(
-            [(float(i), float(o[i]), float(h[i]), float(l[i]), float(c[i])) for i in range(len(df))])
-    else:
-        export_state['ohlc'].setData([])
-
-    def _set_group(group_items, transform=None):
-        for col, item in group_items.items():
-            if col in df.columns and len(df) > 0:
-                y = df[col].to_numpy(dtype=float, copy=False)
-                if transform is not None:
-                    y = transform(y)
-                item.setData(x=x, y=y, connect='finite')
-                item.show()
-            else:
-                item.setData(x=[], y=[])
-                item.hide()
-
-    _set_group(export_state['ema'])
-    _set_group(export_state['bb'])  # Update BB
-    _set_group(export_state['vol'], transform=lambda y: y / 1000.0)
-    _set_group(export_state['dist'])
-    _set_group(export_state['atr'])
-    _set_group(export_state['hv'])
-    _set_group(export_state['ivpct'])
-
-    # TTM squeeze (histogram + dots)
-    if 'ttm_mom' in df.columns and 'squeeze_on' in df.columns and len(df) > 0:
-        mom = df['ttm_mom'].to_numpy(dtype=float, copy=False)
-        sq = df['squeeze_on'].astype(bool).to_numpy(copy=False)
-
-        export_state['ttm'].setData([(float(i), float(mom[i]), bool(sq[i])) for i in range(len(df))])
-
-        spots = []
-        for i in range(len(df)):
-            if not np.isfinite(mom[i]):
-                continue
-            spots.append({
-                'pos': (float(i), 0.0),
-                'brush': pg.mkBrush(TTM_COLORS['sq_on'] if sq[i] else TTM_COLORS['sq_off']),
-                'pen': pg.mkPen(None),
-                'size': 7,
-            })
-
-        export_state['ttm'].show()
-        export_state['ttm_dots'].setData(spots=spots)
-        export_state['ttm_dots'].show()
-    else:
-        export_state['ttm'].setData([])
-        export_state['ttm'].hide()
-        export_state['ttm_dots'].setData(spots=[])
-        export_state['ttm_dots'].hide()
-
-    # Vertical marker lines: reuse existing InfiniteLines, hide extras
-    idxs = []
-    if vlines:
-        for v_date in vlines:
-            v_dt = pd.to_datetime(v_date)
-            if v_dt in df.index:
-                idxs.append(int(df.index.get_loc(v_dt)))
-
-    needed = len(idxs)
-    existing = export_state['vlines']
-
-    while len(existing) < needed:
-        bundle = []
-        for p in plots:
-            line = pg.InfiniteLine(pos=0, angle=90,
-                                   pen=pg.mkPen('darkviolet', width=0.8, style=QtCore.Qt.PenStyle.DashLine))
-            p.addItem(line)
-            bundle.append(line)
-        existing.append(bundle)
-
-    for i, idx in enumerate(idxs):
-        for line in existing[i]:
-            line.setPos(idx)
-            line.show()
-
-    for j in range(needed, len(existing)):
-        for line in existing[j]:
-            line.hide()
 
 
 def _add_plot_content(plots, df, vlines):
@@ -782,41 +542,22 @@ def _add_plot_content(plots, df, vlines):
 
 
 # %% Main Functions
-def export(df, path, vlines=None, display_range=50, width=1920, height=1080, title=None):
-    """High-speed version using a persistent hidden window context."""
-    global _GLOBAL_QT_APP
-    win, plots, title_item = _get_export_context(width, height)
-
-    # 1. Update title + axis
-    title_item.setText(title if title else "")
-    plots[-1].getAxis('bottom').dates = df.index
-
-    # 2. Update persistent items (avoid clear/recreate churn)
-    _update_export_content(plots, df, vlines)
-
-    # 3. Set view range and scale Y
-    p1 = plots[0]
-    x_start = max(0, len(df) - display_range)
-    x_end = len(df)
-    p1.setXRange(x_start, x_end)
-
-    # Use shared scaling logic
-    _auto_scale_panes(plots, df, x_start, x_end)
-
-    # 4. Fast export-only sync
-    _force_export_layout_sync(win, width, height)
-
-    # 5. Export
-    exporter = pg.exporters.ImageExporter(win.scene())
-    exporter.parameters()['width'] = width
-    exporter.parameters()['height'] = height
-    exporter.export(path)
-
-    _GLOBAL_QT_APP.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
-
-def interactive(full_df, display_range=250, title: str | None = None):
+def interactive():
     """Full-featured interactive version with Toolbar, Crosshairs, and dynamic scaling."""
     global _GLOBAL_QT_APP, _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET, _ACTIVE_PLOTS
+
+    display_range = 250
+    
+    # Try to load SPY offline as default
+    from finance.utils.swing_trading_data import SwingTradingData
+    try:
+        data = SwingTradingData('SPY', datasource='offline')
+        full_df = data.df_day
+        title = 'SPY'
+    except Exception as e:
+        print(f"Warning: Failed to load default SPY data: {e}")
+        full_df = pd.DataFrame()
+        title = "No Data"
 
     if _GLOBAL_QT_APP is None:
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
@@ -829,24 +570,113 @@ def interactive(full_df, display_range=250, title: str | None = None):
         main_layout = QtWidgets.QVBoxLayout(central_widget)
 
         toolbar = QtWidgets.QHBoxLayout()
+        
+        # Ticker input
+        ticker_label = QtWidgets.QLabel("Ticker:")
+        ticker_input = QtWidgets.QLineEdit("SPY")
+        ticker_input.setFixedWidth(60)
+        toolbar.addWidget(ticker_label)
+        toolbar.addWidget(ticker_input)
+
+        # Datasource dropdown
+        from finance.utils.swing_trading_data import DATASOURCES
+        ds_label = QtWidgets.QLabel("Source:")
+        ds_combo = QtWidgets.QComboBox()
+        ds_combo.addItems(DATASOURCES)
+        ds_combo.setCurrentText("offline")
+        toolbar.addWidget(ds_label)
+        toolbar.addWidget(ds_combo)
+
+        # Load button
+        load_btn = QtWidgets.QPushButton("Load")
+        toolbar.addWidget(load_btn)
+
+        toolbar.addSpacing(20)
+
         year_cb, month_cb, day_cb = QtWidgets.QComboBox(), QtWidgets.QComboBox(), QtWidgets.QComboBox()
         toolbar.addWidget(QtWidgets.QLabel("Max Date Filter:"))
         for cb in [year_cb, month_cb, day_cb]: toolbar.addWidget(cb)
         toolbar.addStretch()
         main_layout.addLayout(toolbar)
 
+        # Tab Widget
+        tabs = QtWidgets.QTabWidget()
+        main_layout.addWidget(tabs)
+
+        # Tab 1: Chart
+        chart_tab = QtWidgets.QWidget()
+        chart_layout = QtWidgets.QVBoxLayout(chart_tab)
         _GLOBAL_LAYOUT_WIDGET = pg.GraphicsLayoutWidget()
-        main_layout.addWidget(_GLOBAL_LAYOUT_WIDGET)
+        chart_layout.addWidget(_GLOBAL_LAYOUT_WIDGET)
+        tabs.addTab(chart_tab, "Price Chart")
+
+        # Tab 2: Probability Trees
+        stats_tab = QtWidgets.QWidget()
+        stats_layout = QtWidgets.QVBoxLayout(stats_tab)
+        
+        # We need three trees: Daily, Weekly, Monthly
+        # Using a scroll area in case they are large
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_content = QtWidgets.QWidget()
+        scroll_layout = QtWidgets.QVBoxLayout(scroll_content)
+        
+        stats_canvases = []
+        for i in range(3):
+            fig = Figure(figsize=(10, 8))
+            canvas = FigureCanvas(fig)
+            scroll_layout.addWidget(canvas)
+            stats_canvases.append(canvas)
+            
+        scroll.setWidget(scroll_content)
+        stats_layout.addWidget(scroll)
+        tabs.addTab(stats_tab, "Probability Trees")
 
         # Prevent "min-size" starts
         _GLOBAL_MAIN_WIN.setMinimumSize(1200, 700)
         _GLOBAL_MAIN_WIN.resize(1600, 900)
 
         _GLOBAL_MAIN_WIN._year_cb, _GLOBAL_MAIN_WIN._month_cb, _GLOBAL_MAIN_WIN._day_cb = year_cb, month_cb, day_cb
+        _GLOBAL_MAIN_WIN._ticker_input = ticker_input
+        _GLOBAL_MAIN_WIN._ds_combo = ds_combo
+        _GLOBAL_MAIN_WIN._load_btn = load_btn
+        _GLOBAL_MAIN_WIN._stats_canvases = stats_canvases
         _GLOBAL_MAIN_WIN._proxy = None
 
     main_win, win = _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET
     year_cb, month_cb, day_cb = main_win._year_cb, main_win._month_cb, main_win._day_cb
+    ticker_input, ds_combo, load_btn = main_win._ticker_input, main_win._ds_combo, main_win._load_btn
+
+    # Helper to load data from inputs
+    def load_data_from_ui():
+        symbol = ticker_input.text().upper()
+        datasource = ds_combo.currentText()
+        from finance.utils.swing_trading_data import SwingTradingData
+        try:
+            new_data = SwingTradingData(symbol, datasource=datasource)
+            if new_data.df_day is None or new_data.df_day.empty:
+                 QtWidgets.QMessageBox.warning(main_win, "Load Error", f"No data found for {symbol} ({datasource})")
+                 return
+            # Update the application state with new data
+            nonlocal full_df, title
+            full_df = new_data.df_day
+            title = symbol
+            update_plot()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(main_win, "Error", f"Failed to load {symbol}: {str(e)}")
+
+    # Connect UI signals
+    try:
+        load_btn.clicked.disconnect()
+    except:
+        pass
+    load_btn.clicked.connect(load_data_from_ui)
+    
+    try:
+        ticker_input.returnPressed.disconnect()
+    except:
+        pass
+    ticker_input.returnPressed.connect(load_data_from_ui)
 
     # Prevent signal duplication on re-entry
     try:
@@ -890,9 +720,11 @@ def interactive(full_df, display_range=250, title: str | None = None):
 
     def update_plot(*args):
         global _ACTIVE_PLOTS
-        nonlocal plots
+        nonlocal plots, title
 
-        # Cleanup
+        # Update window title
+        if title:
+            main_win.setWindowTitle(f"Swing Trading Analysis - {title}")
         if _ACTIVE_PLOTS:
             try:
                 plots[0].sigXRangeChanged.disconnect()
@@ -909,13 +741,61 @@ def interactive(full_df, display_range=250, title: str | None = None):
         win.ci.layout.setRowStretchFactor(0, 3)
 
         target_str = f"{year_cb.currentText()}-{month_cb.currentText()}-{day_cb.currentText()}"
-        df = full_df[full_df.index <= target_str]
-        if df.empty: return
+        if full_df.empty or not isinstance(full_df.index, pd.DatetimeIndex):
+            df = pd.DataFrame()
+        else:
+            try:
+                df = full_df[full_df.index <= target_str]
+            except Exception as e:
+                print(f"Warning: Failed to filter data: {e}")
+                df = pd.DataFrame()
+
+        if df.empty:
+            # Handle empty display
+            win.addItem(pg.LabelItem("No Data Available", justify='center', size='12pt'), row=1, col=0)
+            return
 
         state['df'], state['x_dates'] = df, df.index
         plots = _setup_plot_panes(win, state['x_dates'], row_offset=1)
         _ACTIVE_PLOTS = plots
         _add_plot_content(plots, df, vlines=None)
+
+        # Update Probability Trees
+        if hasattr(main_win, '_stats_canvases'):
+            # We need the full SwingTradingData object if possible, 
+            # but we only have the dataframes here.
+            # However, plot_probability_tree only needs a series of pct changes.
+            # We need pct for daily, weekly, monthly.
+            # In interactive(full_df), full_df is usually df_day.
+            # To get week/month, we might need to resample or have them passed in.
+            
+            # Let's try to get symbol from title or assume it's available.
+            # Actually, we can just resample df here for weekly/monthly.
+            
+            from finance.utils.plots import plot_probability_tree
+            
+            # Daily
+            canv_d = main_win._stats_canvases[0]
+            canv_d.figure.clear()
+            ax_d = canv_d.figure.add_subplot(111)
+            plot_probability_tree(df['pct'], depth=6, title='Daily Moves', ax=ax_d)
+            canv_d.draw()
+            
+            # Weekly (resample)
+            df_w = df['c'].resample('1W').last().pct_change() * 100
+            canv_w = main_win._stats_canvases[1]
+            canv_w.figure.clear()
+            ax_w = canv_w.figure.add_subplot(111)
+            plot_probability_tree(df_w.dropna(), depth=6, title='Weekly Moves', ax=ax_w)
+            canv_w.draw()
+            
+            # Monthly (resample)
+            df_m = df['c'].resample('1ME').last().pct_change() * 100
+            canv_m = main_win._stats_canvases[2]
+            canv_m.figure.clear()
+            ax_m = canv_m.figure.add_subplot(111)
+            plot_probability_tree(df_m.dropna(), depth=6, title='Monthly Moves', ax=ax_m)
+            canv_m.draw()
 
         # Crosshair Logic (keep strong references!)
         v_lines, h_lines = [], []
@@ -1056,6 +936,19 @@ def interactive(full_df, display_range=250, title: str | None = None):
     year_cb.blockSignals(True);
     month_cb.blockSignals(True);
     day_cb.blockSignals(True)
+    
+    # Initialize state before potentially returning
+    plots = []
+    
+    if full_df.empty or not isinstance(full_df.index, pd.DatetimeIndex):
+        year_cb.clear()
+        month_cb.clear()
+        day_cb.clear()
+        # Ensure it doesn't crash even if empty
+        update_plot()
+        main_win.showNormal()
+        return
+
     year_cb.clear();
     month_cb.clear();
     day_cb.clear()
@@ -1086,3 +979,7 @@ def interactive(full_df, display_range=250, title: str | None = None):
     # Standard blocking behavior for scripts, while being friendly to interactive sessions
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         pg.exec()
+
+
+if __name__ == "__main__":
+    interactive()

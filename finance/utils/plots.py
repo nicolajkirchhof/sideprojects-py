@@ -1,6 +1,7 @@
 import gc
 import os
 import re
+import sys
 from datetime import timedelta, datetime
 
 import mplfinance as mpf
@@ -349,7 +350,7 @@ def violinplot_columns_with_labels(
 
 
 # %% Probability Tree Analysis
-def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_limit=0.55):
+def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_limit=0.55, ax=None):
   """
   Creates a tree graph showing probabilities of consecutive moves.
   """
@@ -421,8 +422,12 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
 
   set_pos(root, 0, 0, 10)
 
-  plt.figure(figsize=(24, 14))
-  plt.title(f"Transition Probabilities - {title}", fontsize=15, pad=20)
+  if ax is None:
+    fig, ax = plt.subplots(figsize=(24, 14))
+  else:
+    fig = ax.get_figure()
+
+  ax.set_title(f"Transition Probabilities - {title}", fontsize=15, pad=20)
 
   # Determine edge colors and widths based on limits
   edge_colors = []
@@ -450,16 +455,15 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
       node_colors.append('lightblue')
 
   nx.draw(G, pos, with_labels=False, node_size=50, node_color=node_colors, arrows=True, edge_color=edge_colors,
-          width=edge_widths)
+          width=edge_widths, ax=ax)
 
   # Draw node labels (Up/Down)
   node_labels = nx.get_node_attributes(G, 'label')
-  nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10)
+  nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10, ax=ax)
 
   # Draw edge labels (Probabilities)
   edge_labels = nx.get_edge_attributes(G, 'label')
-  nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
+  nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6, ax=ax)
 
-  plt.tight_layout()
-  plt.show()
+  return fig, ax
 
