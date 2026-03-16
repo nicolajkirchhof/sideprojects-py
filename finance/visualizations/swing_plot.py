@@ -603,9 +603,24 @@ def interactive():
 
         toolbar.addSpacing(20)
 
-        year_cb, month_cb, day_cb = QtWidgets.QComboBox(), QtWidgets.QComboBox(), QtWidgets.QComboBox()
-        toolbar.addWidget(QtWidgets.QLabel("Max Date Filter:"))
-        for cb in [year_cb, month_cb, day_cb]: toolbar.addWidget(cb)
+        # Start Year dropdown
+        toolbar.addWidget(QtWidgets.QLabel("Start Year:"))
+        start_year_cb = QtWidgets.QComboBox()
+        toolbar.addWidget(start_year_cb)
+        
+        # End Year dropdown
+        toolbar.addWidget(QtWidgets.QLabel("End Year:"))
+        end_year_cb = QtWidgets.QComboBox()
+        toolbar.addWidget(end_year_cb)
+
+        toolbar.addSpacing(20)
+
+        # Timeframe selector for trees
+        toolbar.addWidget(QtWidgets.QLabel("Timeframe:"))
+        tree_tf_combo = QtWidgets.QComboBox()
+        tree_tf_combo.addItems(["Daily", "Weekly", "Monthly"])
+        toolbar.addWidget(tree_tf_combo)
+
         toolbar.addStretch()
         main_layout.addLayout(toolbar)
 
@@ -623,16 +638,6 @@ def interactive():
         # Tab 2: Probability Trees
         stats_tab = QtWidgets.QWidget()
         stats_layout = QtWidgets.QVBoxLayout(stats_tab)
-        
-        # Timeframe selector for trees
-        tree_tf_layout = QtWidgets.QHBoxLayout()
-        tree_tf_label = QtWidgets.QLabel("Timeframe:")
-        tree_tf_combo = QtWidgets.QComboBox()
-        tree_tf_combo.addItems(["Daily", "Weekly", "Monthly"])
-        tree_tf_layout.addWidget(tree_tf_label)
-        tree_tf_layout.addWidget(tree_tf_combo)
-        tree_tf_layout.addStretch()
-        stats_layout.addLayout(tree_tf_layout)
         
         # We need a single canvas for the selected tree
         # Using a scroll area in case it is large
@@ -655,19 +660,6 @@ def interactive():
         monthly_stats_tab = QtWidgets.QWidget()
         monthly_stats_layout = QtWidgets.QVBoxLayout(monthly_stats_tab)
         
-        # Monthly Stats Controls
-        monthly_controls = QtWidgets.QHBoxLayout()
-        monthly_controls.addWidget(QtWidgets.QLabel("Start Year:"))
-        start_year_cb = QtWidgets.QComboBox()
-        monthly_controls.addWidget(start_year_cb)
-        
-        monthly_controls.addWidget(QtWidgets.QLabel("End Year:"))
-        end_year_cb = QtWidgets.QComboBox()
-        monthly_controls.addWidget(end_year_cb)
-        monthly_controls.addStretch()
-        
-        monthly_stats_layout.addLayout(monthly_controls)
-        
         # Monthly scroll area
         monthly_scroll = QtWidgets.QScrollArea()
         monthly_scroll.setWidgetResizable(True)
@@ -683,7 +675,26 @@ def interactive():
         monthly_stats_layout.addWidget(monthly_scroll)
         tabs.addTab(monthly_stats_tab, "Daily/Monthly Stats")
 
-        # Tab 4: Drawdown Analysis
+        # Tab 4: Volatility Analysis
+        volatility_tab = QtWidgets.QWidget()
+        volatility_layout = QtWidgets.QVBoxLayout(volatility_tab)
+        
+        # Volatility scroll area
+        vol_scroll = QtWidgets.QScrollArea()
+        vol_scroll.setWidgetResizable(True)
+        vol_scroll_content = QtWidgets.QWidget()
+        vol_scroll_layout = QtWidgets.QVBoxLayout(vol_scroll_content)
+        
+        fig_vol = Figure(figsize=(12, 22))
+        fig_vol.patch.set_facecolor('#111111')
+        canvas_vol = FigureCanvas(fig_vol)
+        vol_scroll_layout.addWidget(canvas_vol)
+        
+        vol_scroll.setWidget(vol_scroll_content)
+        volatility_layout.addWidget(vol_scroll)
+        tabs.addTab(volatility_tab, "Volatility Analysis")
+
+        # Tab 5: Drawdown Analysis
         drawdown_tab = QtWidgets.QWidget()
         drawdown_layout = QtWidgets.QVBoxLayout(drawdown_tab)
         
@@ -706,20 +717,19 @@ def interactive():
         _GLOBAL_MAIN_WIN.setMinimumSize(1200, 700)
         _GLOBAL_MAIN_WIN.resize(1600, 900)
 
-        _GLOBAL_MAIN_WIN._year_cb, _GLOBAL_MAIN_WIN._month_cb, _GLOBAL_MAIN_WIN._day_cb = year_cb, month_cb, day_cb
         _GLOBAL_MAIN_WIN._ticker_input = ticker_input
         _GLOBAL_MAIN_WIN._ds_combo = ds_combo
         _GLOBAL_MAIN_WIN._load_btn = load_btn
         _GLOBAL_MAIN_WIN._stats_canvas = stats_canvas
         _GLOBAL_MAIN_WIN._tree_tf_combo = tree_tf_combo
         _GLOBAL_MAIN_WIN._canvas_monthly = canvas_monthly
+        _GLOBAL_MAIN_WIN._canvas_vol = canvas_vol
         _GLOBAL_MAIN_WIN._canvas_drawdown = canvas_drawdown
         _GLOBAL_MAIN_WIN._start_year_cb = start_year_cb
         _GLOBAL_MAIN_WIN._end_year_cb = end_year_cb
         _GLOBAL_MAIN_WIN._proxy = None
 
     main_win, win = _GLOBAL_MAIN_WIN, _GLOBAL_LAYOUT_WIDGET
-    year_cb, month_cb, day_cb = main_win._year_cb, main_win._month_cb, main_win._day_cb
     ticker_input, ds_combo, load_btn = main_win._ticker_input, main_win._ds_combo, main_win._load_btn
     tree_tf_combo = main_win._tree_tf_combo
     start_year_cb, end_year_cb = main_win._start_year_cb, main_win._end_year_cb
@@ -789,16 +799,130 @@ def interactive():
         canvas.figure.tight_layout()
         canvas.draw()
 
+    # Helper to update volatility analysis
+    def update_volatility_analysis():
+        if full_df.empty or 'iv' not in full_df.columns:
+            return
+
+        try:
+            start_year = int(start_year_cb.currentText())
+            end_year = int(end_year_cb.currentText())
+        except:
+            return
+
+        if start_year > end_year:
+            return
+
+        canvas = main_win._canvas_vol
+        canvas.figure.clear()
+        canvas.figure.patch.set_facecolor('#111111')
+
+        # Filter for the selected year range
+        df_vol = full_df[(full_df.index.year >= start_year) & (full_df.index.year <= end_year)].copy()
+        df_vol = df_vol.dropna(subset=['iv'])
+        if df_vol.empty:
+            ax = canvas.figure.add_subplot(111)
+            ax.set_facecolor('#111111')
+            ax.set_title(f"No IV Data for {start_year}-{end_year}")
+            canvas.draw()
+            return
+            
+        df_vol['iv_change_pct'] = df_vol['iv'].pct_change() * 100
+        
+        gs = canvas.figure.add_gridspec(3, 2, height_ratios=[1, 1, 1])
+        ax_iv_dyn = canvas.figure.add_subplot(gs[0, 0])
+        ax_premium = canvas.figure.add_subplot(gs[0, 1])
+        ax_hv_time = canvas.figure.add_subplot(gs[1, :])
+        ax_hv14 = canvas.figure.add_subplot(gs[2, 0])
+        ax_hv20 = canvas.figure.add_subplot(gs[2, 1])
+        
+        for ax in [ax_iv_dyn, ax_premium, ax_hv_time, ax_hv14, ax_hv20]:
+            ax.set_facecolor('#111111')
+            ax.tick_params(colors='white')
+            ax.xaxis.label.set_color('white')
+            ax.yaxis.label.set_color('white')
+            ax.title.set_color('white')
+            for spine in ax.spines.values():
+                spine.set_edgecolor('white')
+            ax.grid(True, alpha=0.2, color='white')
+
+        # 1. IV Change % vs Price Change %
+        ax_iv_dyn.scatter(df_vol['pct'], df_vol['iv_change_pct'], 
+                               c=np.abs(df_vol['pct']), cmap='Oranges', alpha=0.5)
+        ax_iv_dyn.axhline(0, color='white', lw=1, alpha=0.5)
+        ax_iv_dyn.axvline(0, color='white', lw=1, alpha=0.5)
+        ax_iv_dyn.set_title("Volatility Dynamics: IV Change % vs Price Move %")
+        ax_iv_dyn.set_xlabel("Underlying Pct Change")
+        ax_iv_dyn.set_ylabel("IV Pct Change")
+        
+        # 2. Volatility Premium Distribution
+        from finance.utils.plots import violinplot_columns_with_labels
+        hv_cols = ['hvc', 'hv14', 'hv20', 'hv50']
+        hv_cols = [c for c in hv_cols if c in df_vol.columns]
+        if hv_cols:
+            df_prem = pd.DataFrame({f'IV-{col}': df_vol['iv'] - df_vol[col] for col in hv_cols})
+            violinplot_columns_with_labels(df_prem, ax=ax_premium, title="IV - HV Premium Distributions")
+
+        # 3. Time Series
+        ax_hv_time.plot(df_vol.index, df_vol['iv'], label='IV', color='cyan', lw=2)
+        for col in hv_cols:
+            ax_hv_time.plot(df_vol.index, df_vol[col], label=col, alpha=0.6, lw=1)
+        ax_hv_time.set_title(f"IV vs Realized Volatilities")
+        leg = ax_hv_time.legend(ncol=len(hv_cols)+1, loc='upper left', framealpha=0.3)
+        plt.setp(leg.get_texts(), color='white')
+
+        # 4. IV vs HV14
+        if 'hv14' in df_vol.columns:
+            max_v14 = max(df_vol['iv'].max(), df_vol['hv14'].max())
+            ax_hv14.scatter(df_vol['hv14'], df_vol['iv'], alpha=0.3, color='tab:blue')
+            ax_hv14.plot([0, max_v14], [0, max_v14], 'r--', alpha=0.6, label='IV=HV14')
+            ax_hv14.set_title("IV vs HV14 (Short-term Realized)")
+            ax_hv14.set_xlabel("HV14")
+            ax_hv14.set_ylabel("IV")
+            leg = ax_hv14.legend(framealpha=0.3)
+            plt.setp(leg.get_texts(), color='white')
+
+        # 5. IV vs HV20
+        if 'hv20' in df_vol.columns:
+            max_v20 = max(df_vol['iv'].max(), df_vol['hv20'].max())
+            ax_hv20.scatter(df_vol['hv20'], df_vol['iv'], alpha=0.3, color='tab:green')
+            ax_hv20.plot([0, max_v20], [0, max_v20], 'r--', alpha=0.6, label='IV=HV20')
+            ax_hv20.set_title("IV vs HV20 (Standard Realized)")
+            ax_hv20.set_xlabel("HV20")
+            ax_hv20.set_ylabel("IV")
+            leg = ax_hv20.legend(framealpha=0.3)
+            plt.setp(leg.get_texts(), color='white')
+
+        canvas.figure.tight_layout()
+        canvas.draw()
+
     # Helper to update drawdown analysis
     def update_drawdown_analysis():
         if full_df.empty or 'c' not in full_df.columns:
             return
         
+        try:
+            start_year = int(start_year_cb.currentText())
+            end_year = int(end_year_cb.currentText())
+        except:
+            return
+
+        if start_year > end_year:
+            return
+
         canvas = main_win._canvas_drawdown
         canvas.figure.clear()
         canvas.figure.patch.set_facecolor('#111111')
         
-        df_dd = full_df.copy()
+        # Filter for the selected year range
+        df_dd = full_df[(full_df.index.year >= start_year) & (full_df.index.year <= end_year)].copy()
+        if df_dd.empty:
+            ax = canvas.figure.add_subplot(111)
+            ax.set_facecolor('#111111')
+            ax.set_title(f"No Data for {start_year}-{end_year}")
+            canvas.draw()
+            return
+            
         df_dd['ath'] = df_dd['c'].cummax()
         df_dd['drawdown_pct'] = (df_dd['c'] - df_dd['ath']) / df_dd['ath'] * 100
         df_dd['is_dd'] = df_dd['c'] < df_dd['ath']
@@ -901,18 +1025,6 @@ def interactive():
             title = symbol
             
             # Reset UI filters
-            year_cb.blockSignals(True); month_cb.blockSignals(True); day_cb.blockSignals(True)
-            year_cb.clear(); month_cb.clear(); day_cb.clear()
-            year_cb.addItems([str(y) for y in sorted(full_df.index.year.unique(), reverse=True)])
-            month_cb.addItems([f"{m:02d}" for m in range(1, 13)])
-            day_cb.addItems([f"{d:02d}" for d in range(1, 32)])
-            last_date = full_df.index[-1]
-            year_cb.setCurrentText(str(last_date.year))
-            month_cb.setCurrentText(f"{last_date.month:02d}")
-            day_cb.setCurrentText(f"{last_date.day:02d}")
-            year_cb.blockSignals(False); month_cb.blockSignals(False); day_cb.blockSignals(False)
-
-            # Reset Monthly Stat filters
             all_years = sorted(full_df.index.year.unique())
             start_year_cb.blockSignals(True); end_year_cb.blockSignals(True)
             start_year_cb.clear(); end_year_cb.clear()
@@ -924,6 +1036,7 @@ def interactive():
 
             update_plot()
             update_stats_violins()
+            update_volatility_analysis()
             update_drawdown_analysis()
         except Exception as e:
             QtWidgets.QMessageBox.critical(main_win, "Error", f"Failed to load {symbol}: {str(e)}")
@@ -945,13 +1058,13 @@ def interactive():
         start_year_cb.currentIndexChanged.disconnect()
     except:
         pass
-    start_year_cb.currentIndexChanged.connect(lambda: update_stats_violins())
+    start_year_cb.currentIndexChanged.connect(lambda: [update_plot(), update_stats_violins(), update_volatility_analysis(), update_drawdown_analysis()])
     
     try:
         end_year_cb.currentIndexChanged.disconnect()
     except:
         pass
-    end_year_cb.currentIndexChanged.connect(lambda: update_stats_violins())
+    end_year_cb.currentIndexChanged.connect(lambda: [update_plot(), update_stats_violins(), update_volatility_analysis(), update_drawdown_analysis()])
     
     try:
         ticker_input.returnPressed.disconnect()
@@ -960,18 +1073,7 @@ def interactive():
     ticker_input.returnPressed.connect(load_data_from_ui)
 
     # Prevent signal duplication on re-entry
-    try:
-        year_cb.currentIndexChanged.disconnect()
-    except:
-        pass
-    try:
-        month_cb.currentIndexChanged.disconnect()
-    except:
-        pass
-    try:
-        day_cb.currentIndexChanged.disconnect()
-    except:
-        pass
+    pass
 
     # Prevent ghost hover events from previous runs
     if getattr(main_win, '_proxy', None):
@@ -1021,12 +1123,13 @@ def interactive():
         win.addItem(title_item, row=0, col=0)
         win.ci.layout.setRowStretchFactor(0, 3)
 
-        target_str = f"{year_cb.currentText()}-{month_cb.currentText()}-{day_cb.currentText()}"
         if full_df.empty or not isinstance(full_df.index, pd.DatetimeIndex):
             df = pd.DataFrame()
         else:
             try:
-                df = full_df[full_df.index <= target_str]
+                start_year = int(start_year_cb.currentText())
+                end_year = int(end_year_cb.currentText())
+                df = full_df[(full_df.index.year >= start_year) & (full_df.index.year <= end_year)]
             except Exception as e:
                 print(f"Warning: Failed to filter data: {e}")
                 df = pd.DataFrame()
@@ -1199,30 +1302,16 @@ def interactive():
         update_y_views()
 
     # Initial UI Setup
-    year_cb.blockSignals(True);
-    month_cb.blockSignals(True);
-    day_cb.blockSignals(True)
-    
     # Initialize state before potentially returning
     plots = []
     
     if full_df.empty or not isinstance(full_df.index, pd.DatetimeIndex):
-        year_cb.clear()
-        month_cb.clear()
-        day_cb.clear()
         # Ensure it doesn't crash even if empty
         update_plot()
         main_win.showNormal()
         return
 
-    year_cb.clear();
-    month_cb.clear();
-    day_cb.clear()
-    year_cb.addItems([str(y) for y in sorted(full_df.index.year.unique(), reverse=True)])
-    month_cb.addItems([f"{m:02d}" for m in range(1, 13)])
-    day_cb.addItems([f"{d:02d}" for d in range(1, 32)])
-
-    # Setup monthly stats years
+    # Setup year range
     all_years = sorted(full_df.index.year.unique())
     start_year_cb.blockSignals(True)
     end_year_cb.blockSignals(True)
@@ -1235,18 +1324,9 @@ def interactive():
     start_year_cb.blockSignals(False)
     end_year_cb.blockSignals(False)
 
-    last_date = full_df.index[-1]
-    year_cb.setCurrentText(str(last_date.year))
-    month_cb.setCurrentText(f"{last_date.month:02d}")
-    day_cb.setCurrentText(f"{last_date.day:02d}")
-
-    for cb in [year_cb, month_cb, day_cb]: cb.currentIndexChanged.connect(update_plot)
-    year_cb.blockSignals(False);
-    month_cb.blockSignals(False);
-    day_cb.blockSignals(False)
-
     update_plot()
     update_stats_violins()
+    update_volatility_analysis()
     update_drawdown_analysis()
     main_win.showNormal()
 
