@@ -358,3 +358,17 @@ plt.show()
 
 print("\nWindow Statistics (Mean Return %):")
 print(df_stats.groupby('5d_window')['pct'].mean().reindex(window_order))
+
+#%% Test trading framework on different MAs
+# Defining the long trading, the short should work the same in the other direction
+# Test with 5, 10, 20, 50 MA and define statistics
+#  Number of trades
+#  PnL percentage per trade
+#  Duration of trade
+# Entry on
+#  trading > MA with an upward / downward slope
+# Exit on
+#  close 2 ATRP below
+#  second close < MA with change < 0
+#  third close < MA
+#  MA slope < 0
