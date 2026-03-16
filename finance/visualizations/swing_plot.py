@@ -683,6 +683,25 @@ def interactive():
         monthly_stats_layout.addWidget(monthly_scroll)
         tabs.addTab(monthly_stats_tab, "Daily/Monthly Stats")
 
+        # Tab 4: Drawdown Analysis
+        drawdown_tab = QtWidgets.QWidget()
+        drawdown_layout = QtWidgets.QVBoxLayout(drawdown_tab)
+        
+        # Drawdown scroll area
+        drawdown_scroll = QtWidgets.QScrollArea()
+        drawdown_scroll.setWidgetResizable(True)
+        drawdown_scroll_content = QtWidgets.QWidget()
+        drawdown_scroll_layout = QtWidgets.QVBoxLayout(drawdown_scroll_content)
+        
+        fig_drawdown = Figure(figsize=(12, 18))
+        fig_drawdown.patch.set_facecolor('#111111')
+        canvas_drawdown = FigureCanvas(fig_drawdown)
+        drawdown_scroll_layout.addWidget(canvas_drawdown)
+        
+        drawdown_scroll.setWidget(drawdown_scroll_content)
+        drawdown_layout.addWidget(drawdown_scroll)
+        tabs.addTab(drawdown_tab, "Drawdown Analysis")
+
         # Prevent "min-size" starts
         _GLOBAL_MAIN_WIN.setMinimumSize(1200, 700)
         _GLOBAL_MAIN_WIN.resize(1600, 900)
@@ -694,6 +713,7 @@ def interactive():
         _GLOBAL_MAIN_WIN._stats_canvas = stats_canvas
         _GLOBAL_MAIN_WIN._tree_tf_combo = tree_tf_combo
         _GLOBAL_MAIN_WIN._canvas_monthly = canvas_monthly
+        _GLOBAL_MAIN_WIN._canvas_drawdown = canvas_drawdown
         _GLOBAL_MAIN_WIN._start_year_cb = start_year_cb
         _GLOBAL_MAIN_WIN._end_year_cb = end_year_cb
         _GLOBAL_MAIN_WIN._proxy = None
@@ -769,6 +789,102 @@ def interactive():
         canvas.figure.tight_layout()
         canvas.draw()
 
+    # Helper to update drawdown analysis
+    def update_drawdown_analysis():
+        if full_df.empty or 'c' not in full_df.columns:
+            return
+        
+        canvas = main_win._canvas_drawdown
+        canvas.figure.clear()
+        canvas.figure.patch.set_facecolor('#111111')
+        
+        df_dd = full_df.copy()
+        df_dd['ath'] = df_dd['c'].cummax()
+        df_dd['drawdown_pct'] = (df_dd['c'] - df_dd['ath']) / df_dd['ath'] * 100
+        df_dd['is_dd'] = df_dd['c'] < df_dd['ath']
+        df_dd['dd_group'] = (df_dd['is_dd'] != df_dd['is_dd'].shift()).cumsum()
+        
+        drawdown_groups = df_dd[df_dd['is_dd']].groupby('dd_group')
+        
+        gs = canvas.figure.add_gridspec(4, 1, height_ratios=[1, 1.5, 1.5, 1.5])
+        ax_scatter = canvas.figure.add_subplot(gs[0])
+        ax_short   = canvas.figure.add_subplot(gs[1])
+        ax_med     = canvas.figure.add_subplot(gs[2])
+        ax_long    = canvas.figure.add_subplot(gs[3])
+        
+        for ax in [ax_scatter, ax_short, ax_med, ax_long]:
+            ax.set_facecolor('#111111')
+            ax.tick_params(colors='white')
+            ax.xaxis.label.set_color('white')
+            ax.yaxis.label.set_color('white')
+            ax.title.set_color('white')
+            for spine in ax.spines.values():
+                spine.set_edgecolor('white')
+
+        dd_summary = []
+        counts = {'short': 0, 'med': 0, 'long': 0}
+        
+        for _, group in drawdown_groups:
+            duration = len(group)
+            if duration < 2: continue
+            
+            severity = group['drawdown_pct'].min()
+            pre_dd_slice = df_dd.loc[df_dd.index < group.index[0], 'iv'].tail(1).values if 'iv' in df_dd.columns else []
+            iv_bottom = group.loc[group['drawdown_pct'].idxmin(), 'iv'] if 'iv' in group.columns else 0
+            iv_exp = ((iv_bottom - pre_dd_slice[0]) / pre_dd_slice[0] * 100) if (len(pre_dd_slice) > 0 and pre_dd_slice[0] > 0) else 0
+            
+            dd_summary.append({'dur': duration, 'sev': abs(severity), 'iv': iv_exp})
+            
+            # Path normalization using Close
+            pre_dd = df_dd.loc[df_dd.index < group.index[0]].tail(1)
+            base_price = pre_dd['c'].values[0] if not pre_dd.empty else group['c'].iloc[0]
+            path = (group['c'].to_numpy() / base_price - 1) * 100
+            days = np.arange(len(path))
+            
+            if duration < 30:
+                ax_short.plot(days, path, alpha=0.3, linewidth=1, color='tab:blue')
+                counts['short'] += 1
+            elif duration <= 65:
+                ax_med.plot(days, path, alpha=0.5, linewidth=1.2, label=f"{group.index[0].year} ({duration}d)")
+                counts['med'] += 1
+            else:
+                ax_long.plot(days, path, alpha=0.7, linewidth=1.5, label=f"{group.index[0].year} ({duration}d)")
+                counts['long'] += 1
+        
+        if dd_summary:
+            df_summ = pd.DataFrame(dd_summary)
+            sc = ax_scatter.scatter(df_summ['dur'], df_summ['sev'], c=df_summ['iv'], cmap='YlOrRd', s=100, alpha=0.6, edgecolors='white')
+            ax_scatter.set_title("Drawdown Severity vs Duration (Color: IV Expansion %)")
+            ax_scatter.set_xlabel("Duration (Days)")
+            ax_scatter.set_ylabel("Max Severity (%)")
+            cb = canvas.figure.colorbar(sc, ax=ax_scatter)
+            cb.set_label("IV Expansion %", color='white')
+            cb.ax.yaxis.set_tick_params(color='white')
+            plt.setp(plt.getp(cb.ax.axes, 'yticklabels'), color='white')
+        
+        for ax, key, title in [
+            (ax_short, 'short', f"Short-Term (< 30 Days, n={counts['short']})"),
+            (ax_med,   'med',   f"Medium-Term (30-65 Days, n={counts['med']})"),
+            (ax_long,  'long',  f"Long-Term (> 65 Days, n={counts['long']})")
+        ]:
+            ax.axhline(0, color='white', linewidth=1, alpha=0.5)
+            ax.set_title(title)
+            ax.set_ylabel("Close % Change from ATH")
+            ax.grid(True, alpha=0.2, color='white')
+
+        if counts['med'] > 0:
+            ncol = 5 if counts['med'] > 15 else 3
+            leg = ax_med.legend(loc='lower left', fontsize=8, ncol=ncol, framealpha=0.3)
+            plt.setp(leg.get_texts(), color='white')
+
+        ax_long.set_xlabel("Days since ATH")
+        if counts['long'] > 0:
+            leg = ax_long.legend(loc='lower left', fontsize=9, ncol=4, framealpha=0.3)
+            plt.setp(leg.get_texts(), color='white')
+            
+        canvas.figure.tight_layout()
+        canvas.draw()
+
     # Helper to load data from inputs
     def load_data_from_ui():
         symbol = ticker_input.text().upper()
@@ -808,6 +924,7 @@ def interactive():
 
             update_plot()
             update_stats_violins()
+            update_drawdown_analysis()
         except Exception as e:
             QtWidgets.QMessageBox.critical(main_win, "Error", f"Failed to load {symbol}: {str(e)}")
 
@@ -1130,6 +1247,7 @@ def interactive():
 
     update_plot()
     update_stats_violins()
+    update_drawdown_analysis()
     main_win.showNormal()
 
     # Force layout AFTER the window is actually shown
