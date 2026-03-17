@@ -1,4 +1,4 @@
-#%%
+# %%
 import numpy as np
 
 import pandas as pd
@@ -16,359 +16,269 @@ pd.set_option("display.max_rows", None)  # None means "no limit"
 pd.set_option("display.width", 140)  # Set the width to 80 characters
 mpl.use('TkAgg')
 mpl.use('QtAgg')
-%load_ext autoreload
-%autoreload 2
+# %load_ext autoreload
+# %autoreload 2
 
-#%%
+# %%
 symbol = 'QQQ'
 
 data = utils.SwingTradingData(symbol, datasource='offline')
+
+
 # df_dolt = utils.swing_trading_data.SwingTradingData(symbol)
 
 #%%
+# Questions on stock
+# - probability of two, three, four, five successive down/up days/weeks/month
+# - duration and percentage change following 5, 10, 20 MA daily, weekly. Following is defined as the slope of the MA becoming positive / negative until it turns into the opposite direction.
+# - duration and percentage change of consecutive weekly up / down moves that are defined as the close not being below / above the prior high / low
+# - duration and percentage change of weekly trend following the 5 MA when the 5 MA > 10 MA > 20 MA to the first close below the 5 MA. The same with opposite MAs for negative trend following
 
-fig, axs = plt.subplots(3, 3, figsize=(24, 14))
-# Average daily stats
-df = data.df_day[['gappct', 'pct']].copy().reset_index(drop=True)
-df['pct_week'] = data.df_week['pct'].copy().reset_index(drop=True)
-df['pct_month'] = data.df_month['pct'].copy().reset_index(drop=True)
-utils.plots.violinplot_columns_with_labels(df, ax=axs[0, 0])
+def calculate_streak_probabilities(df, label):
+  """
+  Calculate the probability of consecutive up/down streaks.
+  """
+  # streak is already in df from swing_indicators (via SwingTradingData)
+  # or it can be recalculated to be sure
+  change_sign = np.sign(df['pct']).replace(0, np.nan).ffill()
+  streak_groups = (change_sign != change_sign.shift()).cumsum()
+  streaks = change_sign.groupby(streak_groups).cumsum()
 
-# Dist from MAs
-df = data.df_day[utils.definitions.MA_DISTS]
-utils.plots.violinplot_columns_with_labels(df, ax=axs[0, 1])
+  # Find the end of each streak
+  # Shift to find where the next value is different or it's the end
+  streak_ends = streaks.iloc[np.where(streaks.values != np.roll(streaks.values, -1))[0]]
+  if len(streaks) > 0:
+    streak_ends = pd.concat([streak_ends, streaks.iloc[[-1]]])
 
-# ATRps
-df = data.df_day[utils.definitions.ATRPs]
-utils.plots.violinplot_columns_with_labels(df, ax=axs[1, 0])
+  up_ends = streak_ends[streak_ends > 0]
+  down_ends = streak_ends[streak_ends < 0].abs()
 
-# HVs
-df = data.df_day[utils.definitions.HVs]
-utils.plots.violinplot_columns_with_labels(df, ax=axs[1, 1])
+  total_up = len(up_ends)
+  total_down = len(down_ends)
 
-# IVs
-data.df_day['iv100'] = data.df_day['iv'] * 100
-df = data.df_day[['iv100', 'iv_pct']]
-utils.plots.violinplot_columns_with_labels(df, ax=axs[2, 0])
+  max_streak = 6
+  up_probs = {}
+  down_probs = {}
 
-# Vols
-data.df_day['v10'] = data.df_day['v'] / 10
-df = data.df_day[['v10']]
-utils.plots.violinplot_columns_with_labels(df, ax=axs[2, 1])
+  for i in range(2, max_streak):
+    up_probs[i] = (up_ends >= i).sum() / total_up if total_up > 0 else 0
+    down_probs[i] = (down_ends >= i).sum() / total_down if total_down > 0 else 0
 
-df = data.df_day[['streak']].copy().reset_index(drop=True).rename(columns={'streak': 'streak_day'})
-df['streak_week'] = data.df_week['streak'].copy().reset_index(drop=True)
-df['streak_month'] = data.df_month['streak'].copy().reset_index(drop=True)
-utils.plots.violinplot_columns_with_labels(df, ax=axs[0, 2])
+  return up_probs, down_probs
 
-# Slopes
-df = data.df_day[utils.definitions.MA_SLOPES]
-utils.plots.violinplot_columns_with_labels(df, ax=axs[2, 2])
 
-plt.show()
+def calculate_ma_slope_stats(df, ma_periods=[5, 10, 20]):
+  """
+  Calculate duration and change following 5, 10, 20 MA.
+  Following is defined as the slope of the MA becoming positive / negative until it turns into the opposite direction.
+  """
+  stats = {}
+  for p in ma_periods:
+    ma = df['c'].rolling(window=p).mean()
+    slope = ma.diff()
+    positive_slope = slope > 0
 
-#%% Consecutive Up-Down days/weeks/month
-utils.plots.plot_probability_tree(data.df_day['pct'], depth=6, title='Daily Moves')
-utils.plots.plot_probability_tree(data.df_week['pct'], depth=6, title='Weekly Moves')
-utils.plots.plot_probability_tree(data.df_month['pct'], depth=6, title='Month Moves')
+    # Identify contiguous blocks
+    # Drop first few rows where MA is NaN
+    valid_mask = positive_slope.notna()
+    ps = positive_slope[valid_mask]
+    df_valid = df[valid_mask]
 
-#%% Plot the percentage violins per month over the last 20 years
-step = 4
-start_year = data.df_day.year.min()
-end_year = data.df_day.year.max()
-total_range = range(start_year, end_year+1, step)
-for year in total_range:
-  year_range = range(year, year+step)
-  fig, axs = plt.subplots(len(year_range), 1, figsize=(24, 14))
+    blocks = (ps != ps.shift()).cumsum()
 
-  for nax, year in enumerate(year_range):
-    df = pd.DataFrame()
-    for i in range(1, 13):
-      df[f'{calendar.month_name[i]}'] = data.df_day[(data.df_day.month == i) & (data.df_day.year == year)]['pct'].reset_index(drop=True)
-    utils.plots.violinplot_columns_with_labels(df, ax=axs[nax], title=f'{year}')
+    # Group by blocks
+    group = df_valid.groupby(blocks)
 
-plt.show()
+    durations = group.size()
+    # For price change, we want the change from the start of the block to the end
+    changes = group.apply(lambda x: (x['c'].iloc[-1] / x['c'].iloc[0] - 1) * 100)
 
-#%% Plot the percentage violins per day of the week over the last 20 years
-step = 8
-start_year = data.df_day.year.min()
-end_year = data.df_day.year.max()
-total_range = range(start_year, end_year+1, step)
+    # To filter 'positive' blocks, we check the first value of 'positive_slope' for each block
+    is_positive_block = ps.groupby(blocks).first()
 
-for start_range_year in total_range:
-  year_range = range(start_range_year, min(start_range_year + step, end_year + 1))
-  num_rows = (len(year_range) + 1) // 2
-  fig, axs = plt.subplots(num_rows, 2, figsize=(24, num_rows * 4))
-  axs = axs.flatten()
+    stats[p] = {
+      'pos_dur': durations[is_positive_block].values,
+      'pos_chg': changes[is_positive_block].values,
+      'neg_dur': durations[~is_positive_block].values,
+      'neg_chg': changes[~is_positive_block].values
+    }
+  return stats
 
-  for nax, year in enumerate(year_range):
-    df_day_plot = pd.DataFrame()
-    # pandas .dt.dayofweek is 0=Mon, 6=Sun
-    # Assuming df_day index is datetime, otherwise we use the 'dayofweek' column if available
-    df_year = data.df_day[data.df_day.year == year]
-    day_names = list(calendar.day_abbr) # Mon..Sun
 
-    for i in range(5): # Trading days Mon-Fri
-      # Use index.dayofweek if index is datetime, else adapt to your column
-      df_day_plot[day_names[i]] = df_year[df_year.index.dayofweek == i]['pct'].reset_index(drop=True)
+def calculate_high_low_streak_stats(df):
+  """
+  Calculate duration and percentage change of consecutive weekly up / down moves
+  defined as the close not being below / above the prior high / low.
+  """
+  # For 'Up' move: close >= prior high
+  # For 'Down' move: close <= prior low
+  # This is a bit tricky because what happens if it's in between?
+  # The requirement says "consecutive weekly up / down moves that are defined as the close not being below / above the prior high / low"
+  # Let's interpret:
+  # Up streak: close >= prior high. Continues as long as close >= prior high?
+  # Actually, "close not being below prior high" might mean an Up streak continues as long as close >= prior high.
+  # Let's use:
+  # Up move: close >= prev high
+  # Down move: close <= prev low
 
-    utils.plots.violinplot_columns_with_labels(df_day_plot, ax=axs[nax], title=f'Daily Returns - {year}')
+  prev_h = df['h'].shift()
+  prev_l = df['l'].shift()
 
-  for i in range(len(year_range), len(axs)):
-    axs[i].set_visible(False)
-  plt.tight_layout()
+  is_up = df['c'] >= prev_h
+  is_down = df['c'] <= prev_l
 
-plt.show()
+  # Since a bar can't be both >= prev_h and <= prev_l (usually), but it could be neither.
+  # If it's neither, the streak breaks.
+  # We need to identify streaks of 'is_up' and streaks of 'is_down'.
 
-#%% Evaluate for all time profitable days
+  def get_streaks(condition):
+    blocks = (condition != condition.shift()).cumsum()
+    group = df.groupby(blocks)
+    durations = group.size()
+    changes = group.apply(lambda x: (x['c'].iloc[-1] / x['c'].iloc[0] - 1) * 100)
+    valid_blocks = condition.groupby(blocks).first()
+    return durations[valid_blocks].values, changes[valid_blocks].values
 
-df_day_plot = pd.DataFrame()
-day_names = list(calendar.day_abbr) # Mon..Sun
+  up_dur, up_chg = get_streaks(is_up)
+  down_dur, down_chg = get_streaks(is_down)
 
-for i in range(5): # Trading days Mon-Fri
-  # Use index.dayofweek if index is datetime, else adapt to your column
-  df_day_plot[day_names[i]] = data.df_day[data.df_day.index.dayofweek == i]['pct'].reset_index(drop=True)
+  return up_dur, up_chg, down_dur, down_chg
 
-utils.plots.violinplot_columns_with_labels(df_day_plot, title=f'Daily Returns')
 
-plt.show()
+def calculate_triple_ma_trend_stats(df):
+  """
+  Calculate duration and percentage change of weekly trend following the 5 MA
+  when the 5 MA > 10 MA > 20 MA to the first close below the 5 MA.
+  """
+  ma5 = df['c'].rolling(window=5).mean()
+  ma10 = df['c'].rolling(window=10).mean()
+  ma20 = df['c'].rolling(window=20).mean()
 
-#%% Analyze the drawdowns from ATH with severity, duration, iv expansion in percentage
-df_dd = data.df_day.copy()
-if 'vwap3' not in df_dd.columns:
-  df_dd['vwap3'] = (df_dd['h'] + df_dd['l'] + df_dd['c']) / 3
+  # Long trend: ma5 > ma10 > ma20
+  # Short trend: ma5 < ma10 < ma20
+  long_condition = (ma5 > ma10) & (ma10 > ma20)
+  short_condition = (ma5 < ma10) & (ma10 < ma20)
 
-df_dd['ath'] = df_dd['c'].cummax()
-df_dd['drawdown_pct'] = (df_dd['c'] - df_dd['ath']) / df_dd['ath'] * 100
-df_dd['is_dd'] = df_dd['c'] < df_dd['ath']
-# Group consecutive drawdown days
-df_dd['dd_group'] = (df_dd['is_dd'] != df_dd['is_dd'].shift()).cumsum()
-
-# Filter only for groups that are actually in drawdown
-drawdown_groups = df_dd[df_dd['is_dd']].groupby('dd_group')
-
-# 3. Visualization
-fig = plt.figure(figsize=(24, 28))
-gs = fig.add_gridspec(4, 1, height_ratios=[1, 1.5, 1.5, 1.5])
-
-ax_scatter = fig.add_subplot(gs[0])
-ax_short   = fig.add_subplot(gs[1])
-ax_med     = fig.add_subplot(gs[2])
-ax_long    = fig.add_subplot(gs[3])
-
-dd_summary = []
-counts = {'short': 0, 'med': 0, 'long': 0}
-
-for _, group in drawdown_groups:
-    duration = len(group)
-    if duration < 2: continue
-
-    # Stats for scatter
-    severity = group['drawdown_pct'].min()
-    pre_dd_slice = df_dd.loc[df_dd.index < group.index[0], 'iv'].tail(1).values
-    iv_bottom = group.loc[group['drawdown_pct'].idxmin(), 'iv']
-    iv_exp = ((iv_bottom - pre_dd_slice[0]) / pre_dd_slice[0] * 100) if (len(pre_dd_slice) > 0 and pre_dd_slice[0] > 0) else 0
-
-    dd_summary.append({'dur': duration, 'sev': abs(severity), 'iv': iv_exp})
-
-    # Path normalization
-    pre_dd = df_dd.loc[df_dd.index < group.index[0]].tail(1)
-    base_price = pre_dd['vwap3'].values[0] if not pre_dd.empty else group['vwap3'].iloc[0]
-    path = (group['vwap3'].to_numpy() / base_price - 1) * 100
-    days = np.arange(len(path))
-
-    if duration < 30:
-        ax_short.plot(days, path, alpha=0.3, linewidth=1, color='tab:blue')
-        counts['short'] += 1
-    elif duration <= 65:
-        ax_med.plot(days, path, alpha=0.5, linewidth=1.2, label=f"{group.index[0].year} ({duration}d)")
-        counts['med'] += 1
-    else:
-        ax_long.plot(days, path, alpha=0.7, linewidth=1.5, label=f"{group.index[0].year} ({duration}d)")
-        counts['long'] += 1
-
-# 1. Scatter Plot
-df_summ = pd.DataFrame(dd_summary)
-sc = ax_scatter.scatter(df_summ['dur'], df_summ['sev'], c=df_summ['iv'], cmap='YlOrRd', s=100, alpha=0.6, edgecolors='black')
-ax_scatter.set_title("Drawdown Severity vs Duration (Color: IV Expansion %)")
-ax_scatter.set_xlabel("Duration (Days)")
-ax_scatter.set_ylabel("Max Severity (%)")
-fig.colorbar(sc, ax=ax_scatter, label="IV Expansion %")
-ax_scatter.grid(True, alpha=0.2)
-
-# 2. Path Overlays
-for ax, key, title in [
-    (ax_short, 'short', f"Short-Term (< 30 Days, n={counts['short']})"),
-    (ax_med,   'med',   f"Medium-Term (30-90 Days, n={counts['med']})"),
-    (ax_long,  'long',  f"Long-Term (> 90 Days, n={counts['long']})")
-]:
-    ax.axhline(0, color='black', linewidth=1, alpha=0.5)
-    ax.set_title(title)
-    ax.set_ylabel("VWAP3 % Change from ATH")
-    ax.grid(True, alpha=0.2)
-
-# Legends for labeled charts
-if counts['med'] > 0:
-    # Use a smaller font and multiple columns if there are many medium drawdowns
-    ncol = 5 if counts['med'] > 15 else 3
-    ax_med.legend(loc='lower left', fontsize=8, ncol=ncol, framealpha=0.6)
-
-ax_long.set_xlabel("Days since ATH")
-if counts['long'] > 0:
-    ax_long.legend(loc='lower left', fontsize=9, ncol=4, framealpha=0.6)
-
-plt.tight_layout()
-plt.show()
-
-#%% Analyze abnormal IV behavior and IV/HV relationships
-df_vol = data.df_day.copy()
+  def get_trend_stats(condition, exit_condition_func):
+    # condition is the entry/persistence condition (e.g., ma5 > ma10 > ma20)
+    # exit_condition_func is a function of df and ma5 that returns true when we should exit
+    # "to the first close below the 5 MA"
     
-# Calculate daily changes and filter for available IV
-df_vol = df_vol.dropna(subset=['iv']).copy()
-df_vol['iv_change_pct'] = df_vol['iv'].pct_change() * 100
+    in_trend = False
+    start_idx = None
+    results = []
 
-fig = plt.figure(figsize=(24, 22))
-gs = fig.add_gridspec(3, 2, height_ratios=[1, 1, 1])
+    for i in range(len(df)):
+      if not in_trend:
+        if condition.iloc[i]:
+          in_trend = True
+          start_idx = i
+      else:
+        # Check for exit
+        if exit_condition_func(df, ma5, i):
+          duration = i - start_idx + 1
+          change = (df['c'].iloc[i] / df['c'].iloc[start_idx] - 1) * 100
+          results.append((duration, change))
+          in_trend = False
     
-ax_iv_dyn = fig.add_subplot(gs[0, 0])
-ax_premium = fig.add_subplot(gs[0, 1])
-ax_hv_time = fig.add_subplot(gs[1, :]) # Span full width
-ax_hv14 = fig.add_subplot(gs[2, 0])
-ax_hv30 = fig.add_subplot(gs[2, 1])
+    if results:
+      durs, chgs = zip(*results)
+      return np.array(durs), np.array(chgs)
+    return np.array([]), np.array([])
 
-# 1. IV Change % vs Price Change %
-ax_iv_dyn.scatter(df_vol['pct'], df_vol['iv_change_pct'], 
-                       c=np.abs(df_vol['pct']), cmap='Oranges', alpha=0.5)
-ax_iv_dyn.axhline(0, color='black', lw=1); ax_iv_dyn.axvline(0, color='black', lw=1)
-ax_iv_dyn.set_title("Volatility Dynamics: IV Change % vs Price Move %")
-ax_iv_dyn.set_xlabel("Underlying Pct Change"); ax_iv_dyn.set_ylabel("IV Pct Change")
-ax_iv_dyn.grid(True, alpha=0.2)
+  long_dur, long_chg = get_trend_stats(long_condition, lambda d, m, i: d['c'].iloc[i] < m.iloc[i])
+  short_dur, short_chg = get_trend_stats(short_condition, lambda d, m, i: d['c'].iloc[i] > m.iloc[i])
 
-# 2. Volatility Premium Distribution (Top Right)
-hv_cols = [c for c in df_vol.columns if c.startswith('hv')]
-df_prem = pd.DataFrame({f'IV-{col}': df_vol['iv'] - df_vol[col] for col in hv_cols})
-utils.plots.violinplot_columns_with_labels(df_prem, ax=ax_premium, title="IV - HV Premium Distributions")
+  return long_dur, long_chg, short_dur, short_chg
 
-# 3. Time Series (Filtered to IV availability)
-ax_hv_time.plot(df_vol.index, df_vol['iv'], label='IV', color='black', lw=2)
-for col in hv_cols:
-    ax_hv_time.plot(df_vol.index, df_vol[col], label=col, alpha=0.4, lw=1)
-ax_hv_time.set_title(f"IV vs Realized Volatilities (Range: {df_vol.index[0].date()} to {df_vol.index[-1].date()})")
-ax_hv_time.legend(ncol=len(hv_cols)+1, loc='upper left')
-ax_hv_time.grid(True, alpha=0.2)
 
-# 4. IV vs HV14
-max_v14 = max(df_vol['iv'].max(), df_vol['hv14'].max())
-ax_hv14.scatter(df_vol['hv14'], df_vol['iv'], alpha=0.3, color='tab:blue')
-ax_hv14.plot([0, max_v14], [0, max_v14], 'r--', alpha=0.6, label='IV=HV14')
-ax_hv14.set_title("IV vs HV14 (Short-term Realized)")
-ax_hv14.set_xlabel("HV14"); ax_hv14.set_ylabel("IV")
-ax_hv14.legend(); ax_hv14.grid(True, alpha=0.2)
+# %%
+# Prepare data
+up_p_day, down_p_day = calculate_streak_probabilities(data.df_day, 'Daily')
+up_p_week, down_p_week = calculate_streak_probabilities(data.df_week, 'Weekly')
+up_p_month, down_p_month = calculate_streak_probabilities(data.df_month, 'Monthly')
 
-# 5. IV vs HV30 (From first evaluation)
-# Ensure hv30 exists (assuming it follows your hv naming convention)
-hv30_col = 'hv30' if 'hv30' in df_vol.columns else 'hv20' # Fallback if hv30 is missing
-max_v30 = max(df_vol['iv'].max(), df_vol[hv30_col].max())
-ax_hv30.scatter(df_vol[hv30_col], df_vol['iv'], alpha=0.3, color='tab:green')
-ax_hv30.plot([0, max_v30], [0, max_v30], 'r--', alpha=0.6, label=f'IV={hv30_col}')
-ax_hv30.set_title(f"IV vs {hv30_col.upper()} (Standard Realized)")
-ax_hv30.set_xlabel(hv30_col.upper()); ax_hv30.set_ylabel("IV")
-ax_hv30.legend(); ax_hv30.grid(True, alpha=0.2)
+ma_slope_stats_day = calculate_ma_slope_stats(data.df_day)
+ma_slope_stats_week = calculate_ma_slope_stats(data.df_week)
 
-plt.tight_layout()
-plt.show()
+hl_streak_dur_up, hl_streak_chg_up, hl_streak_dur_down, hl_streak_chg_down = calculate_high_low_streak_stats(data.df_week)
 
-#%% Hurst Exponent, Multi-Lag Autocorrelation, and 5-Day Monthly Windows
-df_stats = data.df_day.copy()
+triple_ma_long_dur, triple_ma_long_chg, triple_ma_short_dur, triple_ma_short_chg = calculate_triple_ma_trend_stats(data.df_week)
 
-# 1. Rolling Hurst
-df_stats['hurst_100'] = df_stats['c'].rolling(window=100).apply(utils.indicators.hurst, raw=True)
+# %%
+# Visualizations
+fig = plt.figure(figsize=(18, 12))
+gs = fig.add_gridspec(3, 3)
 
-# 2. Multi-Lag Autocorrelations (Legs)
-# Lag 1: Daily momentum/mean-reversion
-# Lag 5: Weekly cycle persistence
-# Lag 21: Monthly cycle (Institutional window)
-for lag in [1, 5, 21]:
-  df_stats[f'ac_lag_{lag}'] = df_stats['pct'].rolling(window=60).apply(lambda x: x.autocorr(lag=lag))
+# 1. Streak Probabilities (Daily)
+ax1 = fig.add_subplot(gs[0, 0])
+x = np.arange(2, 6)
+ax1.bar(x - 0.2, [up_p_day[i] for i in x], 0.4, label='Up Streaks', color='green', alpha=0.7)
+ax1.bar(x + 0.2, [down_p_day[i] for i in x], 0.4, label='Down Streaks', color='red', alpha=0.7)
+ax1.set_title('Prob. of Streak Length >= N (Daily)')
+ax1.set_xticks(x)
+ax1.set_ylabel('Probability')
+ax1.legend()
 
-# 3. Dissect Month into 5-Trading-Day Windows
-# We calculate the ordinal trading day of the month (1, 2, 3...)
-df_stats['trading_day_num'] = df_stats.groupby([df_stats.index.year, df_stats.index.month]).cumcount() + 1
+# 2. MA Slope Duration (Daily)
+ax2 = fig.add_subplot(gs[0, 1])
+ma_to_plot = 10
+ax2.hist(ma_slope_stats_day[ma_to_plot]['pos_dur'], bins=30, alpha=0.5, label=f'Pos Slope MA{ma_to_plot}', color='green')
+ax2.hist(ma_slope_stats_day[ma_to_plot]['neg_dur'], bins=30, alpha=0.5, label=f'Neg Slope MA{ma_to_plot}', color='red')
+ax2.set_title(f'Duration Following {ma_to_plot} MA Slope (Daily)')
+ax2.set_xlabel('Days')
+ax2.legend()
 
-def get_5day_window(d):
-  if d <= 5:  return 'Days 1-5 (Open)'
-  if d <= 10: return 'Days 6-10'
-  if d <= 15: return 'Days 11-15 (Mid)'
-  if d <= 20: return 'Days 16-20 (OpEx)'
-  return 'Days 21+ (Close)'
+# 3. MA Slope Change (Daily)
+ax3 = fig.add_subplot(gs[0, 2])
+ax3.hist(ma_slope_stats_day[ma_to_plot]['pos_chg'], bins=30, alpha=0.5, label=f'Pos Slope MA{ma_to_plot}', color='green')
+ax3.hist(ma_slope_stats_day[ma_to_plot]['neg_chg'], bins=30, alpha=0.5, label=f'Neg Slope MA{ma_to_plot}', color='red')
+ax3.set_title(f'Price Change % Following {ma_to_plot} MA Slope (Daily)')
+ax3.set_xlabel('Change %')
+ax3.legend()
 
-df_stats['5d_window'] = df_stats['trading_day_num'].apply(get_5day_window)
-window_order = ['Days 1-5 (Open)', 'Days 6-10', 'Days 11-15 (Mid)', 'Days 16-20 (OpEx)', 'Days 21+ (Close)']
+# 4. Weekly Close vs Prior High/Low Streak Duration
+ax4 = fig.add_subplot(gs[1, 0])
+ax4.boxplot([hl_streak_dur_up, hl_streak_dur_down], tick_labels=['C >= Prev H', 'C <= Prev L'])
+ax4.set_title('Duration of Weekly High/Low Streaks')
+ax4.set_ylabel('Weeks')
 
-# 4. Visualization
-fig = plt.figure(figsize=(24, 20))
-gs = fig.add_gridspec(4, 1)
+# 5. Weekly Close vs Prior High/Low Streak Change %
+ax5 = fig.add_subplot(gs[1, 1])
+ax5.boxplot([hl_streak_chg_up, hl_streak_chg_down], tick_labels=['C >= Prev H', 'C <= Prev L'])
+ax5.set_title('Price Change % of Weekly High/Low Streaks')
+ax5.set_ylabel('Change %')
 
-ax_hurst = fig.add_subplot(gs[0, 0])
-ax_ac    = fig.add_subplot(gs[1, 0])
-ax_windows = fig.add_subplot(gs[2, 0])
-ax_cum_win = fig.add_subplot(gs[3, 0])
+# 6. Triple MA Trend Duration (Weekly)
+ax6 = fig.add_subplot(gs[1, 2])
+ax6.hist(triple_ma_long_dur, bins=15, alpha=0.5, label='5>10>20 Trend', color='green')
+ax6.hist(triple_ma_short_dur, bins=15, alpha=0.5, label='5<10<20 Trend', color='red')
+ax6.set_title('Triple MA Trend Duration (Weekly)')
+ax6.set_xlabel('Weeks')
+ax6.legend()
 
-# Hurst Plot
-ax_hurst.plot(df_stats.index, df_stats['hurst_100'], color='tab:olive', lw=1.5)
-ax_hurst.axhline(0.5, color='black', linestyle='--', alpha=0.6)
-ax_hurst.set_title("Market Regime (Hurst 100d)")
-ax_hurst.fill_between(df_stats.index, 0.5, df_stats['hurst_100'], where=(df_stats['hurst_100'] > 0.5), color='green', alpha=0.1)
-ax_hurst.fill_between(df_stats.index, 0.5, df_stats['hurst_100'], where=(df_stats['hurst_100'] < 0.5), color='red', alpha=0.1)
+# 7. Triple MA Trend Change % (Weekly)
+ax7 = fig.add_subplot(gs[2, 0])
+ax7.hist(triple_ma_long_chg, bins=15, alpha=0.5, label='5>10>20 Trend', color='green')
+ax7.hist(triple_ma_short_chg, bins=15, alpha=0.5, label='5<10<20 Trend', color='red')
+ax7.set_title('Triple MA Trend Change % (Weekly)')
+ax7.set_xlabel('Change %')
+ax7.legend()
 
-# Multi-Lag Autocorrelation
-for lag, col in [(1, 'tab:cyan'), (5, 'tab:purple'), (21, 'tab:gray')]:
-  ax_ac.plot(df_stats.index, df_stats[f'ac_lag_{lag}'], label=f'Lag {lag}', color=col, alpha=0.7)
-ax_ac.axhline(0, color='black', lw=1)
-ax_ac.set_title("Autocorrelation Legs (Rolling 60d)")
-ax_ac.legend(loc='upper left', ncol=3)
+# 8. Average Change by MA Slope (Summary bar chart)
+ax8 = fig.add_subplot(gs[2, 1:])
+ma_labels = ['MA5', 'MA10', 'MA20']
+avg_pos_chg = [ma_slope_stats_day[p]['pos_chg'].mean() for p in [5, 10, 20]]
+avg_neg_chg = [ma_slope_stats_day[p]['neg_chg'].mean() for p in [5, 10, 20]]
 
-# 5-Day Window Distribution
-df_win_pivot = pd.DataFrame()
-for win in window_order:
-  df_win_pivot[win] = df_stats[df_stats['5d_window'] == win]['pct'].reset_index(drop=True)
-
-utils.plots.violinplot_columns_with_labels(df_win_pivot, ax=ax_windows, title="PnL % Distribution per 5-Trading-Day Window")
-
-# Cumulative Performance by Window
-for win in window_order:
-  win_rets = np.where(df_stats['5d_window'] == win, df_stats['pct'], 0)
-  ax_cum_win.plot(df_stats.index, np.cumsum(win_rets), label=win)
-
-ax_cum_win.set_title("Cumulative Returns Contribution by Monthly Window")
-ax_cum_win.legend(loc='upper left', ncol=3)
-ax_cum_win.grid(True, alpha=0.2)
-
-# Formatting X-Axis for all time-series plots in this section
-for ax in [ax_hurst, ax_ac, ax_cum_win]:
-  # Set major ticks to every month
-  ax.xaxis.set_major_locator(mdates.YearLocator())
-  # Format the label as Year-Month
-  ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-  # Rotate labels to prevent overlap
-  plt.setp(ax.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+ax8.bar(np.arange(3) - 0.2, avg_pos_chg, 0.4, label='Avg Change Pos Slope', color='green', alpha=0.7)
+ax8.bar(np.arange(3) + 0.2, avg_neg_chg, 0.4, label='Avg Change Neg Slope', color='red', alpha=0.7)
+ax8.set_title('Avg Price Change % Following MA Slope (Daily)')
+ax8.set_xticks(np.arange(3))
+ax8.set_xticklabels(ma_labels)
+ax8.set_ylabel('Avg Change %')
+ax8.legend()
 
 plt.tight_layout()
 plt.show()
 
-print("\nWindow Statistics (Mean Return %):")
-print(df_stats.groupby('5d_window')['pct'].mean().reindex(window_order))
-
-#%% Test trading framework on different MAs
-# Defining the long trading, the short should work the same in the other direction
-# Test with 5, 10, 20, 50 MA and define statistics
-#  Number of trades
-#  PnL percentage per trade
-#  Duration of trade
-# Entry on
-#  trading > MA with an upward / downward slope
-# Exit on
-#  close 2 ATRP below
-#  second close < MA with change < 0
-#  third close < MA
-#  MA slope < 0
