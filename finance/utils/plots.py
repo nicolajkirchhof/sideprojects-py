@@ -205,6 +205,28 @@ def heatmap(df_corr, mask=None, name='Correlation Matrix', ax = None):
   fig.tight_layout()
 
 
+def annotate_violin(ax, data, positions, labels):
+    """
+    Annotate a matplotlib violinplot with Q25 / median / Q75 values.
+
+    Parameters
+    ----------
+    ax        : matplotlib Axes
+    data      : list of array-like — one entry per violin
+    positions : array-like          — x-positions matching data order
+    labels    : list of str         — unused (kept for call-site compat)
+    """
+    for i, d in enumerate(data):
+        if len(d) > 0:
+            q25, q50, q75 = np.percentile(d, [25, 50, 75])
+            ax.text(positions[i], q50, f'{q50:.1f}', ha='center', va='bottom',
+                    color='white', fontsize='x-small', fontweight='bold')
+            ax.text(positions[i], q25, f'{q25:.1f}', ha='center', va='top',
+                    color='gray', fontsize='xx-small')
+            ax.text(positions[i], q75, f'{q75:.1f}', ha='center', va='bottom',
+                    color='gray', fontsize='xx-small')
+
+
 def boxplot_columns_with_labels(
     df,
     whis=1.5,

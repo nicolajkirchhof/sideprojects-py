@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"E:/sideprojects-py/.claude/commands\")",
+      "Bash(mkdir -p \".claude/commands\")"
+    ]
+  }
+}
