@@ -1,3 +1,4 @@
+# DORMANT: InfluxDB-based, not currently active. Will be revisited when InfluxDB is back in use.
 import string
 from datetime import datetime
 

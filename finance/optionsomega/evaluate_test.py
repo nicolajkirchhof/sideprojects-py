@@ -1,3 +1,4 @@
+# Let's use 6 columns to allow for 3 items (2 cols each) and 2 items (3 cols each)
 #%%
 import pickle
 from datetime import datetime, timedelta, time

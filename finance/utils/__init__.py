@@ -16,7 +16,6 @@ from . import math
 from . import hourly_data
 from . import daily_data
 from . import underlyings
-from . import tradelog_client
 from . import dolt_data
 from .swing_trading_data import SwingTradingData
 from . import barchart_data

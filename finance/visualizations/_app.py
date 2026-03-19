@@ -326,17 +326,6 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
         self._chart_state['h_lines']      = h_lines
         self._chart_state['hover_labels'] = hover_labels
 
-        def _fmt_group(config_dict, value_fmt, col_label_fn=None, transform_fn=None):
-            parts = []
-            for col, cfg in config_dict.items():
-                if col not in df.columns:
-                    continue
-                val = df.iloc[0].get(col, np.nan)  # placeholder; real value set in update_hover
-                color = cfg['color'] if isinstance(cfg, dict) and 'color' in cfg else str(cfg)
-                label = col_label_fn(col) if col_label_fn else col
-                parts.append((col, color, label))
-            return parts
-
         x_dates = self._chart_state['x_dates']
 
         def update_hover(evt):

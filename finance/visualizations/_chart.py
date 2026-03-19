@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtWidgets
 from ._config import (
     MA_CONFIGS, ATR_CONFIGS, VOL_CONFIGS, DIST_CONFIGS,
     HV_CONFIGS, IVPCT_CONFIGS, BB_CONFIGS,
-    ATR_RATIO_THRESHOLD, ATR_RATIO_COLOR,
+    ATR_RATIO_THRESHOLD, ATR_RATIO_COLOR, TTM_COLORS,
 )
 from ._items import DateAxis, OHLCItem, TTMSqueezeItem, VolumeProfileItem
 
@@ -218,7 +218,6 @@ def _add_plot_content(plots, df, vlines, spy_df=None):
         for i in x_range:
             if not np.isfinite(mom[i]):
                 continue
-            from ._config import TTM_COLORS
             spots.append({
                 'pos':   (float(i), 0.0),
                 'brush': pg.mkBrush(TTM_COLORS['sq_on'] if sq[i] else TTM_COLORS['sq_off']),
@@ -305,4 +304,5 @@ def _auto_scale_panes(plots, df, x_min, x_max):
         mn2, mx2 = _finite_min_max(c_data.to_numpy().ravel())
         if mn2 is None:
             continue
-        p.setYRange(mn2 * 0.9, mx2 * 1.1, padding=0)
+        span = mx2 - mn2
+        p.setYRange(mn2 - 0.1 * span, mx2 + 0.1 * span, padding=0)
