@@ -1,23 +1,22 @@
-from . import influx
-from . import pct
-from . import greeks
-from . import time
+"""
+finance.utils
+==============
+Core infrastructure for finance analysis.
+
+Active modules only — dormant modules (InfluxDB, legacy plots) are in finance.utils._dormant.
+"""
 from . import ibkr
-from . import exchanges
-from . import options
-from . import indicators
-from . import plots
-from . import fitlog
-from . import geometry
-from . import trading_day_data
-from . import colors
-from . import ifttt
-from . import math
-from . import hourly_data
-from . import daily_data
-from . import underlyings
 from . import dolt_data
-from .swing_trading_data import SwingTradingData
-from . import barchart_data
+from . import indicators
 from . import definitions
 from . import fundamentals
+from . import exchanges
+from . import pct
+from . import greeks
+from . import options
+from . import fitlog
+from . import plots
+from . import chart_styles
+from . import momentum_data
+from . import move_character
+from .swing_trading_data import SwingTradingData

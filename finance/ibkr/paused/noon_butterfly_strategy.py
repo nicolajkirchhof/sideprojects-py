@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta, timezone
 
 import ib_async as ib
 import finance.utils as utils
+from finance.utils._dormant import ibkr_options
 
 %load_ext autoreload
 %autoreload 2
@@ -20,8 +21,8 @@ ib_con.connect('127.0.0.1', tws_paper_port, clientId=5, readonly=False)
 ib_con.reqMarketDataType(2)
 
 ## %%
-eu_indices = [utils.ibkr.get_and_qualify_contract_details(ib_con,ib.Index(x, 'EUREX', 'EUR')) for x in ['DAX', 'ESTX50']]
-us_indices = [utils.ibkr.get_and_qualify_contract_details(ib_con, ib.Index(symbol=x[0], exchange=x[1], currency='USD')) for x in [('XSP', 'CBOE')]]
+eu_indices = [ibkr_options.get_and_qualify_contract_details(ib_con,ib.Index(x, 'EUREX', 'EUR')) for x in ['DAX', 'ESTX50']]
+us_indices = [ibkr_options.get_and_qualify_contract_details(ib_con, ib.Index(symbol=x[0], exchange=x[1], currency='USD')) for x in [('XSP', 'CBOE')]]
 de_tz = utils.exchanges.DE_EXCHANGE['TZ']
 # us_tz = utils.exchanges.US_EXCHANGE['TZ']
 us_tz = utils.exchanges.US_NY_EXCHANGE['TZ']
@@ -58,8 +59,8 @@ for contracts_detail in indices[1:]:
   option_contract_details = ib_con.reqContractDetails(option_contract)
 
   ##%%
-  contract_ticker = utils.ibkr.get_options_data(ib_con, contract, signalParameterLive="impliedVolatility")[0]
-  sigma_move, max_value, min_value = utils.ibkr.get_sigma_move(contract_ticker, 2.5, 1)
+  contract_ticker = ibkr_options.get_options_data(ib_con, contract, signalParameterLive="impliedVolatility")[0]
+  sigma_move, max_value, min_value = ibkr_options.get_sigma_move(contract_ticker, 2.5, 1)
 
   ##%%
   relevant_option_contract_details = [od.contract for od in option_contract_details if
@@ -67,7 +68,7 @@ for contracts_detail in indices[1:]:
   # relevant_option_contract_details = [od.contract for od in option_contract_details]
 
   ##%%
-  option_contract_details_ticker = utils.ibkr.get_options_data(ib_con, relevant_option_contract_details,
+  option_contract_details_ticker = ibkr_options.get_options_data(ib_con, relevant_option_contract_details,
                                                                signalParameterFrozen="modelGreeks", max_waittime=600)
   valid_option_contract_details_ticker = [ocdt for ocdt in option_contract_details_ticker if ocdt.modelGreeks is not None]
 
@@ -91,7 +92,7 @@ for contracts_detail in indices[1:]:
   # high_call_wing = ib_con.reqMktData(high_call_wing.contract, "", False, False)
   # atm_call = ib_con.reqMktData(atm_call.contract, "", False, False)
 
-  last_av = utils.ibkr.get_last_available
+  last_av = ibkr_options.get_last_available
 
   def combo_contract_bid_price():
     ib_con.sleep(1)

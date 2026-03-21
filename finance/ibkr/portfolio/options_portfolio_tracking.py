@@ -3,8 +3,18 @@ import os
 from datetime import datetime
 
 import ib_async as ib
+import requests
 
 import finance.utils as utils
+
+# ANSI terminal colors for portfolio output
+_BRIGHT_GREEN = '\033[92m'
+_BRIGHT_RED = '\033[91m'
+_BRIGHT_WHITE = '\033[97m'
+_BG_RED = '\033[41m'
+_RESET = '\033[0m'
+
+TRADELOG_URL = os.environ.get('TRADELOG_URL', 'http://localhost:5186')
 
 # %load_ext autoreload
 # %autoreload 2
@@ -27,6 +37,20 @@ header_portfolio = f'Symbol {SEP} ContractId {SEP} Expiry {SEP} Pos {SEP} Right 
 underlying_market_data = {}
 last_market_data = {}
 closing_order_states = {}
+_sync_snapshots = []
+
+
+def sync_to_tradelog(snapshots):
+  """POST collected Greeks snapshots to the Tradelog backend."""
+  if not snapshots:
+    return
+  try:
+    resp = requests.post(f'{TRADELOG_URL}/api/option-positions-log/sync', json=snapshots, timeout=10)
+    resp.raise_for_status()
+    result = resp.json()
+    print(f'\n{_BRIGHT_GREEN}Tradelog sync: {result["inserted"]} inserted, {result["skipped"]} skipped{_RESET}')
+  except Exception as e:
+    print(f'\n{_BRIGHT_RED}Tradelog sync failed: {e}{_RESET}')
 ##%%
 def print_and_notify(option_portfolio_position):
   #%%
@@ -40,13 +64,12 @@ def print_and_notify(option_portfolio_position):
   line += f'{SEP}{option_portfolio_position.averageCost/int(option_portfolio_position.contract.multiplier):10.5f}'
   line += f'{SEP}1 {SEP}100'
   # line += f'{SEP}{option_portfolio_position.marketPrice:10.5f}{SEP}{pnl:8.2f}{SEP}{pnl_pct:8.2f}{SEP}'
-  color = utils.colors.Colors.BRIGHT_GREEN if pnl > 0 else utils.colors.Colors.BRIGHT_RED
+  color = _BRIGHT_GREEN if pnl > 0 else _BRIGHT_RED
   # Short PUT attention
   if option_portfolio_position.position < 0 and pnl_pct < -100:
-    print(utils.colors.Colors.BG_RED + utils.colors.Colors.BRIGHT_WHITE + line + utils.colors.Colors.RESET)
-    # utils.ifttt.send_ifttt_webhook(TRIGGER, KEY, [line])
+    print(_BG_RED + _BRIGHT_WHITE + line + _RESET)
   else:
-    print(color+line+utils.colors.Colors.RESET)
+    print(color + line + _RESET)
 
 def isnan(x):
   return x != x
@@ -117,6 +140,22 @@ def log_position(position):
   with open(file, 'a', encoding='utf8') as f:
     f.write(plain+'\n')
 
+  # Collect snapshot for Tradelog sync
+  greeks_or_zero = lambda x: float(x) if x is not None and not isnan(x) else 0.0
+  _sync_snapshots.append({
+    'dateTime': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
+    'contractId': str(contract.conId),
+    'underlying': float(umd.close),
+    'iv': float(iv) if iv > 0 and not isnan(iv) else 0.0,
+    'price': float(price) if not isnan(price) else 0.0,
+    'timeValue': float(time_value) if not isnan(time_value) else 0.0,
+    'delta': greeks_or_zero(greeks.delta),
+    'theta': greeks_or_zero(greeks.theta),
+    'gamma': greeks_or_zero(greeks.gamma),
+    'vega': greeks_or_zero(greeks.vega),
+    'margin': float(maintenance_margin),
+  })
+
 
 file = f'N:/My Drive/Trading/portfolio_{tws_instance}.csv'
 if not os.path.exists(file):
@@ -154,6 +193,9 @@ print(header)
 option_portfolio_positions.sort(key=lambda x: x.contract.conId)
 for option_portfolio_position in option_portfolio_positions:
   log_position(option_portfolio_position)
+
+##%%
+sync_to_tradelog(_sync_snapshots)
 
 #%%
 # stock_portfolio_positions = [position for position in portfolio if position.contract.secType in ['STK', 'FUT', 'CFD', 'CRYPTO', 'CASH']]

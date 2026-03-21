@@ -19,6 +19,7 @@ import matplotlib.ticker as mticker
 import mplfinance as mpf
 
 import finance.utils as utils
+from finance.utils._dormant import influx, trading_day_data, mpl_plots
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
@@ -40,7 +41,7 @@ for symbol in symbols:
   os.makedirs(directory_evals, exist_ok=True)
   os.makedirs(directory_plots, exist_ok=True)
 
-  symbol_def = utils.influx.SYMBOLS[symbol]
+  symbol_def = influx.SYMBOLS[symbol]
   exchange = symbol_def['EX']
   tz = exchange['TZ']
 
@@ -54,7 +55,7 @@ for symbol in symbols:
   prior_day = first_day
   day_start = first_day + timedelta(days=1)
 
-  day_data = utils.trading_day_data.TradingDayData(symbol, min_future_cache=timedelta(days=365))
+  day_data = trading_day_data.TradingDayData(symbol, min_future_cache=timedelta(days=365))
   #%%
   while day_start < last_day:
     #%%
@@ -189,7 +190,7 @@ for symbol in symbols:
 
     date_str = day_data.day_start.strftime('%Y-%m-%d')
     if IS_PLOT_ACTIVE:
-      utils.plots.daily_change_plot(day_data, alines, f'T {pullback_threshold:.2f}', vlines)
+      mpl_plots.daily_change_plot(day_data, alines, f'T {pullback_threshold:.2f}', vlines)
 
       # plt.show()
       plt.savefig(f'{directory_plots}/{symbol}_{date_str}.png', bbox_inches='tight')  # High-quality save

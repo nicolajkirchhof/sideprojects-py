@@ -19,6 +19,7 @@ import mplfinance as mpf
 from matplotlib import gridspec
 
 import finance.utils as utils
+from finance.utils._dormant import influx, trading_day_data, mpl_plots
 from finance.behavior_eval.futures_vwap_extrema import day_data
 
 mpl.use('TkAgg')
@@ -38,7 +39,7 @@ for symbol in symbols:
   os.makedirs(directory_plots, exist_ok=True)
 
   # Create a directory
-  symbol_def = utils.influx.SYMBOLS[symbol]
+  symbol_def = influx.SYMBOLS[symbol]
 
   exchange = symbol_def['EX']
   tz = exchange['TZ']
@@ -54,7 +55,7 @@ for symbol in symbols:
   day_start = first_day + timedelta(days=1)
 
   ##%%
-  day_data = utils.trading_day_data.TradingDayData(symbol, timedelta(days=2), timedelta(days=365))
+  day_data = trading_day_data.TradingDayData(symbol, timedelta(days=2), timedelta(days=365))
   #%%
   while day_start < last_day:
 #%%
@@ -112,7 +113,7 @@ for symbol in symbols:
               alpha=0.5, linewidths=[0.25],
               linestyle=['-'])
 
-    utils.plots.daily_change_plot(day_data, alines, '')
+    mpl_plots.daily_change_plot(day_data, alines, '')
     # plt.show()
 
   #%%

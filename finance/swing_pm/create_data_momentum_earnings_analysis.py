@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 import finance.utils as utils
+from finance.utils._dormant import underlyings
 
 # %load_ext autoreload
 # %autoreload 2
@@ -28,8 +29,8 @@ data_path = f'{base_path}/ticker'
 os.makedirs(data_path, exist_ok=True)
 
 # Load Core Data
-liquid_stocks = utils.underlyings.get_liquid_stocks()
-liquid_etfs = utils.underlyings.get_liquid_etfs()
+liquid_stocks = underlyings.get_liquid_stocks()
+liquid_etfs = underlyings.get_liquid_etfs()
 liquid_symbols = liquid_stocks + liquid_etfs
 
 #%%

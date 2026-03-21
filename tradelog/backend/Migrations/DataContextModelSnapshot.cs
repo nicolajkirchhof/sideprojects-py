@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using backend.net.Data;
+using tradelog.Data;
 
 #nullable disable
 
-namespace backend.net.Migrations
+namespace tradelog.Migrations
 {
     [DbContext(typeof(DataContext))]
     partial class DataContextModelSnapshot : ModelSnapshot
@@ -17,12 +17,12 @@ namespace backend.net.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.7")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("backend.net.Models.Capital", b =>
+            modelBuilder.Entity("tradelog.Models.Capital", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -30,24 +30,75 @@ namespace backend.net.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<float>("Bpr")
-                        .HasColumnType("real");
+                    b.Property<decimal>("AvgIv")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Bpr")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
-                    b.Property<float>("ExcessLiquidity")
-                        .HasColumnType("real");
+                    b.Property<decimal>("ExcessLiquidity")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
-                    b.Property<float>("NetLiquidity")
-                        .HasColumnType("real");
+                    b.Property<decimal>("Maintenance")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("MaintenancePct")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("NetDelta")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("NetGamma")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("NetLiquidity")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("NetTheta")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("NetVega")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("RealizedPnl")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("TotalCommissions")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("TotalMargin")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("TotalPnl")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("UnrealizedPnl")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.HasKey("Id");
 
                     b.ToTable("Capitals");
                 });
 
-            modelBuilder.Entity("backend.net.Models.Instrument", b =>
+            modelBuilder.Entity("tradelog.Models.OptionPosition", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -55,69 +106,9 @@ namespace backend.net.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("Multiplier")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SecType")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Sector")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Subsector")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Instruments");
-                });
-
-            modelBuilder.Entity("backend.net.Models.Log", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("InstrumentId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("ProfitMechanism")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("Sentiment")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Logs");
-                });
-
-            modelBuilder.Entity("backend.net.Models.Position", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<double?>("Close")
-                        .HasColumnType("float");
+                    b.Property<decimal?>("ClosePrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<int?>("CloseReasons")
                         .HasColumnType("int");
@@ -125,47 +116,53 @@ namespace backend.net.Migrations
                     b.Property<DateTime?>("Closed")
                         .HasColumnType("datetime2");
 
-                    b.Property<double?>("Comission")
-                        .HasColumnType("float");
+                    b.Property<decimal>("Commission")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<string>("ContractId")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<double>("Cost")
-                        .HasColumnType("float");
+                    b.Property<decimal>("Cost")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<DateTime>("Expiry")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("InstrumentId")
+                    b.Property<int>("Multiplier")
                         .HasColumnType("int");
-
-                    b.Property<string>("InstrumentSpecifics")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("Opened")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("Size")
+                    b.Property<int>("Pos")
                         .HasColumnType("int");
 
-                    b.Property<double>("Strike")
-                        .HasColumnType("float");
-
-                    b.Property<int>("Type")
+                    b.Property<int>("Right")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("Strike")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InstrumentId");
+                    b.HasIndex("ContractId");
 
-                    b.ToTable("Positions");
+                    b.HasIndex("Symbol");
+
+                    b.ToTable("OptionPositions");
                 });
 
-            modelBuilder.Entity("backend.net.Models.Tracking", b =>
+            modelBuilder.Entity("tradelog.Models.OptionPositionsLog", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -173,52 +170,264 @@ namespace backend.net.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ContractId")
-                        .HasColumnType("int");
-
-                    b.Property<float>("Delta")
-                        .HasColumnType("real");
-
-                    b.Property<float>("Gamma")
-                        .HasColumnType("real");
-
-                    b.Property<float>("IV")
-                        .HasColumnType("real");
-
-                    b.Property<float>("Margin")
-                        .HasColumnType("real");
-
-                    b.Property<float>("Price")
-                        .HasColumnType("real");
-
-                    b.Property<float>("Theta")
-                        .HasColumnType("real");
-
-                    b.Property<float>("TimeValue")
-                        .HasColumnType("real");
-
-                    b.Property<string>("Underlying")
+                    b.Property<string>("ContractId")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
-                    b.Property<float>("Vega")
-                        .HasColumnType("real");
+                    b.Property<DateTime>("DateTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Delta")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Gamma")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Iv")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Margin")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Theta")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("TimeValue")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Underlying")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Vega")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Trackings");
+                    b.HasIndex("ContractId", "DateTime")
+                        .IsUnique()
+                        .IsDescending(false, true);
+
+                    b.ToTable("OptionPositionsLogs");
                 });
 
-            modelBuilder.Entity("backend.net.Models.Position", b =>
+            modelBuilder.Entity("tradelog.Models.Portfolio", b =>
                 {
-                    b.HasOne("backend.net.Models.Instrument", "Instrument")
-                        .WithMany()
-                        .HasForeignKey("InstrumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
 
-                    b.Navigation("Instrument");
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Budget")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("MaxAllocation")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("MinAllocation")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<int>("Strategy")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Portfolios");
+                });
+
+            modelBuilder.Entity("tradelog.Models.Trade", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Commission")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Multiplier")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PosChange")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Symbol", "Date");
+
+                    b.ToTable("Trades");
+                });
+
+            modelBuilder.Entity("tradelog.Models.TradeEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActualManagement")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("Ath")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Budget")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("Directional")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("GapPct")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("InstitutionalSupport")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("IntendedManagement")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Learnings")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ManagementRating")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("NewsCatalyst")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("RecentEarnings")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("Rvol")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<bool>("SectorSupport")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Strategy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TaFaNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("Timeframe")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TypeOfTrade")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("XAtrMove")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Symbol");
+
+                    b.ToTable("TradeEntries");
+                });
+
+            modelBuilder.Entity("tradelog.Models.WeeklyPrep", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Breadth")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("CurrentPortfolioRisk")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ExternalComments")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FocusForImprovement")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IndexBias")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("IndexSectorPreference")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Learnings")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NotableSectors")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OpenPositionsRequiringManagement")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PortfolioNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ScanningFor")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("VolatilityNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Watchlist")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WeeklyPreps");
                 });
 #pragma warning restore 612, 618
         }

@@ -5,6 +5,7 @@ import ib_async as ib
 import pandas as pd
 
 import finance.utils as utils
+from finance.utils._dormant import ibkr_options
 
 %load_ext autoreload
 %autoreload 2
@@ -35,9 +36,9 @@ for contract in contracts:
   ib_con.reqMarketDataType(2)
   market_data = ib_con.reqMktData(contract, "", True, False)
   tries = 0
-  while (market_data.modelGreeks is None or ((utils.math.isnan(utils.ibkr.get_options_price(market_data, 'bid')) or
-                                              utils.math.isnan(utils.ibkr.get_options_price(market_data, 'ask')))  and
-                                             utils.math.isnan(utils.ibkr.get_options_price(market_data, 'last')))) and tries < MAX_TRIES:
+  while (market_data.modelGreeks is None or ((utils.math.isnan(ibkr_options.get_options_price(market_data, 'bid')) or
+                                              utils.math.isnan(ibkr_options.get_options_price(market_data, 'ask')))  and
+                                             utils.math.isnan(ibkr_options.get_options_price(market_data, 'last')))) and tries < MAX_TRIES:
     print(f"Waiting {tries} / {MAX_TRIES}  for option frozen data...")
     tries += 1
     ib_con.sleep(5)
@@ -62,15 +63,15 @@ for contract in contracts:
   elif market_data.modelGreeks is not None:
     greeks = market_data.modelGreeks
 
-  bid = utils.ibkr.get_options_price(market_data, 'bid')
-  ask = utils.ibkr.get_options_price(market_data, 'ask')
-  last = utils.ibkr.get_options_price(market_data, 'last')
+  bid = ibkr_options.get_options_price(market_data, 'bid')
+  ask = ibkr_options.get_options_price(market_data, 'ask')
+  last = ibkr_options.get_options_price(market_data, 'last')
 
   price = last
   if utils.math.isnan(price) and not utils.math.isnan(bid) and not utils.math.isnan(ask):
     price = (bid + ask)/2
   iv = greeks.impliedVol if greeks.impliedVol is not None else -1
-  daily_iv = utils.ibkr.yearly_to_daily_iv(iv)
+  daily_iv = ibkr_options.yearly_to_daily_iv(iv)
   ##%% Greeks sometimes return None
   greeks_to_str = lambda x: f'{1000*x:.0f}' if x is not None else 'NaN'
   exp = contract.lastTradeDateOrContractMonth

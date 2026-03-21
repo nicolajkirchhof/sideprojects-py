@@ -8,6 +8,7 @@ from time import perf_counter
 from datetime import datetime
 
 from finance import utils
+from finance.utils._dormant import underlyings
 
 # %load_ext autoreload
 # %autoreload 2
@@ -24,7 +25,7 @@ pickle.dump(delisted, open('finance/_data/delisted.pkl', 'wb'))
 print(f"======>>>[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] delisted: {len(df_delisted):,} rows")
 
 #%%
-underlyings = utils.underlyings.get_liquid_underlyings()
+underlyings = underlyings.get_liquid_underlyings()
 total = len(underlyings)
 print(f"======>>>[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] underlyings: {total:,}")
 

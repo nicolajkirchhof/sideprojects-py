@@ -5,9 +5,14 @@
       [opened]="(isHandset$ | async) === false">
     <mat-toolbar>Menu</mat-toolbar>
     <mat-nav-list>
-      <a mat-list-item routerLink="/log">Log</a>
-      <a mat-list-item routerLink="/positions">Positions</a>
-      <a mat-list-item routerLink="/instruments">Instruments</a>
+      <a mat-list-item routerLink="/dashboard">Dashboard</a>
+      <a mat-list-item routerLink="/trade-entries">Trade Entries</a>
+      <a mat-list-item routerLink="/option-positions">Option Positions</a>
+      <a mat-list-item routerLink="/trades">Trades</a>
+      <a mat-list-item routerLink="/capital">Capital</a>
+      <a mat-list-item routerLink="/weekly-prep">Weekly Prep</a>
+      <a mat-list-item routerLink="/analytics">Analytics</a>
+      <a mat-list-item routerLink="/portfolio">Portfolio</a>
       <a mat-list-item routerLink="/about">About</a>
     </mat-nav-list>
   </mat-sidenav>
@@ -24,6 +29,15 @@
       }
       <span>Tradelog</span>
       <span class="ml-4 opacity-90 text-sm">{{ (breadcrumb$ | async) }}</span>
+      <span class="flex-1"></span>
+      @if (lastSyncInfo$ | async; as sync) {
+        <span class="text-xs flex items-center gap-1"
+              [class]="sync.stale ? 'text-amber-400' : 'opacity-70'"
+              [matTooltip]="sync.stale ? 'Greeks data may be stale' : 'IBKR Greeks sync status'">
+          <mat-icon class="!text-base !w-4 !h-4">{{ sync.stale ? 'warning' : 'sync' }}</mat-icon>
+          {{ sync.label }}
+        </span>
+      }
     </mat-toolbar>
     <div class="flex flex-1 flex-col">
       <router-outlet></router-outlet>

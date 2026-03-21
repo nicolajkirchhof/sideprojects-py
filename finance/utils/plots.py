@@ -1,208 +1,12 @@
-import gc
-import os
-import re
-import sys
-from datetime import timedelta, datetime
-
-import mplfinance as mpf
+"""
+finance.utils.plots
+=====================
+Active matplotlib plotting helpers used by the swing plot dashboard.
+"""
 import numpy as np
 import networkx as nx
 import pandas as pd
-from matplotlib import gridspec, pyplot as plt
-
-from finance import utils
-import matplotlib.ticker as mticker
-
-import pyqtgraph as pg
-from pyqtgraph import QtCore, QtGui
-from pyqtgraph.Qt import QtWidgets
-import pyqtgraph.exporters
-
-from finance.utils.trading_day_data import TradingDayData
-
-# Reusing your configurations for visual consistency
-EMA_CONFIGS = {'ema5': '#f5deb3', 'ema10': '#f5deb3', 'ema20': '#e2b46d', 'ema50': '#c68e17', 'vwap3': '#00bfff'} #'ema100': '#8b5a2b', 'ema200': '#4b3621',
-ATR_CONFIGS = {'atrp9': '#b0c4de', 'atrp14': '#4682b4', 'atrp20': '#000080'}
-AC_CONFIGS = {'ac100_lag_1': '#e0ffff', 'ac100_lag_5': '#00ced1', 'ac100_lag_10': '#00bfff', 'ac100_lag_20': '#008080'}
-AC_REGIME_CONFIGS = {'ac_mom': '#e1bee7', 'ac_mr': '#ba68c8', 'ac_comp': '#4a148c'}
-SLOPE_CONFIGS = {'ema10_slope': '#ffccbc', 'ema20_slope': '#ff8a65', 'ema50_slope': '#ff5722', 'ema100_slope': '#e64a19', 'ema200_slope': '#bf360c'}
-HURST_CONFIGS = {'hurst50': '#fff59d', 'hurst100': '#fbc02d'}
-HV_CONFIGS = {'hv9': '#a5d6a7', 'hv14': '#66bb6a', 'hv30': '#2e7d32', 'iv': '#ff00ff'}
-
-
-
-
-def plot_multi_pane_mpl(df, symbol, ref_df = None, vlines=dict(vlines=[], colors=[]), fig=None):
-  panes = 7 if ref_df is None else 8
-
-  # 1. Setup Figure and Grid (8 Panes matching pyqtgraph)
-  if fig is None:
-    fig = mpf.figure(figsize=(24, 24))
-    gs = gridspec.GridSpec(panes, 1, height_ratios=[3]+[1]*(panes-1))
-    axes = [fig.add_subplot(gs[i]) for i in range(8)]
-  else:
-    axes = fig.get_axes()
-    for ax in axes: ax.clear()
-
-  # 2. Pane 1: Price + EMAs (using mplfinance)
-  ap = []
-  for col, color in EMA_CONFIGS.items():
-    if col in df.columns:
-      ap.append(mpf.make_addplot(df[col], ax=axes[0], color=color, width=1.0))
-
-  mpf.plot(df, type='ohlc', columns=utils.influx.MPF_COLUMN_MAPPING, volume=axes[1], style='yahoo', ax=axes[0], addplot=ap, vlines=vlines, datetime_format='%y-%m-%d')
-  if ref_df is not None and len(ref_df) == len(df):
-    mpf.plot(ref_df, type='ohlc', columns=utils.influx.MPF_COLUMN_MAPPING, style='yahoo', ax=axes[7], addplot=ap, vlines=vlines, datetime_format='%y-%m-%d')
-  axes[0].set_title(f"{symbol} Multi-Pane Analysis", fontsize=16)
-
-  # 4. Indicator Panes (Panes 3-8)
-  config_map = [
-    (axes[2], ATR_CONFIGS, 'ATR %'),
-    (axes[3], AC_CONFIGS, 'AutoCorr'),
-    (axes[4], HURST_CONFIGS, 'Hurst'),
-    (axes[5], AC_REGIME_CONFIGS, 'AC Regimes'),
-    (axes[6], HV_CONFIGS, 'IV/HV')
-  ]
-
-  for ax, config, label in config_map:
-    for col, cfg in config.items():
-      if col in df.columns:
-        ax.plot(df.index, df[col], color=cfg if isinstance(cfg, str) else cfg['color'],
-                lw=cfg.get('width', 1.0) if isinstance(cfg, dict) else 1.0, label=col)
-
-    # Zero/Baseline levels matching @thisFile
-    if label in ['AutoCorr', 'EMA Slope', 'AC Regimes']: ax.axhline(0, color='#666', lw=0.8, ls='--')
-    if label == 'ATR %': ax.axhline(1.2, color='#666', lw=0.8, ls='--')
-    if label == 'Hurst': ax.axhline(0.5, color='#666', lw=0.8, ls='--')
-
-    ax.set_ylabel(label)
-    ax.grid(True, alpha=0.3)
-    # Optional: ax.legend(loc='upper left', fontsize=8)
-
-  plt.tight_layout()
-  return fig
-
-def daily_change_plot(day_data: TradingDayData, alines=None, title_add='', atr_vlines=dict(vlines=[], colors=[]),
-                      ad=True, basetime='5m'):
-  # |-------------------------|
-  # |        5m/10m/15m       |
-  # | ------------------------|
-  # |   D   |       30m       |
-  # | ------------------------|
-  if basetime == '5m':
-    df_base = day_data.df_5m_ad if ad else day_data.df_5m
-  elif basetime == '10m':
-    df_base = day_data.df_10m_ad if ad else day_data.df_10m
-  elif basetime == '15m':
-    df_base = day_data.df_15m_ad if ad else day_data.df_15m
-  df_30m = day_data.df_30m_ad if ad else day_data.df_30m
-
-  fig = mpf.figure(style='yahoo', figsize=(19, 11), tight_layout=True)
-  gs = gridspec.GridSpec(3, 2, height_ratios=[2, 0.25, 1], width_ratios=[1, 2])
-
-  date_str = day_data.day_start.strftime('%a, %Y-%m-%d')
-  ax1 = fig.add_subplot(gs[0, :])
-  ax2 = fig.add_subplot(gs[2, 0])
-  ax3 = fig.add_subplot(gs[2, 1])
-  ax4 = fig.add_subplot(gs[1, :])
-
-  indicator_hlines = [day_data.cdc, day_data.pdc, day_data.pdh, day_data.pdl,
-                      day_data.onh, day_data.onl, day_data.cwh, day_data.cwl, day_data.pwh, day_data.pwl]
-  fig.suptitle(
-    f'{day_data.symbol} {date_str} || O {day_data.cdo:.2f} H {day_data.cdh:.2f} C {day_data.cdc:.2f} L {day_data.cdl:.2f} || On: H {day_data.onh:.2f} L {day_data.onl:.2f} \n' +
-    f'PD: H {day_data.pdh:.2f} C {day_data.pdc:.2f} L {day_data.pdl:.2f} || ' +
-    f'CW: H {day_data.cwh:.2f} L {day_data.cwl:.2f} || PW: H {day_data.pwh:.2f} L {day_data.pwl:.2f} || {title_add}')
-
-  hlines = dict(hlines=indicator_hlines, colors=['deeppink'] + ['#bf42f5'] * 5 + ['#3179f5'] * 4,
-                linewidths=[0.4] * 1 + [0.6] * 3 + [0.4] * 6,
-                linestyle=['--'] * 2 + ['-'] * (len(indicator_hlines) - 1))
-  hlines_day = dict(hlines=indicator_hlines[1:], colors=['#bf42f5'] * 5 + ['#3179f5'] * 4,
-                    linewidths=[0.6] * 3 + [0.4] * 6, linestyle=['--'] + ['-'] * (len(indicator_hlines) - 1))
-  vlines = dict(vlines=[day_data.day_open, day_data.day_close], alpha=[0.2], colors=['deeppink'] * 2, linewidths=[1],
-                linestyle=['--'])
-
-  ind_5m_ema20_plot = mpf.make_addplot(df_base['20EMA'], ax=ax1, width=0.6, color="#FF9900", linestyle='--')
-  ind_5m_ema240_plot = mpf.make_addplot(df_base['200EMA'], ax=ax1, width=0.6, color='#0099FF', linestyle='--')
-  ind_vwap3_plot = mpf.make_addplot(df_base['VWAP3'], ax=ax1, width=2, color='turquoise')
-
-  ind_30m_ema20_plot = mpf.make_addplot(df_30m['20EMA'], ax=ax3, width=0.6, color="#FF9900", linestyle='--')
-
-  ind_day_ema20_plot = mpf.make_addplot(day_data.df_day['20EMA'], ax=ax2, width=0.6, color="#FF9900", linestyle='--')
-
-  mpf.plot(df_base, type='candle', ax=ax1, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0,
-           datetime_format='%H:%M', tight_layout=True,
-           scale_width_adjustment=dict(candle=1.35), hlines=hlines, alines=alines, vlines=vlines,
-           addplot=[ind_5m_ema20_plot, ind_5m_ema240_plot, ind_vwap3_plot])
-  mpf.plot(df_base, type='line', ax=ax4, columns=['lh'] * 5, xrotation=0, datetime_format='%H:%M', vlines=atr_vlines,
-           tight_layout=True)
-
-  mpf.plot(day_data.df_day, type='candle', ax=ax2, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0,
-           datetime_format='%m-%d', tight_layout=True,
-           hlines=hlines_day, warn_too_much_data=700, addplot=[ind_day_ema20_plot])
-  mpf.plot(df_30m, type='candle', ax=ax3, columns=utils.influx.MPF_COLUMN_MAPPING, xrotation=0, datetime_format='%H:%M',
-           tight_layout=True,
-           scale_width_adjustment=dict(candle=1.35), hlines=hlines, addplot=[ind_30m_ema20_plot])
-
-  # Use MaxNLocator to increase the number of ticks
-  ax1.xaxis.set_major_locator(mticker.MaxNLocator(nbins=20))  # Increase number of ticks on x-axis
-  ax4.xaxis.set_major_locator(mticker.MaxNLocator(nbins=20))  # Increase number of ticks on x-axis
-  ax1.yaxis.set_major_locator(mticker.MaxNLocator(nbins=10))  # Increase number of ticks on y-axis
-  plt.tight_layout(h_pad=0.1)
-
-
-def last_date_from_files(directory):
-  files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-  # Sort files by name in descending order
-  files_sorted = sorted(files, reverse=True)
-  first_file = files_sorted[0] if files_sorted else None
-  if first_file is not None:
-    # Define a regex pattern to extract the date (format: YYYY-MM-DD)
-    date_pattern = r'\d{4}-\d{2}-\d{2}'  # Adjust the pattern to match your date format
-
-    # Find the date in the filename
-    match = re.search(date_pattern, first_file)
-    if match:
-      date_str = match.group()  # Extract the date string
-      parsed_date = datetime.strptime(date_str, "%Y-%m-%d")  # Parse into a datetime object
-      print(f"Date string: {date_str}")
-      print(f"Parsed date: {parsed_date}")
-      return parsed_date
-    else:
-      print("No date found in filename.")
-  return None
-
-
-def heatmap(df_corr, mask=None, name='Correlation Matrix', ax = None):
-  # 3. Setup Plot
-  fig, ax = plt.subplots(figsize=(24, 14)) if ax is None else (ax.figure, ax)
-  # We use the original 'corr' for imshow but can set masked values to NaN/Alpha
-  im = ax.imshow(df_corr, cmap='RdYlGn', vmin=-1, vmax=1)
-
-  # 4. Labels and Ticks
-  cols = df_corr.columns
-  ax.set_xticks(np.arange(len(cols)))
-  ax.set_yticks(np.arange(len(cols)))
-  ax.set_xticklabels(cols)
-  ax.set_yticklabels(cols)
-
-  plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-
-  # 5. Add text labels only for the non-masked parts
-  for i in range(len(cols)):
-    for j in range(len(cols)):
-      if not mask[i, j]:  # Only draw text if it's not in mask
-        val = df_corr.iloc[i, j]
-        ax.text(j, i, f"{val:.2f}",
-                ha="center", va="center", color="black", fontsize=9)
-
-  # 6. Aesthetics
-  ax.set_title(name)
-  # Remove the top and right spines to clean up the "empty" space
-  ax.spines['top'].set_visible(False)
-  ax.spines['right'].set_visible(False)
-
-  fig.colorbar(im, ax=ax, label='Correlation Coefficient')
-  fig.tight_layout()
+from matplotlib import pyplot as plt
 
 
 def annotate_violin(ax, data, positions, labels):
@@ -225,67 +29,6 @@ def annotate_violin(ax, data, positions, labels):
                     color='gray', fontsize='xx-small')
             ax.text(positions[i], q75, f'{q75:.1f}', ha='center', va='bottom',
                     color='gray', fontsize='xx-small')
-
-
-def boxplot_columns_with_labels(
-    df,
-    whis=1.5,
-    showfliers=False,
-    figsize=(23, 12),
-    rotate=45,
-    fmt="{:.2f}",
-    text_kwargs=None,
-    title='',
-    ax=None
-):
-  """
-  Boxplot for all t-columns, annotated with:
-    Q1, median, Q3, lower whisker, upper whisker (actual numeric values).
-  Whiskers follow Matplotlib's default logic: most extreme data within [Q1 - whis*IQR, Q3 + whis*IQR].
-  """
-  text_kwargs = text_kwargs or {}
-
-  cols = df.columns.tolist()
-
-  data = [df[c].dropna().to_numpy(dtype=float) for c in cols]
-
-  fig, ax = plt.subplots(figsize=figsize) if ax is None else (ax.figure, ax)
-  ax.boxplot(data, tick_labels=cols, showfliers=showfliers, whis=whis)
-
-  ax.axhline(0, color="gray", linewidth=1)
-  ax.set_title("Distribution of values")
-  ax.grid(True, axis="y", alpha=0.25)
-  plt.setp(ax.get_xticklabels(), rotation=rotate, ha="right")
-
-  # Annotate each box with Q1/Median/Q3 and whiskers
-  for i, y in enumerate(data, start=1):  # positions are 1..N
-    y = y[np.isfinite(y)]
-    if y.size == 0:
-      continue
-
-    q1, med, q3 = np.percentile(y, [25, 50, 75])
-    iqr = q3 - q1
-    lo_fence = q1 - whis * iqr
-    hi_fence = q3 + whis * iqr
-
-    # "Actual" whiskers = most extreme points inside fences
-    in_lo = y[y >= lo_fence]
-    in_hi = y[y <= hi_fence]
-    wlo = np.min(in_lo) if in_lo.size else np.min(y)
-    whi = np.max(in_hi) if in_hi.size else np.max(y)
-
-    # place labels slightly to the right of each box
-    x = i
-    bbox = dict(facecolor="white", edgecolor="none", alpha=0.75)
-
-    ax.text(x, whi, f"whi={fmt.format(whi)}", va="bottom", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, q3, f"q3={fmt.format(q3)}", va="bottom", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, med, f"m ={fmt.format(med)}", va="center", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, q1, f"q1={fmt.format(q1)}", va="top", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-    ax.text(x, wlo, f"wlo={fmt.format(wlo)}", va="top", ha="left", fontsize=8, bbox=bbox, **text_kwargs)
-
-  plt.tight_layout()
-  return fig, ax
 
 
 def violinplot_columns_with_labels(
@@ -362,7 +105,7 @@ def violinplot_columns_with_labels(
     bg_color = "black" if is_dark else "white"
     text_color = "white" if is_dark else "black"
     box_alpha = 0.85 if is_dark else 0.75
-    
+
     x, bbox = i, dict(facecolor=bg_color, edgecolor="none", alpha=box_alpha)
     ax.hlines(s['med'], x - 0.1, x + 0.1, color=text_color, lw=2)
     ax.hlines([s['q1'], s['q3']], x - 0.1, x + 0.1, color=text_color, lw=1, linestyle='-', alpha=0.6, zorder=3)
@@ -398,7 +141,6 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
       p_depth, p_seq = parent
 
       # Filter full moves list to find occurrences of the parent sequence
-      # We look for the sequence followed by 1 or 0
       count_up = 0
       count_down = 0
 
@@ -457,7 +199,6 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
 
   # Use background color to determine node and edge colors
   face_color = ax.get_facecolor()
-  # Convert face_color to a comparable format if it's a tuple (RGBA)
   if isinstance(face_color, tuple):
     from matplotlib.colors import to_hex
     face_color_hex = to_hex(face_color)
@@ -509,4 +250,3 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
                                bbox=dict(facecolor=ax.get_facecolor(), edgecolor='none', alpha=0.6))
 
   return fig, ax
-

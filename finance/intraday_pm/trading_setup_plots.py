@@ -19,6 +19,7 @@ import mplfinance as mpf
 from matplotlib import gridspec
 
 import finance.utils as utils
+from finance.utils._dormant import influx, trading_day_data, mpl_plots
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
@@ -35,7 +36,7 @@ for symbol in symbols[-1:]:
   os.makedirs(directory, exist_ok=True)
 
   # Create a directory
-  symbol_def = utils.influx.SYMBOLS[symbol]
+  symbol_def = influx.SYMBOLS[symbol]
 
   exchange = symbol_def['EX']
   tz = exchange['TZ']
@@ -53,10 +54,10 @@ for symbol in symbols[-1:]:
   #%%
   while day_start < last_day:
     #%%
-    day_data = utils.trading_day_data.TradingDayData(day_start, symbol)
+    day_data = trading_day_data.TradingDayData(day_start, symbol)
 
     date_str = day_data.day_start.strftime('%Y-%m-%d')
-    utils.plots.daily_change_plot(day_data)
+    mpl_plots.daily_change_plot(day_data)
 
     # plt.show()
     ##%%

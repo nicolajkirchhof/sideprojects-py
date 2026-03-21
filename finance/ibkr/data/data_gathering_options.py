@@ -6,26 +6,27 @@ import matplotlib as mpl
 from datetime import datetime, timedelta
 import dateutil
 from finance import utils
-from finance.utils.influx import DB_DAILY
+from finance.utils._dormant import influx, underlyings
+from finance.utils._dormant.influx import DB_DAILY
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-utils.influx.create_databases()
-influx_client_df, influx_client = utils.influx.get_influx_clients()
+influx.create_databases()
+influx_client_df, influx_client = influx.get_influx_clients()
 
 tws_instance = 'real'
 ib_con = utils.ibkr.connect(tws_instance, 4, 2)
 
 # %%
 
-no_ooi_indices = utils.underlyings.cboe_volatility_indices + utils.underlyings.eu_volatility_indices
+no_ooi_indices = underlyings.cboe_volatility_indices + underlyings.eu_volatility_indices
 no_hv_indices = no_ooi_indices
 
-eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in utils.underlyings.eu_indices]
-us_indices = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX'] + utils.underlyings.cboe_volatility_indices],
+eu_indices = [ib.Index(x, 'EUREX', 'EUR') for x in underlyings.eu_indices]
+us_indices = [*[ib.Index(x, 'CBOE', 'USD') for x in ['VIX'] + underlyings.cboe_volatility_indices],
               ib.Index('SPX', 'CBOE', 'USD'),
               ib.Index('NDX', 'NASDAQ', 'USD'), ib.Index('RUT', 'RUSSELL', 'USD'),
               ib.Index('INDU', 'CME', 'USD')]
@@ -45,14 +46,14 @@ us_futures = [*[ib.ContFuture(symbol=x[0], multiplier=x[1], exchange=x[2], curre
 futures = [*eu_futures, *us_futures]
 
 ## %%
-us_etf_symbols = [*utils.underlyings.market_etf_symbols, *utils.underlyings.sectors_etf_symbols,
-                  *utils.underlyings.world_etf_symbols, *utils.underlyings.crypto_etf_symbols,
-                  *utils.underlyings.forex_etf_symbols, *utils.underlyings.metals_etf_symbols,
-                  *utils.underlyings.energy_etf_symbols, *utils.underlyings.agriculture_etf_symbols]
+us_etf_symbols = [*underlyings.market_etf_symbols, *underlyings.sectors_etf_symbols,
+                  *underlyings.world_etf_symbols, *underlyings.crypto_etf_symbols,
+                  *underlyings.forex_etf_symbols, *underlyings.metals_etf_symbols,
+                  *underlyings.energy_etf_symbols, *underlyings.agriculture_etf_symbols]
 
 us_etfs = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in us_etf_symbols]
 
-us_stocks = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in utils.underlyings.us_stock_symbols]
+us_stocks = [ib.Stock(symbol=x, exchange='SMART', currency='USD') for x in underlyings.us_stock_symbols]
 
 contracts = [*indices, *us_etfs, *forex, *futures, *us_stocks]
 

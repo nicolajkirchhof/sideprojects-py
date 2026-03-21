@@ -6,14 +6,15 @@ import matplotlib as mpl
 from datetime import datetime, timedelta
 import dateutil
 from finance import utils
+from finance.utils._dormant import influx
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
 
-utils.influx.create_databases()
-influx_client_df, influx_client = utils.influx.get_influx_clients()
+influx.create_databases()
+influx_client_df, influx_client = influx.get_influx_clients()
 
 tws_instance = 'real'
 ib_con = utils.ibkr.connect(tws_instance, 3, 2)
@@ -113,7 +114,7 @@ for contract in contracts:
       continue
     field_name = field_name_lu[typ]['close']
     c_last = influx_client_df.query(f'select last("{field_name}") from {contract_to_fieldname(contract)}',
-                                   database=utils.influx.sec_type_to_database_name(contract.secType))
+                                   database=influx.sec_type_to_database_name(contract.secType))
     if c_last:
       current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime()
       if current_date.date() > (datetime.now() - timedelta(days=3)).date():
@@ -132,5 +133,5 @@ for contract in contracts:
         continue
       dfs_type = ib.util.df(data).rename(columns=field_name_lu[typ]).set_index('date').tz_localize('UTC')
       influx_client_df.write_points(dfs_type, contract_to_fieldname(contract),
-                                   database=utils.influx.sec_type_to_database_name(contract.secType))
+                                   database=influx.sec_type_to_database_name(contract.secType))
 

@@ -18,7 +18,8 @@ import mplfinance as mpf
 
 
 import finance.utils as utils
-from finance.utils.influx import DB_CFD, DB_INDEX, DB_FOREX
+from finance.utils._dormant import influx
+from finance.utils._dormant.influx import DB_CFD, DB_INDEX, DB_FOREX
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
@@ -27,7 +28,7 @@ mpl.use('QtAgg')
 
 
 #%% get influx data
-influx_client_df, influx_client = utils.influx.get_influx_clients()
+influx_client_df, influx_client = influx.get_influx_clients()
 
 
 de_exchange = {'TZ':ZoneInfo('Europe/Berlin'), 'Open': timedelta(hours=9), 'Close': timedelta(hours=17, minutes=30), 'PostClose': timedelta(hours=22), 'PreOpen': timedelta(hours=8)}
@@ -59,10 +60,10 @@ test_day_oct = parser.parse('2024-10-08T00:00:00').replace(tzinfo=tz)
 test_day_nov = parser.parse('2024-11-08T00:00:00').replace(tzinfo=tz)
 ##%%
 
-df_feb = influx_client_df.query(utils.influx.get_candles_range_aggregate_query(test_day_feb, test_day_feb+timedelta(days=1), symbol, '1h'), database=db)[symbol]
-df_aug = influx_client_df.query(utils.influx.get_candles_range_aggregate_query(test_day_aug, test_day_aug+timedelta(days=1), symbol, '1h'), database=db)[symbol]
-# df_oct = influx_client_df.query(utils.influx.get_candles_range_aggregate_query(test_day_oct, test_day_oct+timedelta(days=1), symbol, '1h'), database=db)[symbol]
-# df_nov = influx_client_df.query(utils.influx.get_candles_range_aggregate_query(test_day_nov, test_day_nov+timedelta(days=1), symbol, '1h'), database=db)[symbol]
+df_feb = influx_client_df.query(influx.get_candles_range_aggregate_query(test_day_feb, test_day_feb+timedelta(days=1), symbol, '1h'), database=db)[symbol]
+df_aug = influx_client_df.query(influx.get_candles_range_aggregate_query(test_day_aug, test_day_aug+timedelta(days=1), symbol, '1h'), database=db)[symbol]
+# df_oct = influx_client_df.query(influx.get_candles_range_aggregate_query(test_day_oct, test_day_oct+timedelta(days=1), symbol, '1h'), database=db)[symbol]
+# df_nov = influx_client_df.query(influx.get_candles_range_aggregate_query(test_day_nov, test_day_nov+timedelta(days=1), symbol, '1h'), database=db)[symbol]
 
 #%%
 plt.close()
@@ -86,7 +87,7 @@ fig, ax = mpf.plot(
   returnfig=True,
   title=f"{symbol}",
   ylabel="Price ($)",
-  columns=utils.influx.MPF_COLUMN_MAPPING,
+  columns=influx.MPF_COLUMN_MAPPING,
   volume=False,
   tight_layout=True,
   figsize=(24, 13),
