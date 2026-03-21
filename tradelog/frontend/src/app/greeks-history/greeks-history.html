@@ -1,0 +1,48 @@
+<div class="p-6 flex flex-col gap-6">
+  <div class="flex items-center gap-4">
+    <button mat-stroked-button (click)="goBack()">Back</button>
+    <span class="text-lg font-medium">Greeks History — {{ contractId }}</span>
+  </div>
+
+  @if (logs.length === 0) {
+    <div class="opacity-60">No Greeks snapshots found for this contract.</div>
+  } @else {
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-4">
+          <div class="font-medium mb-2">Delta / Gamma</div>
+          <div class="h-48">
+            <canvas baseChart type="line" [data]="deltaChart" [options]="dualAxisOptions"></canvas>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-4">
+          <div class="font-medium mb-2">Theta / Vega</div>
+          <div class="h-48">
+            <canvas baseChart type="line" [data]="thetaChart" [options]="dualAxisOptions"></canvas>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-4">
+          <div class="font-medium mb-2">Implied Volatility</div>
+          <div class="h-48">
+            <canvas baseChart type="line" [data]="ivChart" [options]="chartOptions"></canvas>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-4">
+          <div class="font-medium mb-2">Price / Time Value</div>
+          <div class="h-48">
+            <canvas baseChart type="line" [data]="priceChart" [options]="dualAxisOptions"></canvas>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  }
+</div>

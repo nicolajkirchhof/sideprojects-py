@@ -1,0 +1,166 @@
+<app-content-area [showRightSidebar]="showSidebar">
+  <div main>
+    <!-- Chart -->
+    <div class="mx-4 mb-4" style="height: 250px;">
+      <canvas baseChart
+              [type]="'line'"
+              [data]="chartData"
+              [options]="chartOptions">
+      </canvas>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-end mx-4 mb-2">
+      <button mat-raised-button color="primary" (click)="onNew()">New Snapshot</button>
+    </div>
+
+    <!-- Table -->
+    <div class="mat-elevation-z8 m-4 overflow-auto">
+      <table mat-table [dataSource]="capitals" class="w-full whitespace-nowrap">
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let c">{{ c.date | date:'shortDate' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="netLiquidity">
+          <th mat-header-cell *matHeaderCellDef>Net Liq</th>
+          <td mat-cell *matCellDef="let c">{{ c.netLiquidity | number:'1.0-0' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="maintenance">
+          <th mat-header-cell *matHeaderCellDef>Maint</th>
+          <td mat-cell *matCellDef="let c">{{ c.maintenance | number:'1.0-0' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="maintenancePct">
+          <th mat-header-cell *matHeaderCellDef>Maint %</th>
+          <td mat-cell *matCellDef="let c"
+              [class]="c.maintenancePct >= 50 ? 'text-red-400' : c.maintenancePct >= 30 ? 'text-yellow-400' : ''">
+            {{ c.maintenancePct | number:'1.1-1' }}%
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="excessLiquidity">
+          <th mat-header-cell *matHeaderCellDef>Excess Liq</th>
+          <td mat-cell *matCellDef="let c">{{ c.excessLiquidity | number:'1.0-0' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="bpr">
+          <th mat-header-cell *matHeaderCellDef>BPR</th>
+          <td mat-cell *matCellDef="let c">{{ c.bpr | number:'1.0-0' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalPnl">
+          <th mat-header-cell *matHeaderCellDef>Total P/L</th>
+          <td mat-cell *matCellDef="let c" [class]="pnlColor(c.totalPnl)">
+            {{ c.totalPnl | number:'1.2-2' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="netDelta">
+          <th mat-header-cell *matHeaderCellDef>Delta</th>
+          <td mat-cell *matCellDef="let c">{{ c.netDelta | number:'1.2-4' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="netTheta">
+          <th mat-header-cell *matHeaderCellDef>Theta</th>
+          <td mat-cell *matCellDef="let c">{{ c.netTheta | number:'1.2-4' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="totalMargin">
+          <th mat-header-cell *matHeaderCellDef>Margin</th>
+          <td mat-cell *matCellDef="let c">{{ c.totalMargin | number:'1.0-0' }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            (click)="onRowSelect(row)"
+            class="cursor-pointer"
+            [class.!bg-blue-900]="selected?.id === row.id"></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sidebar form -->
+  <div sidebar class="flex flex-1">
+    @if (showSidebar) {
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
+
+        @if (!isCreating) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>ID</mat-label>
+            <input matInput formControlName="id" readonly>
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Date</mat-label>
+          <input matInput [matDatepicker]="dpDate" formControlName="date">
+          <mat-datepicker-toggle matSuffix [for]="dpDate"></mat-datepicker-toggle>
+          <mat-datepicker #dpDate></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Net Liquidity</mat-label>
+          <input matInput type="number" formControlName="netLiquidity" step="1">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Maintenance</mat-label>
+          <input matInput type="number" formControlName="maintenance" step="1">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Excess Liquidity</mat-label>
+          <input matInput type="number" formControlName="excessLiquidity" step="1">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>BPR</mat-label>
+          <input matInput type="number" formControlName="bpr" step="1">
+        </mat-form-field>
+
+        <!-- Snapshotted values (read-only, edit mode) -->
+        @if (!isCreating && selected) {
+          <div class="border-t border-white/10 pt-3 mt-1">
+            <div class="text-xs opacity-50 mb-2">Snapshotted Aggregations</div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <span class="opacity-60">Maintenance %:</span>
+              <span>{{ selected.maintenancePct | number:'1.1-1' }}%</span>
+              <span class="opacity-60">Total P/L:</span>
+              <span [class]="pnlColor(selected.totalPnl)">{{ selected.totalPnl | number:'1.2-2' }}</span>
+              <span class="opacity-60">Unrealized P/L:</span>
+              <span [class]="pnlColor(selected.unrealizedPnl)">{{ selected.unrealizedPnl | number:'1.2-2' }}</span>
+              <span class="opacity-60">Realized P/L:</span>
+              <span [class]="pnlColor(selected.realizedPnl)">{{ selected.realizedPnl | number:'1.2-2' }}</span>
+              <span class="opacity-60">Delta:</span>
+              <span>{{ selected.netDelta | number:'1.2-4' }}</span>
+              <span class="opacity-60">Theta:</span>
+              <span>{{ selected.netTheta | number:'1.2-4' }}</span>
+              <span class="opacity-60">Vega:</span>
+              <span>{{ selected.netVega | number:'1.2-4' }}</span>
+              <span class="opacity-60">Gamma:</span>
+              <span>{{ selected.netGamma | number:'1.2-4' }}</span>
+              <span class="opacity-60">Avg IV:</span>
+              <span>{{ selected.avgIv | number:'1.0-1' }}%</span>
+              <span class="opacity-60">Margin:</span>
+              <span>{{ selected.totalMargin | number:'1.0-0' }}</span>
+              <span class="opacity-60">Commissions:</span>
+              <span>{{ selected.totalCommissions | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        }
+
+        <!-- Actions -->
+        <div class="flex gap-2 justify-end mt-2 pb-4">
+          @if (!isCreating && selected) {
+            <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+          }
+          <span class="flex-1"></span>
+          <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
+          <button mat-flat-button color="primary" type="submit">Save</button>
+        </div>
+      </form>
+    }
+  </div>
+</app-content-area>

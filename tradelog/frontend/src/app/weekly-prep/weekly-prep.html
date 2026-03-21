@@ -1,0 +1,156 @@
+<app-content-area [showRightSidebar]="showSidebar">
+  <div main>
+    <!-- Filters + New button -->
+    <div class="flex items-center gap-4 mx-4 mb-2">
+      <mat-form-field appearance="outline" class="w-32" subscriptSizing="dynamic">
+        <mat-label>Year</mat-label>
+        <mat-select [(value)]="filterYear" (selectionChange)="onFilterChange()">
+          <mat-option [value]="null">All</mat-option>
+          @for (y of availableYears; track y) {
+            <mat-option [value]="y">{{ y }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <span class="flex-1"></span>
+      <button mat-raised-button color="primary" (click)="onNew()">New Week</button>
+    </div>
+
+    <!-- Table -->
+    <div class="mat-elevation-z8 m-4">
+      <table mat-table [dataSource]="entries" class="w-full">
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let e">{{ e.date | date:'mediumDate' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="indexBias">
+          <th mat-header-cell *matHeaderCellDef>Index Bias</th>
+          <td mat-cell *matCellDef="let e">{{ e.indexBias || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="breadth">
+          <th mat-header-cell *matHeaderCellDef>Breadth</th>
+          <td mat-cell *matCellDef="let e">{{ e.breadth || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="currentPortfolioRisk">
+          <th mat-header-cell *matHeaderCellDef>Portfolio Risk</th>
+          <td mat-cell *matCellDef="let e">{{ e.currentPortfolioRisk || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="scanningFor">
+          <th mat-header-cell *matHeaderCellDef>Scanning For</th>
+          <td mat-cell *matCellDef="let e">{{ e.scanningFor || '—' }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            (click)="onRowSelect(row)"
+            class="cursor-pointer"
+            [class.!bg-blue-900]="selected?.id === row.id"></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sidebar form -->
+  <div sidebar class="flex flex-1">
+    @if (showSidebar) {
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
+
+        @if (!isCreating) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>ID</mat-label>
+            <input matInput formControlName="id" readonly>
+          </mat-form-field>
+        }
+
+        <!-- Date -->
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Week of</mat-label>
+          <input matInput [matDatepicker]="dpDate" formControlName="date">
+          <mat-datepicker-toggle matSuffix [for]="dpDate"></mat-datepicker-toggle>
+          <mat-datepicker #dpDate></mat-datepicker>
+        </mat-form-field>
+
+        <!-- Short text fields -->
+        <div class="flex gap-3">
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Index Bias</mat-label>
+            <input matInput formControlName="indexBias">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Breadth</mat-label>
+            <input matInput formControlName="breadth">
+          </mat-form-field>
+        </div>
+
+        <div class="flex gap-3">
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Portfolio Risk</mat-label>
+            <input matInput formControlName="currentPortfolioRisk">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Scanning For</mat-label>
+            <input matInput formControlName="scanningFor">
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Index / Sector Preference</mat-label>
+          <input matInput formControlName="indexSectorPreference">
+        </mat-form-field>
+
+        <!-- Rich text fields -->
+        <label class="text-sm font-medium">Notable Sectors</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notableSectors" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Volatility Notes</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="volatilityNotes" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Open Positions Requiring Management</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="openPositionsRequiringManagement" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Portfolio Notes</label>
+        <div class="min-h-[80px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="portfolioNotes" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Watchlist</label>
+        <div class="min-h-[80px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="watchlist" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Learnings</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Focus for Improvement</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="focusForImprovement" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">External Comments</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="externalComments" theme="snow"></quill-editor>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-2 justify-end mt-2 pb-4">
+          @if (!isCreating && selected) {
+            <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+          }
+          <span class="flex-1"></span>
+          <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
+          <button mat-flat-button color="primary" type="submit">Save</button>
+        </div>
+      </form>
+    }
+  </div>
+</app-content-area>

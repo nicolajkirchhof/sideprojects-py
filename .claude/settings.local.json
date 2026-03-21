@@ -8,7 +8,18 @@
       "Bash(wc:*)",
       "Bash(npx ng:*)",
       "Bash(ls:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(curl -s \"https://azuresearch-usnc.nuget.org/query?q=IBApi&prerelease=false&take=10\")",
+      "Bash(python -m json.tool)",
+      "WebSearch",
+      "WebFetch(domain:www.interactivebrokers.com)",
+      "WebFetch(domain:interactivebrokers.github.io)",
+      "Bash(curl -s https://www.interactivebrokers.com/en/software/am/am/reports/activityflexqueries.htm)",
+      "Bash(curl -s https://www.interactivebrokers.com/en/software/reportguide/reportguide.htm)",
+      "Bash(curl -s https://ibkrguides.com/reportingreference/reportguide/activityflexqueries.htm)",
+      "WebFetch(domain:www.ibkrguides.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.interactivebrokers.co.in)"
     ]
   }
 }

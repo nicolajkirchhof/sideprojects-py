@@ -16,6 +16,8 @@ public class DataContext : DbContext
     public DbSet<Capital> Capitals { get; set; }
     public DbSet<WeeklyPrep> WeeklyPreps { get; set; }
     public DbSet<Portfolio> Portfolios { get; set; }
+    public DbSet<IbkrConfig> IbkrConfigs { get; set; }
+    public DbSet<StockPriceCache> StockPriceCaches { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -59,5 +61,14 @@ public class DataContext : DbContext
         modelBuilder.Entity<OptionPosition>()
             .Property(e => e.CloseReasons)
             .HasConversion<int?>();
+
+        // StockPriceCache: unique index on Symbol
+        modelBuilder.Entity<StockPriceCache>()
+            .HasIndex(e => e.Symbol)
+            .IsUnique();
+
+        // Trade: index on ExecutionId for dedup
+        modelBuilder.Entity<Trade>()
+            .HasIndex(e => e.ExecutionId);
     }
 }

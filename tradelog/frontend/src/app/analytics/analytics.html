@@ -1,0 +1,148 @@
+<div class="p-6 flex flex-col gap-6">
+
+  <!-- Overall metrics cards -->
+  @if (overall) {
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-3 text-center">
+          <div class="text-xs opacity-60 uppercase">Total P/L</div>
+          <div class="text-lg font-bold" [ngClass]="pnlColor(overall.totalPnl)">{{ overall.totalPnl | number:'1.0-0' }}</div>
+        </mat-card-content>
+      </mat-card>
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-3 text-center">
+          <div class="text-xs opacity-60 uppercase">Net P/L</div>
+          <div class="text-lg font-bold" [ngClass]="pnlColor(overall.netPnl)">{{ overall.netPnl | number:'1.0-0' }}</div>
+        </mat-card-content>
+      </mat-card>
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-3 text-center">
+          <div class="text-xs opacity-60 uppercase">Annualized ROI</div>
+          <div class="text-lg font-bold" [ngClass]="pnlColor(overall.annualizedRoi)">{{ overall.annualizedRoi | number:'1.1-1' }}%</div>
+        </mat-card-content>
+      </mat-card>
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-3 text-center">
+          <div class="text-xs opacity-60 uppercase">Win Rate</div>
+          <div class="text-lg font-bold">{{ overall.winRate | number:'1.1-1' }}%</div>
+        </mat-card-content>
+      </mat-card>
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-3 text-center">
+          <div class="text-xs opacity-60 uppercase">Avg Win</div>
+          <div class="text-lg font-bold text-green-400">{{ overall.avgWin | number:'1.0-0' }}</div>
+        </mat-card-content>
+      </mat-card>
+      <mat-card appearance="outlined">
+        <mat-card-content class="!p-3 text-center">
+          <div class="text-xs opacity-60 uppercase">Avg Loss</div>
+          <div class="text-lg font-bold text-red-400">{{ overall.avgLoss | number:'1.0-0' }}</div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  }
+
+  <!-- Equity curve -->
+  <mat-card appearance="outlined">
+    <mat-card-content class="!p-4">
+      <div class="flex items-center gap-4 mb-4">
+        <span class="font-medium">Equity Curve</span>
+        <mat-button-toggle-group [(value)]="curveMode" (change)="onCurveModeChange()">
+          <mat-button-toggle value="overall">Overall</mat-button-toggle>
+          <mat-button-toggle value="strategy">By Strategy</mat-button-toggle>
+          <mat-button-toggle value="budget">By Budget</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+      <div class="h-64">
+        <canvas baseChart
+                type="line"
+                [data]="chartData"
+                [options]="chartOptions">
+        </canvas>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Strategy breakdown table -->
+  <mat-card appearance="outlined">
+    <mat-card-content class="!p-4">
+      <div class="font-medium mb-3">Strategy Breakdown</div>
+      <table mat-table [dataSource]="strategies" class="w-full">
+        <ng-container matColumnDef="strategy">
+          <th mat-header-cell *matHeaderCellDef>Strategy</th>
+          <td mat-cell *matCellDef="let s">{{ s.strategy }}</td>
+        </ng-container>
+        <ng-container matColumnDef="tradeCount">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Trades</th>
+          <td mat-cell *matCellDef="let s" class="text-right">{{ s.tradeCount }}</td>
+        </ng-container>
+        <ng-container matColumnDef="totalPnl">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Total P/L</th>
+          <td mat-cell *matCellDef="let s" class="text-right" [ngClass]="pnlColor(s.totalPnl)">{{ s.totalPnl | number:'1.0-0' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="winRate">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Win Rate</th>
+          <td mat-cell *matCellDef="let s" class="text-right">{{ s.winRate | number:'1.1-1' }}%</td>
+        </ng-container>
+        <ng-container matColumnDef="avgWin">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Avg Win</th>
+          <td mat-cell *matCellDef="let s" class="text-right text-green-400">{{ s.avgWin | number:'1.0-0' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="avgLoss">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Avg Loss</th>
+          <td mat-cell *matCellDef="let s" class="text-right text-red-400">{{ s.avgLoss | number:'1.0-0' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="expectancy">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Expectancy</th>
+          <td mat-cell *matCellDef="let s" class="text-right" [ngClass]="pnlColor(s.expectancy)">{{ s.expectancy | number:'1.0-0' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="maxDrawdown">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Max DD</th>
+          <td mat-cell *matCellDef="let s" class="text-right text-red-400">{{ s.maxDrawdown | number:'1.0-0' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="strategyColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: strategyColumns;"></tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Budget comparison -->
+  <mat-card appearance="outlined">
+    <mat-card-content class="!p-4">
+      <div class="font-medium mb-3">Budget Comparison</div>
+      <table mat-table [dataSource]="budgets" class="w-full">
+        <ng-container matColumnDef="budget">
+          <th mat-header-cell *matHeaderCellDef>Budget</th>
+          <td mat-cell *matCellDef="let b">{{ b.budget }}</td>
+        </ng-container>
+        <ng-container matColumnDef="tradeCount">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Trades</th>
+          <td mat-cell *matCellDef="let b" class="text-right">{{ b.tradeCount }}</td>
+        </ng-container>
+        <ng-container matColumnDef="totalPnl">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Total P/L</th>
+          <td mat-cell *matCellDef="let b" class="text-right" [ngClass]="pnlColor(b.totalPnl)">{{ b.totalPnl | number:'1.0-0' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="winRate">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Win Rate</th>
+          <td mat-cell *matCellDef="let b" class="text-right">{{ b.winRate | number:'1.1-1' }}%</td>
+        </ng-container>
+        <ng-container matColumnDef="avgWin">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Avg Win</th>
+          <td mat-cell *matCellDef="let b" class="text-right text-green-400">{{ b.avgWin | number:'1.0-0' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="avgLoss">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Avg Loss</th>
+          <td mat-cell *matCellDef="let b" class="text-right text-red-400">{{ b.avgLoss | number:'1.0-0' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="expectancy">
+          <th mat-header-cell *matHeaderCellDef class="text-right">Expectancy</th>
+          <td mat-cell *matCellDef="let b" class="text-right" [ngClass]="pnlColor(b.expectancy)">{{ b.expectancy | number:'1.0-0' }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="budgetColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: budgetColumns;"></tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+
+</div>

@@ -55,6 +55,7 @@ export class App {
       if (url.startsWith('/analytics')) return 'Analytics';
       if (url.startsWith('/portfolio')) return 'Portfolio';
       if (url.startsWith('/greeks-history')) return 'Greeks History';
+      if (url.startsWith('/ibkr-config')) return 'IBKR Settings';
       if (url.startsWith('/about')) return 'About';
       return 'Dashboard';
     }),

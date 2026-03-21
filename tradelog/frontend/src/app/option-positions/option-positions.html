@@ -1,0 +1,246 @@
+<app-content-area [showRightSidebar]="showSidebar">
+  <div main>
+    <!-- Filter + New button -->
+    <div class="flex items-center gap-4 mx-4 mb-2">
+      <mat-button-toggle-group [value]="statusFilter" (change)="onStatusFilterChange($event.value)">
+        <mat-button-toggle value="open">Open</mat-button-toggle>
+        <mat-button-toggle value="closed">Closed</mat-button-toggle>
+        <mat-button-toggle value="all">All</mat-button-toggle>
+      </mat-button-toggle-group>
+      <span class="flex-1"></span>
+      <button mat-raised-button color="primary" (click)="onNew()">New Position</button>
+    </div>
+
+    <!-- Table -->
+    <div class="mat-elevation-z8 m-4 overflow-auto">
+      <table mat-table [dataSource]="positions" class="w-full whitespace-nowrap">
+        <ng-container matColumnDef="symbol">
+          <th mat-header-cell *matHeaderCellDef>Symbol</th>
+          <td mat-cell *matCellDef="let p">{{ p.symbol }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="contractId">
+          <th mat-header-cell *matHeaderCellDef>Contract</th>
+          <td mat-cell *matCellDef="let p" class="text-xs opacity-70">{{ p.contractId }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="right">
+          <th mat-header-cell *matHeaderCellDef>R</th>
+          <td mat-cell *matCellDef="let p">{{ rightLabel[p.right] || p.right }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="strike">
+          <th mat-header-cell *matHeaderCellDef>Strike</th>
+          <td mat-cell *matCellDef="let p">{{ p.strike | number:'1.0-2' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="expiry">
+          <th mat-header-cell *matHeaderCellDef>Expiry</th>
+          <td mat-cell *matCellDef="let p">{{ p.expiry | date:'shortDate' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="pos">
+          <th mat-header-cell *matHeaderCellDef>Pos</th>
+          <td mat-cell *matCellDef="let p">{{ p.pos }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="cost">
+          <th mat-header-cell *matHeaderCellDef>Cost</th>
+          <td mat-cell *matCellDef="let p">{{ p.cost | number:'1.2-5' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="lastPrice">
+          <th mat-header-cell *matHeaderCellDef>Last</th>
+          <td mat-cell *matCellDef="let p">{{ p.lastPrice != null ? (p.lastPrice | number:'1.2-5') : '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="unrealizedPnl">
+          <th mat-header-cell *matHeaderCellDef>Unr P/L</th>
+          <td mat-cell *matCellDef="let p" [class]="pnlColor(p.unrealizedPnl)">
+            {{ p.unrealizedPnl != null ? (p.unrealizedPnl | number:'1.2-2') : '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="unrealizedPnlPct">
+          <th mat-header-cell *matHeaderCellDef>Unr %</th>
+          <td mat-cell *matCellDef="let p" [class]="pnlColor(p.unrealizedPnlPct)">
+            {{ p.unrealizedPnlPct != null ? (p.unrealizedPnlPct | number:'1.0-1') + '%' : '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="realizedPnl">
+          <th mat-header-cell *matHeaderCellDef>Real P/L</th>
+          <td mat-cell *matCellDef="let p" [class]="pnlColor(p.realizedPnl)">
+            {{ p.realizedPnl != null ? (p.realizedPnl | number:'1.2-2') : '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="delta">
+          <th mat-header-cell *matHeaderCellDef>Delta</th>
+          <td mat-cell *matCellDef="let p">{{ p.delta != null ? (p.delta | number:'1.2-4') : '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="theta">
+          <th mat-header-cell *matHeaderCellDef>Theta</th>
+          <td mat-cell *matCellDef="let p">{{ p.theta != null ? (p.theta | number:'1.2-4') : '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="durationPct">
+          <th mat-header-cell *matHeaderCellDef>Dur%</th>
+          <td mat-cell *matCellDef="let p">{{ p.durationPct != null ? (p.durationPct | number:'1.0-0') + '%' : '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="roic">
+          <th mat-header-cell *matHeaderCellDef>ROIC</th>
+          <td mat-cell *matCellDef="let p" [class]="pnlColor(p.roic)">
+            {{ p.roic != null ? (p.roic | number:'1.1-1') + '%' : '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let p">
+            <button mat-icon-button class="!w-8 !h-8" (click)="openGreeksHistory(p.contractId, $event)" matTooltip="Greeks History">
+              <mat-icon class="!text-base">show_chart</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            (click)="onRowSelect(row)"
+            class="cursor-pointer"
+            [class.!bg-blue-900]="selected?.id === row.id"></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sidebar form -->
+  <div sidebar class="flex flex-1">
+    @if (showSidebar) {
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
+
+        @if (!isCreating) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>ID</mat-label>
+            <input matInput formControlName="id" readonly>
+          </mat-form-field>
+        }
+
+        <div class="flex gap-3">
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Symbol</mat-label>
+            <input matInput formControlName="symbol" style="text-transform: uppercase">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Contract ID</mat-label>
+            <input matInput formControlName="contractId">
+          </mat-form-field>
+        </div>
+
+        <div class="flex gap-3">
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Right</mat-label>
+            <mat-select formControlName="right">
+              @for (r of rights; track r) {
+                <mat-option [value]="r">{{ r }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Pos (+ long, - short)</mat-label>
+            <input matInput type="number" formControlName="pos">
+          </mat-form-field>
+        </div>
+
+        <div class="flex gap-3">
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Strike</mat-label>
+            <input matInput type="number" formControlName="strike" step="0.5">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Cost</mat-label>
+            <input matInput type="number" formControlName="cost" step="0.01">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Multiplier</mat-label>
+            <input matInput type="number" formControlName="multiplier">
+          </mat-form-field>
+        </div>
+
+        <div class="flex gap-3">
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Opened</mat-label>
+            <input matInput [matDatepicker]="dpOpened" formControlName="opened">
+            <mat-datepicker-toggle matSuffix [for]="dpOpened"></mat-datepicker-toggle>
+            <mat-datepicker #dpOpened></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Expiry</mat-label>
+            <input matInput [matDatepicker]="dpExpiry" formControlName="expiry">
+            <mat-datepicker-toggle matSuffix [for]="dpExpiry"></mat-datepicker-toggle>
+            <mat-datepicker #dpExpiry></mat-datepicker>
+          </mat-form-field>
+        </div>
+
+        <!-- Close fields (edit mode) -->
+        @if (!isCreating) {
+          <div class="flex gap-3">
+            <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+              <mat-label>Close Price</mat-label>
+              <input matInput type="number" formControlName="closePrice" step="0.01">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+              <mat-label>Closed</mat-label>
+              <input matInput [matDatepicker]="dpClosed" formControlName="closed">
+              <mat-datepicker-toggle matSuffix [for]="dpClosed"></mat-datepicker-toggle>
+              <mat-datepicker #dpClosed></mat-datepicker>
+            </mat-form-field>
+          </div>
+        }
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Commission</mat-label>
+          <input matInput type="number" formControlName="commission" step="0.01">
+        </mat-form-field>
+
+        <!-- Computed fields (read-only, edit mode only) -->
+        @if (!isCreating && selected) {
+          <div class="border-t border-white/10 pt-3 mt-1">
+            <div class="text-xs opacity-50 mb-2">Computed</div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <span class="opacity-60">Unrealized P/L:</span>
+              <span [class]="pnlColor(selected.unrealizedPnl)">{{ selected.unrealizedPnl != null ? (selected.unrealizedPnl | number:'1.2-2') : '—' }}</span>
+              <span class="opacity-60">Unrealized %:</span>
+              <span [class]="pnlColor(selected.unrealizedPnlPct)">{{ selected.unrealizedPnlPct != null ? (selected.unrealizedPnlPct | number:'1.0-1') + '%' : '—' }}</span>
+              <span class="opacity-60">Realized P/L:</span>
+              <span [class]="pnlColor(selected.realizedPnl)">{{ selected.realizedPnl != null ? (selected.realizedPnl | number:'1.2-2') : '—' }}</span>
+              <span class="opacity-60">Duration %:</span>
+              <span>{{ selected.durationPct != null ? (selected.durationPct | number:'1.0-0') + '%' : '—' }}</span>
+              <span class="opacity-60">ROIC:</span>
+              <span [class]="pnlColor(selected.roic)">{{ selected.roic != null ? (selected.roic | number:'1.1-1') + '%' : '—' }}</span>
+              <span class="opacity-60">Delta:</span>
+              <span>{{ selected.delta != null ? (selected.delta | number:'1.2-4') : '—' }}</span>
+              <span class="opacity-60">Theta:</span>
+              <span>{{ selected.theta != null ? (selected.theta | number:'1.2-4') : '—' }}</span>
+              <span class="opacity-60">IV:</span>
+              <span>{{ selected.iv != null ? (selected.iv | number:'1.0-1') + '%' : '—' }}</span>
+              <span class="opacity-60">Margin:</span>
+              <span>{{ selected.margin != null ? (selected.margin | number:'1.2-2') : '—' }}</span>
+            </div>
+          </div>
+        }
+
+        <!-- Actions -->
+        <div class="flex gap-2 justify-end mt-2 pb-4">
+          @if (!isCreating && selected) {
+            <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+          }
+          <span class="flex-1"></span>
+          <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
+          <button mat-flat-button color="primary" type="submit">Save</button>
+        </div>
+      </form>
+    }
+  </div>
+</app-content-area>
