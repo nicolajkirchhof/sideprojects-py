@@ -13,7 +13,7 @@
       <a mat-list-item routerLink="/weekly-prep">Weekly Prep</a>
       <a mat-list-item routerLink="/analytics">Analytics</a>
       <a mat-list-item routerLink="/portfolio">Portfolio</a>
-      <a mat-list-item routerLink="/ibkr-config">IBKR Settings</a>
+      <a mat-list-item routerLink="/accounts">Accounts</a>
       <a mat-list-item routerLink="/about">About</a>
     </mat-nav-list>
   </mat-sidenav>
@@ -31,6 +31,7 @@
       <span>Tradelog</span>
       <span class="ml-4 opacity-90 text-sm">{{ (breadcrumb$ | async) }}</span>
       <span class="flex-1"></span>
+      <app-account-switcher class="mr-3"></app-account-switcher>
       @if (lastSyncInfo$ | async; as sync) {
         <span class="text-xs flex items-center gap-1"
               [class]="sync.stale ? 'text-amber-400' : 'opacity-70'"

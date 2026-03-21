@@ -2,9 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace tradelog.Models;
 
-public class WeeklyPrep
+public class WeeklyPrep : tradelog.Data.IAccountScoped
 {
     public int Id { get; set; }
+    public int AccountId { get; set; }
 
     [Required]
     public DateTime Date { get; set; }

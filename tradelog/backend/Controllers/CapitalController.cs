@@ -41,7 +41,7 @@ public class CapitalController : ControllerBase
             : 0;
 
         // Snapshot portfolio aggregations from current positions
-        var agg = await ComputeCurrentPortfolioAggregation();
+        var agg = await PortfolioAggregationService.ComputeAsync(_context);
         capital.TotalPnl = agg.TotalPnl;
         capital.UnrealizedPnl = agg.UnrealizedPnl;
         capital.RealizedPnl = agg.RealizedPnl;
@@ -88,39 +88,4 @@ public class CapitalController : ControllerBase
         return NoContent();
     }
 
-    private async Task<PortfolioAggregation> ComputeCurrentPortfolioAggregation()
-    {
-        var positions = await _context.OptionPositions.ToListAsync();
-        var contractIds = positions.Select(p => p.ContractId).Distinct().ToList();
-
-        var latestLogs = await _context.OptionPositionsLogs
-            .Where(l => contractIds.Contains(l.ContractId))
-            .GroupBy(l => l.ContractId)
-            .Select(g => g.OrderByDescending(l => l.DateTime).First())
-            .ToDictionaryAsync(l => l.ContractId);
-
-        var optionAgg = OptionComputations.ComputePortfolioAggregation(positions, latestLogs);
-
-        // Add stock/futures realized P/L
-        var trades = await _context.Trades
-            .OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id)
-            .ToListAsync();
-        var tradeDtos = TradeComputations.ComputeRunningFields(trades);
-        var tradeRealizedPnl = tradeDtos.Sum(d => d.Pnl);
-        var tradeCommissions = tradeDtos.Sum(d => d.Commission);
-
-        return new PortfolioAggregation
-        {
-            TotalPnl = optionAgg.TotalPnl + tradeRealizedPnl,
-            UnrealizedPnl = optionAgg.UnrealizedPnl,
-            RealizedPnl = optionAgg.RealizedPnl + tradeRealizedPnl,
-            NetDelta = optionAgg.NetDelta,
-            NetTheta = optionAgg.NetTheta,
-            NetGamma = optionAgg.NetGamma,
-            NetVega = optionAgg.NetVega,
-            AvgIv = optionAgg.AvgIv,
-            TotalMargin = optionAgg.TotalMargin,
-            TotalCommissions = optionAgg.TotalCommissions + tradeCommissions,
-        };
-    }
 }

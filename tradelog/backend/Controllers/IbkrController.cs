@@ -1,5 +1,7 @@
 using tradelog.Data;
+using tradelog.Dtos;
 using tradelog.Models;
+using tradelog.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,62 +13,35 @@ namespace tradelog.Controllers;
 public class IbkrController : ControllerBase
 {
     private readonly DataContext _context;
+    private readonly IbkrSyncService _syncService;
+    private readonly IAccountContext _accountContext;
     private static readonly TimeSpan SyncCooldown = TimeSpan.FromHours(1);
 
-    public IbkrController(DataContext context)
+    public IbkrController(DataContext context, IbkrSyncService syncService, IAccountContext accountContext)
     {
         _context = context;
-    }
-
-    [HttpGet("config")]
-    public async Task<ActionResult<IbkrConfig>> GetConfig()
-    {
-        var config = await _context.IbkrConfigs.FirstOrDefaultAsync();
-        if (config == null)
-        {
-            // Return defaults without persisting
-            return new IbkrConfig { Host = "127.0.0.1", Port = 7497, ClientId = 1 };
-        }
-        return config;
-    }
-
-    [HttpPut("config")]
-    public async Task<ActionResult<IbkrConfig>> UpdateConfig(IbkrConfig input)
-    {
-        var existing = await _context.IbkrConfigs.FirstOrDefaultAsync();
-        if (existing == null)
-        {
-            existing = new IbkrConfig();
-            _context.IbkrConfigs.Add(existing);
-        }
-
-        existing.Host = input.Host;
-        existing.Port = input.Port;
-        existing.ClientId = input.ClientId;
-
-        await _context.SaveChangesAsync();
-        return existing;
+        _syncService = syncService;
+        _accountContext = accountContext;
     }
 
     [HttpGet("sync/status")]
     public async Task<ActionResult<object>> GetSyncStatus()
     {
-        var config = await _context.IbkrConfigs.FirstOrDefaultAsync();
+        var account = await GetCurrentAccount();
+        if (account == null)
+            return Ok(new { lastSyncAt = (DateTime?)null, lastSyncResult = (string?)null, canSync = false, cooldownRemainingSeconds = (int?)null });
 
-        var lastSyncAt = config?.LastSyncAt;
-        var lastSyncResult = config?.LastSyncResult;
         var now = DateTime.UtcNow;
-
         bool canSync;
         int? cooldownRemainingSeconds = null;
 
-        if (lastSyncAt == null)
+        if (account.LastSyncAt == null)
         {
             canSync = true;
         }
         else
         {
-            var elapsed = now - lastSyncAt.Value;
+            var elapsed = now - account.LastSyncAt.Value;
             canSync = elapsed >= SyncCooldown;
             if (!canSync)
                 cooldownRemainingSeconds = (int)(SyncCooldown - elapsed).TotalSeconds;
@@ -74,8 +49,8 @@ public class IbkrController : ControllerBase
 
         return Ok(new
         {
-            lastSyncAt,
-            lastSyncResult,
+            lastSyncAt = account.LastSyncAt,
+            lastSyncResult = account.LastSyncResult,
             canSync,
             cooldownRemainingSeconds,
         });
@@ -84,14 +59,14 @@ public class IbkrController : ControllerBase
     [HttpPost("sync")]
     public async Task<ActionResult<object>> TriggerSync()
     {
-        var config = await _context.IbkrConfigs.FirstOrDefaultAsync();
-        if (config == null)
-            return BadRequest("IBKR connection not configured. Set host, port, and client ID first.");
+        var account = await GetCurrentAccount();
+        if (account == null)
+            return BadRequest("No account selected. Select an account first.");
 
         // Enforce cooldown
-        if (config.LastSyncAt != null)
+        if (account.LastSyncAt != null)
         {
-            var elapsed = DateTime.UtcNow - config.LastSyncAt.Value;
+            var elapsed = DateTime.UtcNow - account.LastSyncAt.Value;
             if (elapsed < SyncCooldown)
             {
                 var remaining = (int)(SyncCooldown - elapsed).TotalSeconds;
@@ -99,7 +74,25 @@ public class IbkrController : ControllerBase
             }
         }
 
-        // Phase 2 will replace this with actual TWS sync
-        return StatusCode(501, new { message = "IBKR sync not yet implemented. TWS API integration coming in Phase 2." });
+        // Run sync
+        var result = await _syncService.SyncAll(account);
+
+        // Update sync metadata (only set LastSyncAt on success)
+        if (result.Success)
+            account.LastSyncAt = DateTime.UtcNow;
+        account.LastSyncResult = result.Message;
+        await _context.SaveChangesAsync();
+
+        if (result.Success)
+            return Ok(result);
+        else
+            return StatusCode(500, result);
+    }
+
+    private async Task<Account?> GetCurrentAccount()
+    {
+        var accountId = _accountContext.CurrentAccountId;
+        if (accountId == 0) return null;
+        return await _context.Accounts.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == accountId);
     }
 }

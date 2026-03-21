@@ -10,6 +10,8 @@ export interface TradeDto {
   price: number;
   commission: number;
   multiplier: number;
+  bestExitPrice?: number | null;
+  bestExitDate?: string | null;
 
   // Computed
   lastPos: number;
@@ -26,6 +28,8 @@ export interface TradeUpsert {
   price: number;
   commission: number;
   multiplier: number;
+  bestExitPrice?: number | null;
+  bestExitDate?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

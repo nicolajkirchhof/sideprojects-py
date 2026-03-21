@@ -2,9 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace tradelog.Models;
 
-public class Trade
+public class Trade : tradelog.Data.IAccountScoped
 {
     public int Id { get; set; }
+    public int AccountId { get; set; }
 
     [Required, StringLength(20)]
     public string Symbol { get; set; } = string.Empty;
@@ -27,4 +28,10 @@ public class Trade
     /// <summary>IBKR execution ID for dedup.</summary>
     [StringLength(50)]
     public string? ExecutionId { get; set; }
+
+    /// <summary>Best exit price for this execution (for trade review).</summary>
+    public decimal? BestExitPrice { get; set; }
+
+    /// <summary>Date of the best exit opportunity.</summary>
+    public DateTime? BestExitDate { get; set; }
 }

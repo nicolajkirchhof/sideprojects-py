@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using tradelog.Data;
 
@@ -11,9 +12,11 @@ using tradelog.Data;
 namespace tradelog.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260321172334_AddOptionPositionSecType")]
+    partial class AddOptionPositionSecType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,53 +25,6 @@ namespace tradelog.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("tradelog.Models.Account", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClientId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Host")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("IbkrAccountId")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("LastSyncAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastSyncResult")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("Port")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IbkrAccountId")
-                        .IsUnique();
-
-                    b.ToTable("Accounts");
-                });
-
             modelBuilder.Entity("tradelog.Models.Capital", b =>
                 {
                     b.Property<int>("Id")
@@ -76,9 +32,6 @@ namespace tradelog.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("int");
 
                     b.Property<decimal>("AvgIv")
                         .HasPrecision(18, 6)
@@ -148,7 +101,7 @@ namespace tradelog.Migrations
                     b.ToTable("Capitals");
                 });
 
-            modelBuilder.Entity("tradelog.Models.OptionPosition", b =>
+            modelBuilder.Entity("tradelog.Models.IbkrConfig", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -156,15 +109,36 @@ namespace tradelog.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AccountId")
+                    b.Property<int>("ClientId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("BestExitDate")
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LastSyncAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<decimal?>("BestExitPrice")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
+                    b.Property<string>("LastSyncResult")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Port")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("IbkrConfigs");
+                });
+
+            modelBuilder.Entity("tradelog.Models.OptionPosition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal?>("ClosePrice")
                         .HasPrecision(18, 6)
@@ -237,9 +211,6 @@ namespace tradelog.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AccountId")
-                        .HasColumnType("int");
-
                     b.Property<string>("ContractId")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -286,9 +257,9 @@ namespace tradelog.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId", "ContractId", "DateTime")
+                    b.HasIndex("ContractId", "DateTime")
                         .IsUnique()
-                        .IsDescending(false, false, true);
+                        .IsDescending(false, true);
 
                     b.ToTable("OptionPositionsLogs");
                 });
@@ -300,9 +271,6 @@ namespace tradelog.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("int");
 
                     b.Property<int>("Budget")
                         .HasColumnType("int");
@@ -359,16 +327,6 @@ namespace tradelog.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("BestExitDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("BestExitPrice")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
-
                     b.Property<decimal>("Commission")
                         .HasPrecision(18, 6)
                         .HasColumnType("decimal(18,6)");
@@ -414,9 +372,6 @@ namespace tradelog.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("int");
 
                     b.Property<string>("ActualManagement")
                         .HasColumnType("nvarchar(max)");
@@ -501,9 +456,6 @@ namespace tradelog.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Breadth")
                         .HasMaxLength(20)

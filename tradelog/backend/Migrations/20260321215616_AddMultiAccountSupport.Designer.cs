@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using tradelog.Data;
 
@@ -11,9 +12,11 @@ using tradelog.Data;
 namespace tradelog.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260321215616_AddMultiAccountSupport")]
+    partial class AddMultiAccountSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -159,13 +162,6 @@ namespace tradelog.Migrations
                     b.Property<int>("AccountId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("BestExitDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("BestExitPrice")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
-
                     b.Property<decimal?>("ClosePrice")
                         .HasPrecision(18, 6)
                         .HasColumnType("decimal(18,6)");
@@ -286,9 +282,9 @@ namespace tradelog.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId", "ContractId", "DateTime")
+                    b.HasIndex("ContractId", "DateTime")
                         .IsUnique()
-                        .IsDescending(false, false, true);
+                        .IsDescending(false, true);
 
                     b.ToTable("OptionPositionsLogs");
                 });
@@ -361,13 +357,6 @@ namespace tradelog.Migrations
 
                     b.Property<int>("AccountId")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("BestExitDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("BestExitPrice")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
 
                     b.Property<decimal>("Commission")
                         .HasPrecision(18, 6)

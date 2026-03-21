@@ -2,9 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace tradelog.Models;
 
-public class Portfolio
+public class Portfolio : tradelog.Data.IAccountScoped
 {
     public int Id { get; set; }
+    public int AccountId { get; set; }
 
     [Required]
     public Budget Budget { get; set; }

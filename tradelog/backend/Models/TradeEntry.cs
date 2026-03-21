@@ -2,9 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace tradelog.Models;
 
-public class TradeEntry
+public class TradeEntry : tradelog.Data.IAccountScoped
 {
     public int Id { get; set; }
+    public int AccountId { get; set; }
 
     [Required, StringLength(20)]
     public string Symbol { get; set; } = string.Empty;

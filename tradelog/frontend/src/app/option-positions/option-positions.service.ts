@@ -27,6 +27,8 @@ export interface OptionPositionDto {
   commission: number;
   multiplier: number;
   closeReasons?: number | null;
+  bestExitPrice?: number | null;
+  bestExitDate?: string | null;
 
   // From latest log
   lastPrice?: number | null;
@@ -63,6 +65,8 @@ export interface OptionPositionUpsert {
   commission: number;
   multiplier: number;
   closeReasons?: number | null;
+  bestExitPrice?: number | null;
+  bestExitDate?: string | null;
 }
 
 export interface OptionPositionsLog {

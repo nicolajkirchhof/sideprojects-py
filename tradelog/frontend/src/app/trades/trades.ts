@@ -69,6 +69,8 @@ export class Trades implements OnInit {
       price: [null, [Validators.required]],
       commission: [0],
       multiplier: [1],
+      bestExitPrice: [null],
+      bestExitDate: [null],
     });
   }
 
@@ -102,6 +104,8 @@ export class Trades implements OnInit {
       price: row.price,
       commission: row.commission,
       multiplier: row.multiplier,
+      bestExitPrice: row.bestExitPrice ?? null,
+      bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
     });
     this.showSidebar = true;
   }
@@ -117,6 +121,8 @@ export class Trades implements OnInit {
       price: null,
       commission: 0,
       multiplier: 1,
+      bestExitPrice: null,
+      bestExitDate: null,
     });
     this.showSidebar = true;
   }
@@ -141,6 +147,8 @@ export class Trades implements OnInit {
       price: Number(v.price),
       commission: Number(v.commission ?? 0),
       multiplier: Number(v.multiplier ?? 1),
+      bestExitPrice: v.bestExitPrice ? Number(v.bestExitPrice) : null,
+      bestExitDate: toIsoOrNull(v.bestExitDate),
     };
 
     const obs = this.isCreating || !payload.id

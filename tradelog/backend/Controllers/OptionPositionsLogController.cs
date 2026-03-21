@@ -73,8 +73,10 @@ public class OptionPositionsLogController : ControllerBase
             return BadRequest("No entries provided");
 
         // Get existing (contractId, dateTime) pairs to skip duplicates
+        // IgnoreQueryFilters: the Python sync path doesn't send the X-Account-Id header
         var incoming = entries.Select(e => new { e.ContractId, e.DateTime }).ToList();
         var existingKeys = await _context.OptionPositionsLogs
+            .IgnoreQueryFilters()
             .Where(l => incoming.Select(i => i.ContractId).Contains(l.ContractId))
             .Select(l => new { l.ContractId, l.DateTime })
             .ToListAsync();

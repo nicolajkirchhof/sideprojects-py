@@ -2,9 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace tradelog.Models;
 
-public class OptionPosition
+public class OptionPosition : tradelog.Data.IAccountScoped
 {
     public int Id { get; set; }
+    public int AccountId { get; set; }
 
     [Required, StringLength(20)]
     public string Symbol { get; set; } = string.Empty;
@@ -39,4 +40,14 @@ public class OptionPosition
 
     /// <summary>IBKR contract ID for TWS API matching.</summary>
     public int? ConId { get; set; }
+
+    /// <summary>IBKR security type: "OPT" or "FOP".</summary>
+    [StringLength(10)]
+    public string? SecType { get; set; }
+
+    /// <summary>Best exit price the position could have achieved (for trade review).</summary>
+    public decimal? BestExitPrice { get; set; }
+
+    /// <summary>Date of the best exit opportunity.</summary>
+    public DateTime? BestExitDate { get; set; }
 }

@@ -30,6 +30,7 @@
           },
           "configurations": {
             "production": {
+              "outputPath": "../backend/wwwroot",
               "budgets": [
                 {
                   "type": "initial",

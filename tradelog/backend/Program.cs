@@ -1,4 +1,5 @@
 using tradelog.Data;
+using tradelog.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 
@@ -14,9 +15,13 @@ builder.Services.AddControllers(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IAccountContext, AccountContext>();
+builder.Services.AddScoped<IbkrSyncService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// CORS only needed in Development (ng serve on port 4200)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Cors", policy =>
@@ -44,12 +49,16 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "v1");
         options.RoutePrefix = "swagger";
     });
+    app.UseCors("Cors");
 }
 
-app.UseHttpsRedirection();
-
-app.UseCors("Cors");
+// Serve Angular frontend as static files (for Staging/Production standalone mode)
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.MapControllers();
+
+// SPA fallback: serve index.html for non-API routes (Angular routing)
+app.MapFallbackToFile("index.html");
 
 app.Run();

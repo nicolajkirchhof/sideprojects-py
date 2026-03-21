@@ -11,6 +11,7 @@ import { Observable, of, timer } from 'rxjs';
 import { map, shareReplay, filter, startWith, switchMap, catchError } from 'rxjs/operators';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { OptionPositionsLogService } from './option-positions/option-positions.service';
+import { AccountSwitcherComponent } from './shared/account-switcher/account-switcher';
 
 @Component({
   selector: 'app-root',
@@ -24,7 +25,8 @@ import { OptionPositionsLogService } from './option-positions/option-positions.s
     MatSidenavModule,
     MatListModule,
     MatIconModule,
-    MatTooltipModule
+    MatTooltipModule,
+    AccountSwitcherComponent
   ],
   templateUrl: './app.html'
 })
@@ -55,7 +57,7 @@ export class App {
       if (url.startsWith('/analytics')) return 'Analytics';
       if (url.startsWith('/portfolio')) return 'Portfolio';
       if (url.startsWith('/greeks-history')) return 'Greeks History';
-      if (url.startsWith('/ibkr-config')) return 'IBKR Settings';
+      if (url.startsWith('/accounts')) return 'Accounts';
       if (url.startsWith('/about')) return 'About';
       return 'Dashboard';
     }),

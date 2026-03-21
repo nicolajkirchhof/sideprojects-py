@@ -8,6 +8,15 @@
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
+  <!-- IBApi: Official IBKR TWS API C# client (vendored from C:\TWS_API\source\CSharpClient\client\) -->
+  <ItemGroup>
+    <ProjectReference Include="lib\IBApi\CSharpAPI.csproj" />
+    <!-- Exclude IBApi source files from backend compilation (they compile as a separate project) -->
+    <Compile Remove="lib\**" />
+    <Content Remove="lib\**" />
+    <None Remove="lib\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>

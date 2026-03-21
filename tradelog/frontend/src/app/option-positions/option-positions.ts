@@ -86,6 +86,8 @@ export class OptionPositions implements OnInit {
       commission: [0],
       multiplier: [100],
       closeReasons: [null],
+      bestExitPrice: [null],
+      bestExitDate: [null],
     });
   }
 
@@ -121,6 +123,8 @@ export class OptionPositions implements OnInit {
       commission: row.commission,
       multiplier: row.multiplier,
       closeReasons: row.closeReasons ?? null,
+      bestExitPrice: row.bestExitPrice ?? null,
+      bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
     });
     this.showSidebar = true;
   }
@@ -143,6 +147,8 @@ export class OptionPositions implements OnInit {
       commission: 0,
       multiplier: 100,
       closeReasons: null,
+      bestExitPrice: null,
+      bestExitDate: null,
     });
     this.showSidebar = true;
   }
@@ -179,6 +185,8 @@ export class OptionPositions implements OnInit {
       commission: Number(v.commission ?? 0),
       multiplier: Number(v.multiplier ?? 100),
       closeReasons: v.closeReasons ? Number(v.closeReasons) : null,
+      bestExitPrice: v.bestExitPrice ? Number(v.bestExitPrice) : null,
+      bestExitDate: toIsoOrNull(v.bestExitDate),
     };
 
     const obs = this.isCreating || !payload.id

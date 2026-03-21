@@ -8,7 +8,7 @@ import { WeeklyPrepComponent } from './weekly-prep/weekly-prep';
 import { AnalyticsComponent } from './analytics/analytics';
 import { PortfolioComponent } from './portfolio/portfolio';
 import { GreeksHistoryComponent } from './greeks-history/greeks-history';
-import { IbkrConfigComponent } from './ibkr-config/ibkr-config';
+import { AccountsComponent } from './accounts/accounts';
 import { About } from './about/about';
 
 export const routes: Routes = [
@@ -21,7 +21,7 @@ export const routes: Routes = [
     { path: 'analytics', component: AnalyticsComponent },
     { path: 'portfolio', component: PortfolioComponent },
     { path: 'greeks-history', component: GreeksHistoryComponent },
-    { path: 'ibkr-config', component: IbkrConfigComponent },
+    { path: 'accounts', component: AccountsComponent },
     { path: 'about', component: About },
     { path: '', redirectTo: '/dashboard', pathMatch: 'full' }
 ];
