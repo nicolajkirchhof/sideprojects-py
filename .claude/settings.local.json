@@ -16,7 +16,8 @@
       "Bash(curl -s :*)",
       "WebFetch(domain:www.ibkrguides.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:www.interactivebrokers.co.in)"
+      "WebFetch(domain:www.interactivebrokers.co.in)",
+      "Bash(dotnet sln:*)"
     ]
   }
 }
