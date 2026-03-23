@@ -5,8 +5,18 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load user-secrets in all environments (not just Development)
+builder.Configuration.AddUserSecrets<Program>();
+
+// Inject the DB password from user-secrets into the connection string
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+var passwordKey = $"DbPassword:{builder.Environment.EnvironmentName}";
+var dbPassword = builder.Configuration[passwordKey]
+    ?? throw new InvalidOperationException($"Missing user-secret '{passwordKey}'. Run: dotnet user-secrets set \"{passwordKey}\" \"<password>\"");
+connectionString = connectionString.Replace("{password}", dbPassword);
+
 builder.Services.AddDbContext<DataContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(connectionString));
 builder.Services.AddControllers(options =>
 {
     options.ReturnHttpNotAcceptable = true;
