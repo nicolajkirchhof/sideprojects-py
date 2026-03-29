@@ -17,7 +17,8 @@
       "WebFetch(domain:www.ibkrguides.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:www.interactivebrokers.co.in)",
-      "Bash(dotnet sln:*)"
+      "Bash(dotnet sln:*)",
+      "Bash(python:*)"
     ]
   }
 }
