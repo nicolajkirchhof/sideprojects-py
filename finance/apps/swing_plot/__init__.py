@@ -11,6 +11,7 @@ from __future__ import annotations
 
 APP_NAME = "swing-plot"
 APP_DESCRIPTION = "Swing trading analysis dashboard (multi-tab PyQtGraph)"
+APP_ICON_ID = "candlestick"
 
 
 _GLOBAL_WIN = None

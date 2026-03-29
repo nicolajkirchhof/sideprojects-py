@@ -191,7 +191,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.cmb_dist.currentIndexChanged.connect(_on_dist_change)
 
     dist_layout.addWidget(QtWidgets.QLabel("Show:"))
-    dist_layout.addWidget(self.cmb_dist, 1)
+    dist_layout.addWidget(self.cmb_dist, stretch=1)
     c_layout.addWidget(dist_box)
 
     # --- View Tab (Daily / Weekly) ---
@@ -425,9 +425,9 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.plot_dist.setTitle("Distribution of Changes", color="#DDDDDD", size="12pt")
     self.plot_probs.setTitle("Probability of Holding Levels", color="#DDDDDD", size="12pt")
 
-    p_layout.addWidget(self.plot_path, 1)
-    p_layout.addWidget(self.plot_dist, 1)
-    p_layout.addWidget(self.plot_probs, 1)
+    p_layout.addWidget(self.plot_path, stretch=1)
+    p_layout.addWidget(self.plot_dist, stretch=1)
+    p_layout.addWidget(self.plot_probs, stretch=1)
 
     # Load SPY swing data upfront so prefills are instant.
     self._load_spy_swing_initial()

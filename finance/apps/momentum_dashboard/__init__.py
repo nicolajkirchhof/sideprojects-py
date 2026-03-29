@@ -11,6 +11,7 @@ from __future__ import annotations
 
 APP_NAME = "momentum"
 APP_DESCRIPTION = "Momentum & Earnings analysis dashboard (Qt)"
+APP_ICON_ID = "momentum"
 
 
 _GLOBAL_WIN = None

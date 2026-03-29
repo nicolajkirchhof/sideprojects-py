@@ -32,10 +32,8 @@ def main() -> None:
     args, remaining = parser.parse_known_args()
 
     if args.app is None:
-        print("Available applications:\n")
-        for name, desc in list_apps().items():
-            print(f"  {name:20s}  {desc}")
-        print(f"\nUsage: python -m finance.apps <app-name>")
+        from finance.apps._launcher import launch_launcher
+        launch_launcher()
         sys.exit(0)
 
     app_module = get_app(args.app)
