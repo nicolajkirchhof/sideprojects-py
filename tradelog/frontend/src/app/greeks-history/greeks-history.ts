@@ -1,5 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,7 +10,7 @@ import { OptionPositionsLogService, OptionPositionsLog } from '../option-positio
 @Component({
   selector: 'app-greeks-history',
   standalone: true,
-  imports: [CommonModule, MatCardModule, MatButtonModule, BaseChartDirective],
+  imports: [MatCardModule, MatButtonModule, BaseChartDirective],
   templateUrl: './greeks-history.html',
   host: { class: 'flex flex-col flex-1 overflow-auto' },
 })

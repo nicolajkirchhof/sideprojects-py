@@ -1,5 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -15,7 +15,6 @@ import { AccountsService, Account, SyncStatus } from './accounts.service';
   selector: 'app-accounts',
   standalone: true,
   imports: [
-    CommonModule,
     ReactiveFormsModule,
     MatTableModule,
     MatFormFieldModule,
@@ -24,8 +23,8 @@ import { AccountsService, Account, SyncStatus } from './accounts.service';
     MatIconModule,
     MatCheckboxModule,
     MatCardModule,
-    ContentArea,
-  ],
+    ContentArea
+],
   templateUrl: './accounts.html',
   host: { class: 'flex flex-col flex-1' },
 })
