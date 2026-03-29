@@ -1,5 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { AccountsService, Account } from '../../accounts/accounts.service';
@@ -8,7 +8,7 @@ import { Router } from '@angular/router';
 @Component({
   selector: 'app-account-switcher',
   standalone: true,
-  imports: [CommonModule, MatSelectModule, MatFormFieldModule],
+  imports: [MatSelectModule, MatFormFieldModule],
   template: `
     <mat-form-field appearance="outline" subscriptSizing="dynamic" class="account-switcher">
       <mat-select [value]="selectedId" (selectionChange)="onChange($event.value)" placeholder="Select account">
