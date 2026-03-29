@@ -149,6 +149,7 @@ flask_session/
 
 #AI
 .output.txt
+.claude/plans/
 
 #NET
 obj/
