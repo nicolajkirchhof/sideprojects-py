@@ -11,6 +11,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { QuillModule } from 'ngx-quill';
 import {
   TradeEntriesService, TradeEntry, TradeEntryUpsert,
@@ -18,6 +19,7 @@ import {
   STRATEGY_LABELS, TYPE_OF_TRADE_LABELS, TIMEFRAME_LABELS, MANAGEMENT_RATING_LABELS,
 } from './trade-entries.service';
 import { toIsoOrNull } from '../shared/utils';
+import { NotificationService } from '../shared/notification.service';
 
 @Component({
   selector: 'app-trade-entries',
@@ -35,6 +37,7 @@ import { toIsoOrNull } from '../shared/utils';
     MatCheckboxModule,
     MatDatepickerModule,
     MatNativeDateModule,
+    MatProgressBarModule,
     QuillModule,
     DatePipe,
   ],
@@ -44,6 +47,9 @@ import { toIsoOrNull } from '../shared/utils';
 export class TradeEntries implements OnInit {
   private service = inject(TradeEntriesService);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+
+  loading = false;
 
   entries: TradeEntry[] = [];
   displayedColumns = ['symbol', 'date', 'typeOfTrade', 'directional', 'budget', 'strategy', 'managementRating'];
@@ -114,12 +120,19 @@ export class TradeEntries implements OnInit {
   }
 
   load(): void {
+    this.loading = true;
     const filters: any = {};
     if (this.filterBudget) filters.budget = this.filterBudget;
     if (this.filterStrategy) filters.strategy = this.filterStrategy;
     this.service.getAll(filters).subscribe({
-      next: (data) => (this.entries = data ?? []),
-      error: (err) => console.error('Failed to load trade entries', err),
+      next: (data) => {
+        this.entries = data ?? [];
+        this.loading = false;
+      },
+      error: () => {
+        this.notify.error('Failed to load trade entries');
+        this.loading = false;
+      },
     });
   }
 
@@ -234,10 +247,11 @@ export class TradeEntries implements OnInit {
 
     obs.subscribe({
       next: () => {
+        this.notify.success(this.isCreating ? 'Trade entry created' : 'Trade entry updated');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Save failed', err),
+      error: () => this.notify.error('Failed to save trade entry'),
     });
   }
 
@@ -246,10 +260,11 @@ export class TradeEntries implements OnInit {
     if (!confirm(`Delete trade entry for ${this.selected.symbol}?`)) return;
     this.service.delete(this.selected.id).subscribe({
       next: () => {
+        this.notify.success('Trade entry deleted');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Delete failed', err),
+      error: () => this.notify.error('Failed to delete trade entry'),
     });
   }
 }

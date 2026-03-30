@@ -1,8 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
+import { forkJoin } from 'rxjs';
 import { MatTableModule } from '@angular/material/table';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration } from 'chart.js/auto';
 import {
@@ -13,6 +15,7 @@ import {
   EquityCurvePoint,
 } from './analytics.service';
 import { pnlColor } from '../shared/utils';
+import { NotificationService } from '../shared/notification.service';
 
 @Component({
   selector: 'app-analytics',
@@ -22,6 +25,7 @@ import { pnlColor } from '../shared/utils';
     MatTableModule,
     MatCardModule,
     MatButtonToggleModule,
+    MatProgressBarModule,
     BaseChartDirective,
     DecimalPipe,
   ],
@@ -30,7 +34,9 @@ import { pnlColor } from '../shared/utils';
 })
 export class AnalyticsComponent implements OnInit {
   private service = inject(AnalyticsService);
+  private notify = inject(NotificationService);
 
+  loading = false;
   overall: OverallPerformance | null = null;
   strategies: StrategyPerformance[] = [];
   budgets: BudgetPerformance[] = [];
@@ -59,14 +65,21 @@ export class AnalyticsComponent implements OnInit {
   private readonly COLORS = ['#48dbfb', '#ff6b6b', '#feca57', '#54a0ff', '#5f27cd', '#01a3a4', '#f368e0', '#ff9f43'];
 
   ngOnInit(): void {
+    this.loading = true;
+    let remaining = 3;
+    const done = () => { if (--remaining === 0) this.loading = false; };
+
     this.service.getOverall().subscribe({
-      next: (data) => (this.overall = data),
+      next: (data) => { this.overall = data; done(); },
+      error: () => { this.notify.error('Failed to load overall analytics'); done(); },
     });
     this.service.getStrategies().subscribe({
-      next: (data) => (this.strategies = data),
+      next: (data) => { this.strategies = data; done(); },
+      error: () => { this.notify.error('Failed to load strategy data'); done(); },
     });
     this.service.getBudgets().subscribe({
-      next: (data) => (this.budgets = data),
+      next: (data) => { this.budgets = data; done(); },
+      error: () => { this.notify.error('Failed to load budget data'); done(); },
     });
     this.loadEquityCurve();
   }
@@ -79,45 +92,41 @@ export class AnalyticsComponent implements OnInit {
     if (this.curveMode === 'overall') {
       this.service.getOverallEquityCurve().subscribe({
         next: (curve) => this.setChartSingle('Portfolio', curve),
+        error: () => this.notify.error('Failed to load equity curve'),
       });
     } else if (this.curveMode === 'strategy') {
-      // Load one curve per strategy
       this.service.getStrategies().subscribe({
         next: (strats) => {
-          const datasets: { label: string; data: EquityCurvePoint[] }[] = [];
-          let remaining = strats.length;
-          if (remaining === 0) {
+          if (strats.length === 0) {
             this.chartData = { labels: [], datasets: [] };
             return;
           }
-          strats.forEach((s, i) => {
-            this.service.getStrategyEquityCurve(s.strategy).subscribe({
-              next: (curve) => {
-                datasets.push({ label: s.strategy, data: curve });
-                remaining--;
-                if (remaining === 0) this.setChartMulti(datasets);
-              },
-            });
+          const curveRequests = strats.map(s =>
+            this.service.getStrategyEquityCurve(s.strategy));
+          forkJoin(curveRequests).subscribe({
+            next: (curves) => {
+              const datasets = strats.map((s, i) => ({ label: s.strategy, data: curves[i] }));
+              this.setChartMulti(datasets);
+            },
+            error: () => this.notify.error('Failed to load strategy equity curves'),
           });
         },
       });
     } else {
       this.service.getBudgets().subscribe({
         next: (budgets) => {
-          const datasets: { label: string; data: EquityCurvePoint[] }[] = [];
-          let remaining = budgets.length;
-          if (remaining === 0) {
+          if (budgets.length === 0) {
             this.chartData = { labels: [], datasets: [] };
             return;
           }
-          budgets.forEach((b, i) => {
-            this.service.getBudgetEquityCurve(b.budget).subscribe({
-              next: (curve) => {
-                datasets.push({ label: b.budget, data: curve });
-                remaining--;
-                if (remaining === 0) this.setChartMulti(datasets);
-              },
-            });
+          const curveRequests = budgets.map(b =>
+            this.service.getBudgetEquityCurve(b.budget));
+          forkJoin(curveRequests).subscribe({
+            next: (curves) => {
+              const datasets = budgets.map((b, i) => ({ label: b.budget, data: curves[i] }));
+              this.setChartMulti(datasets);
+            },
+            error: () => this.notify.error('Failed to load budget equity curves'),
           });
         },
       });

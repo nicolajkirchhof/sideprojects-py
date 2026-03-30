@@ -10,8 +10,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { TradesService, TradeDto, TradeUpsert } from './trades.service';
 import { toIsoOrNull, pnlColor } from '../shared/utils';
+import { NotificationService } from '../shared/notification.service';
 
 @Component({
   selector: 'app-trades',
@@ -28,6 +30,7 @@ import { toIsoOrNull, pnlColor } from '../shared/utils';
     MatIconModule,
     MatDatepickerModule,
     MatNativeDateModule,
+    MatProgressBarModule,
     DatePipe,
     DecimalPipe,
   ],
@@ -38,6 +41,9 @@ export class Trades implements OnInit {
   private service = inject(TradesService);
   private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+
+  loading = false;
 
   trades: TradeDto[] = [];
   displayedColumns = [
@@ -75,6 +81,7 @@ export class Trades implements OnInit {
   }
 
   load(): void {
+    this.loading = true;
     const filters: any = {};
     if (this.filterSymbol.trim()) filters.symbol = this.filterSymbol.trim().toUpperCase();
     this.service.getAll(filters).subscribe({
@@ -84,8 +91,12 @@ export class Trades implements OnInit {
         this.displayedColumns = this.hasMultiplier
           ? ['symbol', 'date', 'posChange', 'price', 'multiplier', 'totalPos', 'avgPrice', 'pnl', 'commission']
           : ['symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission'];
+        this.loading = false;
       },
-      error: (err) => console.error('Failed to load trades', err),
+      error: () => {
+        this.notify.error('Failed to load trades');
+        this.loading = false;
+      },
     });
   }
 
@@ -157,10 +168,11 @@ export class Trades implements OnInit {
 
     obs.subscribe({
       next: () => {
+        this.notify.success(this.isCreating ? 'Trade created' : 'Trade updated');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Save failed', err),
+      error: () => this.notify.error('Failed to save trade'),
     });
   }
 
@@ -169,10 +181,11 @@ export class Trades implements OnInit {
     if (!confirm(`Delete ${this.selected.symbol} trade from ${new Date(this.selected.date).toLocaleDateString()}?`)) return;
     this.service.delete(this.selected.id).subscribe({
       next: () => {
+        this.notify.success('Trade deleted');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Delete failed', err),
+      error: () => this.notify.error('Failed to delete trade'),
     });
   }
 

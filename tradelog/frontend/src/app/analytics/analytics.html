@@ -1,4 +1,7 @@
 <div class="p-6 flex flex-col gap-6">
+  @if (loading) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
 
   <!-- Overall metrics cards -->
   @if (overall) {

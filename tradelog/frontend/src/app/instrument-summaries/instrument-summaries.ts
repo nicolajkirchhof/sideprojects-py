@@ -3,6 +3,7 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Router } from '@angular/router';
 import {
   InstrumentSummariesService,
@@ -10,6 +11,7 @@ import {
   TradeInstrumentSummary,
 } from './instrument-summaries.service';
 import { pnlColor } from '../shared/utils';
+import { NotificationService } from '../shared/notification.service';
 import {
   TYPE_OF_TRADE_LABELS,
 } from '../trade-entries/trade-entries.service';
@@ -23,6 +25,7 @@ import {
     MatButtonModule,
     MatButtonToggleModule,
     DecimalPipe,
+    MatProgressBarModule,
   ],
   templateUrl: './instrument-summaries.html',
   host: { class: 'flex flex-col flex-1 overflow-auto' },
@@ -30,6 +33,9 @@ import {
 export class InstrumentSummaries implements OnInit {
   private service = inject(InstrumentSummariesService);
   private router = inject(Router);
+  private notify = inject(NotificationService);
+
+  loading = false;
 
   optionSummaries: OptionInstrumentSummary[] = [];
   tradeSummaries: TradeInstrumentSummary[] = [];
@@ -56,13 +62,21 @@ export class InstrumentSummaries implements OnInit {
   }
 
   load(): void {
+    this.loading = true;
+    let remaining = 2;
+    const done = () => { if (--remaining === 0) this.loading = false; };
+
     const status = this.statusFilter === 'all' ? undefined : this.statusFilter;
     this.service.getOptionSummaries(status).subscribe({
       next: (data) => {
         this.optionSummaries = data ?? [];
         this.computeTotals();
+        done();
       },
-      error: (err) => console.error('Failed to load option summaries', err),
+      error: (err) => {
+        this.notify.error('Failed to load option summaries');
+        done();
+      },
     });
     this.service.getTradeSummaries().subscribe({
       next: (data) => {
@@ -70,8 +84,12 @@ export class InstrumentSummaries implements OnInit {
           ? (data ?? [])
           : (data ?? []).filter(t =>
               this.statusFilter === 'open' ? t.totalPos !== 0 : t.totalPos === 0);
+        done();
       },
-      error: (err) => console.error('Failed to load trade summaries', err),
+      error: (err) => {
+        this.notify.error('Failed to load trade summaries');
+        done();
+      },
     });
   }
 

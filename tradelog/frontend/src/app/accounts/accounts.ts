@@ -8,7 +8,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ContentArea } from '../shared/content-area/content-area';
+import { NotificationService } from '../shared/notification.service';
 import { AccountsService, Account, SyncStatus } from './accounts.service';
 
 @Component({
@@ -23,6 +25,7 @@ import { AccountsService, Account, SyncStatus } from './accounts.service';
     MatIconModule,
     MatCheckboxModule,
     MatCardModule,
+    MatProgressBarModule,
     ContentArea
 ],
   templateUrl: './accounts.html',
@@ -31,6 +34,9 @@ import { AccountsService, Account, SyncStatus } from './accounts.service';
 export class AccountsComponent implements OnInit {
   private service = inject(AccountsService);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+
+  loading = false;
 
   accounts: Account[] = [];
   displayedColumns = ['name', 'ibkrAccountId', 'host', 'port', 'clientId', 'isDefault', 'lastSyncAt'];
@@ -58,9 +64,16 @@ export class AccountsComponent implements OnInit {
   }
 
   load(): void {
+    this.loading = true;
     this.service.getAll().subscribe({
-      next: (data) => (this.accounts = data ?? []),
-      error: (err) => console.error('Failed to load accounts', err),
+      next: (data) => {
+        this.accounts = data ?? [];
+        this.loading = false;
+      },
+      error: () => {
+        this.notify.error('Failed to load accounts');
+        this.loading = false;
+      },
     });
     this.refreshSyncStatus();
   }
@@ -123,6 +136,7 @@ export class AccountsComponent implements OnInit {
     if (this.isCreating || !payload.id) {
       this.service.create(payload).subscribe({
         next: (created) => {
+          this.notify.success('Account created');
           this.load();
           this.onCancel();
           // Auto-select if first account
@@ -130,12 +144,16 @@ export class AccountsComponent implements OnInit {
             this.service.selectAccount(created.id);
           }
         },
-        error: (err) => console.error('Save failed', err),
+        error: () => this.notify.error('Failed to create account'),
       });
     } else {
       this.service.update(payload.id as number, payload).subscribe({
-        next: () => { this.load(); this.onCancel(); },
-        error: (err) => console.error('Save failed', err),
+        next: () => {
+          this.notify.success('Account updated');
+          this.load();
+          this.onCancel();
+        },
+        error: () => this.notify.error('Failed to update account'),
       });
     }
   }
@@ -144,8 +162,12 @@ export class AccountsComponent implements OnInit {
     if (!this.selected) return;
     if (!confirm(`Delete account "${this.selected.name}"?`)) return;
     this.service.delete(this.selected.id).subscribe({
-      next: () => { this.load(); this.onCancel(); },
-      error: (err) => console.error('Delete failed', err),
+      next: () => {
+        this.notify.success('Account deleted');
+        this.load();
+        this.onCancel();
+      },
+      error: () => this.notify.error('Failed to delete account'),
     });
   }
 

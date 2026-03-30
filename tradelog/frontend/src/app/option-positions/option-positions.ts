@@ -13,11 +13,13 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import {
   OptionPositionsService, OptionPositionDto, OptionPositionUpsert,
   PositionRight, POSITION_RIGHT_LABELS,
 } from './option-positions.service';
 import { toIsoOrNull, pnlColor } from '../shared/utils';
+import { NotificationService } from '../shared/notification.service';
 
 @Component({
   selector: 'app-option-positions',
@@ -36,6 +38,7 @@ import { toIsoOrNull, pnlColor } from '../shared/utils';
     MatTooltipModule,
     MatDatepickerModule,
     MatNativeDateModule,
+    MatProgressBarModule,
     DatePipe,
     DecimalPipe,
   ],
@@ -47,6 +50,9 @@ export class OptionPositions implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+
+  loading = false;
 
   positions: OptionPositionDto[] = [];
   displayedColumns = [
@@ -92,11 +98,18 @@ export class OptionPositions implements OnInit {
   }
 
   load(): void {
+    this.loading = true;
     const filters: any = { status: this.statusFilter === 'all' ? undefined : this.statusFilter };
     if (this.filterSymbol.trim()) filters.symbol = this.filterSymbol.trim().toUpperCase();
     this.service.getAll(filters).subscribe({
-      next: (data) => (this.positions = data ?? []),
-      error: (err) => console.error('Failed to load positions', err),
+      next: (data) => {
+        this.positions = data ?? [];
+        this.loading = false;
+      },
+      error: () => {
+        this.notify.error('Failed to load option positions');
+        this.loading = false;
+      },
     });
   }
 
@@ -195,10 +208,11 @@ export class OptionPositions implements OnInit {
 
     obs.subscribe({
       next: () => {
+        this.notify.success(this.isCreating ? 'Position created' : 'Position updated');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Save failed', err),
+      error: () => this.notify.error('Failed to save position'),
     });
   }
 
@@ -207,10 +221,11 @@ export class OptionPositions implements OnInit {
     if (!confirm(`Delete ${this.selected.symbol} ${this.selected.right} ${this.selected.strike} position?`)) return;
     this.service.delete(this.selected.id).subscribe({
       next: () => {
+        this.notify.success('Position deleted');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Delete failed', err),
+      error: () => this.notify.error('Failed to delete position'),
     });
   }
 

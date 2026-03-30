@@ -1,5 +1,8 @@
 <app-content-area [showRightSidebar]="showSidebar">
   <div main>
+    @if (loading) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
     <!-- Filters + New button -->
     <div class="flex items-center gap-4 mx-4 mb-2">
       <mat-form-field appearance="outline" class="w-32" subscriptSizing="dynamic">

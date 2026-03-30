@@ -30,3 +30,11 @@ quill-editor .ql-container {
 quill-editor .ql-editor {
   min-height: 0;
 }
+
+/* Snackbar variants */
+.snackbar-success .mdc-snackbar__surface {
+  background-color: #2e7d32 !important;
+}
+.snackbar-error .mdc-snackbar__surface {
+  background-color: #c62828 !important;
+}

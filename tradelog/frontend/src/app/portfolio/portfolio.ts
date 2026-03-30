@@ -7,10 +7,12 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ContentArea } from '../shared/content-area/content-area';
 import { PortfolioService, PortfolioDto, PortfolioUpsert } from './portfolio.service';
 import { Budget, Strategy, STRATEGY_LABELS } from '../trade-entries/trade-entries.service';
 import { pnlColor } from '../shared/utils';
+import { NotificationService } from '../shared/notification.service';
 
 @Component({
   selector: 'app-portfolio',
@@ -25,6 +27,7 @@ import { pnlColor } from '../shared/utils';
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatProgressBarModule,
     DecimalPipe,
   ],
   templateUrl: './portfolio.html',
@@ -33,6 +36,9 @@ import { pnlColor } from '../shared/utils';
 export class PortfolioComponent implements OnInit {
   private service = inject(PortfolioService);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+
+  loading = false;
 
   entries: PortfolioDto[] = [];
   displayedColumns = ['budget', 'strategy', 'minAllocation', 'maxAllocation', 'currentAllocation', 'pnl'];
@@ -59,9 +65,16 @@ export class PortfolioComponent implements OnInit {
   }
 
   load(): void {
+    this.loading = true;
     this.service.getAll().subscribe({
-      next: (data) => (this.entries = data ?? []),
-      error: (err) => console.error('Failed to load portfolio', err),
+      next: (data) => {
+        this.entries = data ?? [];
+        this.loading = false;
+      },
+      error: () => {
+        this.notify.error('Failed to load portfolio');
+        this.loading = false;
+      },
     });
   }
 
@@ -105,8 +118,12 @@ export class PortfolioComponent implements OnInit {
       maxAllocation: Number(v.maxAllocation),
     };
 
-    const done = () => { this.load(); this.onCancel(); };
-    const fail = (err: any) => console.error('Save failed', err);
+    const done = () => {
+      this.notify.success(this.isCreating ? 'Allocation created' : 'Allocation updated');
+      this.load();
+      this.onCancel();
+    };
+    const fail = () => this.notify.error('Failed to save allocation');
 
     if (this.isCreating || !payload.id) {
       this.service.create(payload).subscribe({ next: done, error: fail });
@@ -120,10 +137,11 @@ export class PortfolioComponent implements OnInit {
     if (!confirm('Delete this portfolio allocation?')) return;
     this.service.delete(this.selected.id).subscribe({
       next: () => {
+        this.notify.success('Allocation deleted');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Delete failed', err),
+      error: () => this.notify.error('Failed to delete allocation'),
     });
   }
 

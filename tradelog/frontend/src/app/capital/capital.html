@@ -1,5 +1,8 @@
 <app-content-area [showRightSidebar]="showSidebar">
   <div main>
+    @if (loading) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
     <!-- Chart -->
     <div class="mx-4 mb-4" style="height: 250px;">
       <canvas baseChart

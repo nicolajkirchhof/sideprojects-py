@@ -10,8 +10,10 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration } from 'chart.js/auto';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { CapitalService, Capital, CapitalUpsert } from './capital.service';
 import { toIsoOrNull, pnlColor } from '../shared/utils';
+import { NotificationService } from '../shared/notification.service';
 
 @Component({
   selector: 'app-capital',
@@ -27,6 +29,7 @@ import { toIsoOrNull, pnlColor } from '../shared/utils';
     MatDatepickerModule,
     MatNativeDateModule,
     BaseChartDirective,
+    MatProgressBarModule,
     DatePipe,
     DecimalPipe,
   ],
@@ -36,6 +39,9 @@ import { toIsoOrNull, pnlColor } from '../shared/utils';
 export class CapitalComponent implements OnInit {
   private service = inject(CapitalService);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+
+  loading = false;
 
   capitals: Capital[] = [];
   displayedColumns = [
@@ -83,12 +89,17 @@ export class CapitalComponent implements OnInit {
   }
 
   load(): void {
+    this.loading = true;
     this.service.getAll().subscribe({
       next: (data) => {
         this.capitals = data ?? [];
         this.updateChart();
+        this.loading = false;
       },
-      error: (err) => console.error('Failed to load capital', err),
+      error: () => {
+        this.notify.error('Failed to load capital snapshots');
+        this.loading = false;
+      },
     });
   }
 
@@ -147,10 +158,11 @@ export class CapitalComponent implements OnInit {
 
     obs.subscribe({
       next: () => {
+        this.notify.success(this.isCreating ? 'Snapshot created' : 'Snapshot updated');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Save failed', err),
+      error: () => this.notify.error('Failed to save snapshot'),
     });
   }
 
@@ -159,10 +171,11 @@ export class CapitalComponent implements OnInit {
     if (!confirm('Delete this capital snapshot?')) return;
     this.service.delete(this.selected.id).subscribe({
       next: () => {
+        this.notify.success('Snapshot deleted');
         this.load();
         this.onCancel();
       },
-      error: (err) => console.error('Delete failed', err),
+      error: () => this.notify.error('Failed to delete snapshot'),
     });
   }
 

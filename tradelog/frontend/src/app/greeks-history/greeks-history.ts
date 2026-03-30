@@ -1,6 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { BaseChartDirective } from 'ng2-charts';
@@ -16,6 +16,7 @@ import { OptionPositionsLogService, OptionPositionsLog } from '../option-positio
 })
 export class GreeksHistoryComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private logService = inject(OptionPositionsLogService);
 
   contractId = '';
@@ -94,6 +95,6 @@ export class GreeksHistoryComponent implements OnInit {
   }
 
   goBack(): void {
-    window.history.back();
+    this.router.navigate(['/option-positions']);
   }
 }
