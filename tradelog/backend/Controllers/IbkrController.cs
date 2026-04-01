@@ -13,81 +13,173 @@ namespace tradelog.Controllers;
 public class IbkrController : ControllerBase
 {
     private readonly DataContext _context;
-    private readonly IbkrSyncService _syncService;
+    private readonly FlexQueryClient _flexClient;
+    private readonly FlexReportParser _flexParser;
+    private readonly FlexSyncService _flexSync;
+    private readonly TwsLiveSyncService _liveSync;
     private readonly IAccountContext _accountContext;
-    private static readonly TimeSpan SyncCooldown = TimeSpan.FromHours(1);
+    private readonly ILogger<IbkrController> _logger;
+    private static readonly TimeSpan LiveSyncCooldown = TimeSpan.FromHours(1);
 
-    public IbkrController(DataContext context, IbkrSyncService syncService, IAccountContext accountContext)
+    public IbkrController(
+        DataContext context,
+        FlexQueryClient flexClient,
+        FlexReportParser flexParser,
+        FlexSyncService flexSync,
+        TwsLiveSyncService liveSync,
+        IAccountContext accountContext,
+        ILogger<IbkrController> logger)
     {
         _context = context;
-        _syncService = syncService;
+        _flexClient = flexClient;
+        _flexParser = flexParser;
+        _flexSync = flexSync;
+        _liveSync = liveSync;
         _accountContext = accountContext;
+        _logger = logger;
     }
+
+    // ────────────────────────────────────────────
+    // Status
+    // ────────────────────────────────────────────
 
     [HttpGet("sync/status")]
     public async Task<ActionResult<object>> GetSyncStatus()
     {
         var account = await GetCurrentAccount();
         if (account == null)
-            return Ok(new { lastSyncAt = (DateTime?)null, lastSyncResult = (string?)null, canSync = false, cooldownRemainingSeconds = (int?)null });
+            return Ok(new
+            {
+                flexConfigured = false,
+                lastFlexSyncAt = (DateTime?)null,
+                lastFlexSyncResult = (string?)null,
+                lastLiveSyncAt = (DateTime?)null,
+                lastLiveSyncResult = (string?)null,
+                canLiveSync = false,
+                liveSyncCooldownSeconds = (int?)null,
+            });
 
         var now = DateTime.UtcNow;
-        bool canSync;
-        int? cooldownRemainingSeconds = null;
+        bool canLiveSync;
+        int? cooldownSeconds = null;
 
         if (account.LastSyncAt == null)
         {
-            canSync = true;
+            canLiveSync = true;
         }
         else
         {
             var elapsed = now - account.LastSyncAt.Value;
-            canSync = elapsed >= SyncCooldown;
-            if (!canSync)
-                cooldownRemainingSeconds = (int)(SyncCooldown - elapsed).TotalSeconds;
+            canLiveSync = elapsed >= LiveSyncCooldown;
+            if (!canLiveSync)
+                cooldownSeconds = (int)(LiveSyncCooldown - elapsed).TotalSeconds;
         }
 
         return Ok(new
         {
-            lastSyncAt = account.LastSyncAt,
-            lastSyncResult = account.LastSyncResult,
-            canSync,
-            cooldownRemainingSeconds,
+            flexConfigured = !string.IsNullOrEmpty(account.FlexToken) && !string.IsNullOrEmpty(account.FlexQueryId),
+            lastFlexSyncAt = account.LastFlexSyncAt,
+            lastFlexSyncResult = account.LastFlexSyncResult,
+            lastLiveSyncAt = account.LastSyncAt,
+            lastLiveSyncResult = account.LastSyncResult,
+            canLiveSync,
+            liveSyncCooldownSeconds = cooldownSeconds,
         });
     }
 
-    [HttpPost("sync")]
-    public async Task<ActionResult<object>> TriggerSync()
+    // ────────────────────────────────────────────
+    // Flex Sync
+    // ────────────────────────────────────────────
+
+    [HttpPost("flex-sync")]
+    public async Task<ActionResult<FlexSyncResultDto>> TriggerFlexSync(CancellationToken ct)
     {
         var account = await GetCurrentAccount();
         if (account == null)
-            return BadRequest("No account selected. Select an account first.");
+            return BadRequest("No account selected.");
 
-        // Enforce cooldown
+        if (string.IsNullOrEmpty(account.FlexToken) || string.IsNullOrEmpty(account.FlexQueryId))
+            return BadRequest("Flex credentials not configured. Set FlexToken and FlexQueryId in account settings.");
+
+        var result = new FlexSyncResultDto();
+
+        try
+        {
+            _logger.LogInformation("Starting Flex sync for account {AccountId}", account.IbkrAccountId);
+
+            var xml = await _flexClient.FetchReportAsync(account.FlexToken, account.FlexQueryId, ct);
+            _flexParser.ValidateSections(xml);
+
+            var trades = _flexParser.ParseTrades(xml);
+            var positions = _flexParser.ParseOpenPositions(xml);
+            var equity = _flexParser.ParseEquitySummary(xml);
+            var optionEvents = _flexParser.ParseOptionEvents(xml);
+
+            var (tradesCreated, tradesUpdated, optCreated, optClosed) = await _flexSync.SyncTradesAsync(trades);
+            result.TradesCreated = tradesCreated;
+            result.TradesUpdated = tradesUpdated;
+            result.OptionPositionsCreated = optCreated;
+            result.OptionPositionsClosed = optClosed;
+
+            result.OptionEventsProcessed = await _flexSync.SyncOptionEventsAsync(optionEvents);
+            result.CapitalDaysCreated = await _flexSync.SyncCapitalAsync(equity);
+            result.Warnings = await _flexSync.ReconcilePositionsAsync(positions);
+
+            result.Success = true;
+            result.Message = result.ToSummary();
+
+            account.LastFlexSyncAt = DateTime.UtcNow;
+            account.LastFlexSyncResult = result.Message;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Flex sync complete: {Summary}", result.Message);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Message = $"Flex sync failed: {ex.Message}";
+
+            account.LastFlexSyncResult = result.Message;
+            await _context.SaveChangesAsync();
+
+            _logger.LogError(ex, "Flex sync failed");
+            return StatusCode(500, result);
+        }
+    }
+
+    // ────────────────────────────────────────────
+    // Live Sync (TWS — Greeks + Stock Prices)
+    // ────────────────────────────────────────────
+
+    [HttpPost("live-sync")]
+    public async Task<ActionResult<LiveSyncResultDto>> TriggerLiveSync()
+    {
+        var account = await GetCurrentAccount();
+        if (account == null)
+            return BadRequest("No account selected.");
+
         if (account.LastSyncAt != null)
         {
             var elapsed = DateTime.UtcNow - account.LastSyncAt.Value;
-            if (elapsed < SyncCooldown)
+            if (elapsed < LiveSyncCooldown)
             {
-                var remaining = (int)(SyncCooldown - elapsed).TotalSeconds;
-                return Conflict(new { message = $"Next sync available in {remaining / 60} minutes.", cooldownRemainingSeconds = remaining });
+                var remaining = (int)(LiveSyncCooldown - elapsed).TotalSeconds;
+                return Conflict(new { message = $"Next live sync in {remaining / 60} minutes.", cooldownRemainingSeconds = remaining });
             }
         }
 
-        // Run sync
-        var result = await _syncService.SyncAll(account);
+        var result = await _liveSync.SyncAll(account);
 
-        // Update sync metadata (only set LastSyncAt on success)
         if (result.Success)
             account.LastSyncAt = DateTime.UtcNow;
         account.LastSyncResult = result.Message;
         await _context.SaveChangesAsync();
 
-        if (result.Success)
-            return Ok(result);
-        else
-            return StatusCode(500, result);
+        return result.Success ? Ok(result) : StatusCode(500, result);
     }
+
+    // ────────────────────────────────────────────
 
     private async Task<Account?> GetCurrentAccount()
     {

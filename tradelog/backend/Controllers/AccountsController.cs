@@ -59,6 +59,8 @@ public class AccountsController : ControllerBase
         existing.Port = account.Port;
         existing.ClientId = account.ClientId;
         existing.IsDefault = account.IsDefault;
+        existing.FlexToken = account.FlexToken;
+        existing.FlexQueryId = account.FlexQueryId;
 
         await _context.SaveChangesAsync();
         return NoContent();

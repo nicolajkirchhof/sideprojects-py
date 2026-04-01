@@ -92,3 +92,12 @@ finance/apps/                        →  All interactive applications
 - Scripts with `# %%` cell markers are designed for interactive execution in IPython/Spyder (not pytest-based)
 - No formal test framework; `finance/ibkr/test.py` is a Jupyter-style connection test notebook
 - Windows-focused (PowerShell admin scripts, .NET backend, PyQt6 desktop UI)
+
+### Testing — TDD
+
+All implementation must follow Test-Driven Development:
+
+1. **Write tests first** — before writing any production code, write failing tests that define the expected behavior
+2. **Red → Green → Refactor** — confirm the test fails, write minimal code to pass it, then refactor
+3. **Test frameworks**: `xUnit` + `Moq` for the .NET backend (`tradelog/backend.Tests/`), `pytest` for Python code
+4. **Test behavior, not implementation** — tests should assert on observable outcomes, not internal state

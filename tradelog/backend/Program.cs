@@ -26,8 +26,12 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<IAccountContext, AccountContext>();
-builder.Services.AddScoped<IbkrSyncService>();
+builder.Services.AddScoped<TwsLiveSyncService>();
+builder.Services.AddScoped<FlexQueryClient>();
+builder.Services.AddSingleton<FlexReportParser>();
+builder.Services.AddScoped<FlexSyncService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

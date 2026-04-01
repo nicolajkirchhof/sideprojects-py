@@ -8,6 +8,8 @@ public class DataContext : DbContext
 {
     private readonly IAccountContext? _accountContext;
 
+    private int CurrentAccountId => _accountContext?.CurrentAccountId ?? 0;
+
     public DataContext(DbContextOptions<DataContext> options, IAccountContext? accountContext = null)
         : base(options)
     {
@@ -41,18 +43,17 @@ public class DataContext : DbContext
 
         // ────────────────────────────────────────────
         // Global query filters — scope all account-owned entities
+        // Reference CurrentAccountId property (not a local variable) so EF Core
+        // parameterizes the filter and re-evaluates it per query execution.
         // ────────────────────────────────────────────
 
-        // Use a backing field so EF can translate the filter to SQL
-        var accountId = _accountContext?.CurrentAccountId ?? 0;
-
-        modelBuilder.Entity<TradeEntry>().HasQueryFilter(e => e.AccountId == accountId);
-        modelBuilder.Entity<OptionPosition>().HasQueryFilter(e => e.AccountId == accountId);
-        modelBuilder.Entity<OptionPositionsLog>().HasQueryFilter(e => e.AccountId == accountId);
-        modelBuilder.Entity<Trade>().HasQueryFilter(e => e.AccountId == accountId);
-        modelBuilder.Entity<Capital>().HasQueryFilter(e => e.AccountId == accountId);
-        modelBuilder.Entity<WeeklyPrep>().HasQueryFilter(e => e.AccountId == accountId);
-        modelBuilder.Entity<Portfolio>().HasQueryFilter(e => e.AccountId == accountId);
+        modelBuilder.Entity<TradeEntry>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<OptionPosition>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<OptionPositionsLog>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<Trade>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<Capital>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<WeeklyPrep>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<Portfolio>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
 
         // ────────────────────────────────────────────
         // Indexes

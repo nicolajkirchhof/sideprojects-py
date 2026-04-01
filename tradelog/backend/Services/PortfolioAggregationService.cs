@@ -5,7 +5,7 @@ namespace tradelog.Services;
 
 /// <summary>
 /// Shared computation of portfolio-level aggregations from option positions and trades.
-/// Used by both CapitalController (on manual create) and IbkrSyncService (on IBKR sync).
+/// Used by CapitalController (on manual create) and TwsLiveSyncService (on live sync).
 /// </summary>
 public static class PortfolioAggregationService
 {

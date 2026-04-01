@@ -9,6 +9,10 @@
     <UserSecretsId>07f628c1-a3bf-4c07-b623-369a7646713a</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="backend.Tests" />
+  </ItemGroup>
+
   <!-- IBApi: Official IBKR TWS API C# client (vendored from C:\TWS_API\source\CSharpClient\client\) -->
   <ItemGroup>
     <ProjectReference Include="lib\IBApi\CSharpAPI.csproj" />

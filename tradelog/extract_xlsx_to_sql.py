@@ -3,7 +3,7 @@ Extract data from 'Portfolio-Tracking 2026.xlsx' and generate a SQL Server scrip
 to populate the tradelog database.
 
 Usage:
-    python tradelog/extract_xlsx_to_sql.py [--account-id 1] [--output tradelog/seed.sql]
+    python tradelog/extract_xlsx_to_sql.py [--ibkr-account-id 8497] [--output tradelog/seed.sql]
 
 The generated .sql file can be run manually against the database via:
     sqlcmd -S localhost -d tradelog -i tradelog/seed.sql
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import openpyxl
@@ -64,7 +64,6 @@ TYPE_OF_TRADE = {
     "Long Stock": 14,
     "Short Stock": 15,
     "Short Put Vertical": 1,  # alias for Short Put Spread
-    "Long Put Vertical": 6,
 }
 
 DIRECTIONAL = {
@@ -112,23 +111,8 @@ def sql_datetime(v) -> str:
         return f"'{v.strftime('%Y-%m-%dT%H:%M:%S')}'"
     if isinstance(v, (int, float)):
         # Excel serial date
-        from datetime import timedelta
-
         base = datetime(1899, 12, 30)
         return f"'{(base + timedelta(days=v)).strftime('%Y-%m-%dT%H:%M:%S')}'"
-    return "NULL"
-
-
-def sql_date(v) -> str:
-    if v is None:
-        return "NULL"
-    if isinstance(v, datetime):
-        return f"'{v.strftime('%Y-%m-%d')}'"
-    if isinstance(v, (int, float)):
-        from datetime import timedelta
-
-        base = datetime(1899, 12, 30)
-        return f"'{(base + timedelta(days=v)).strftime('%Y-%m-%d')}'"
     return "NULL"
 
 
@@ -189,17 +173,6 @@ def sql_enum(v, mapping: dict, default: str = "NULL") -> str:
     return str(result)
 
 
-def is_empty_row(row, num_cols: int) -> bool:
-    """Check if first num_cols cells are all None/empty."""
-    for i, cell in enumerate(row):
-        if i >= num_cols:
-            break
-        v = cell.value
-        if v is not None and str(v).strip():
-            return False
-    return True
-
-
 def is_formula(v) -> bool:
     return isinstance(v, str) and v.startswith("=")
 
@@ -207,7 +180,7 @@ def is_formula(v) -> bool:
 # ── Extractors ───────────────────────────────────────────────────────────
 
 
-def extract_portfolios(wb, account_id: int) -> list[str]:
+def extract_portfolios(wb, account_id: int | str) -> list[str]:
     ws = wb["Portfolio"]
     stmts = []
     for row in ws.iter_rows(min_row=2):
@@ -228,7 +201,7 @@ def extract_portfolios(wb, account_id: int) -> list[str]:
     return stmts
 
 
-def extract_weekly_preps(wb, account_id: int) -> list[str]:
+def extract_weekly_preps(wb, account_id: int | str) -> list[str]:
     ws = wb["WeeklyPrep"]
     stmts = []
     for row in ws.iter_rows(min_row=2):
@@ -250,7 +223,7 @@ def extract_weekly_preps(wb, account_id: int) -> list[str]:
     return stmts
 
 
-def extract_capitals(wb, account_id: int) -> list[str]:
+def extract_capitals(wb, account_id: int | str) -> list[str]:
     """Extract only the manually entered columns from Capital sheet."""
     ws = wb["Capital"]
     stmts = []
@@ -282,7 +255,7 @@ def extract_capitals(wb, account_id: int) -> list[str]:
     return stmts
 
 
-def extract_trade_entries(wb, account_id: int) -> list[str]:
+def extract_trade_entries(wb, account_id: int | str) -> list[str]:
     """Extract from TradeLog sheet → TradeEntries table."""
     ws = wb["TradeLog"]
     stmts = []
@@ -327,7 +300,7 @@ def extract_trade_entries(wb, account_id: int) -> list[str]:
     return stmts
 
 
-def extract_option_positions(wb, account_id: int) -> list[str]:
+def extract_option_positions(wb, account_id: int | str) -> list[str]:
     """Extract raw data from OptionPositions sheet."""
     ws = wb["OptionPositions"]
     stmts = []
@@ -363,7 +336,7 @@ def extract_option_positions(wb, account_id: int) -> list[str]:
     return stmts
 
 
-def extract_stock_trades(wb, account_id: int) -> list[str]:
+def extract_stock_trades(wb, account_id: int | str) -> list[str]:
     """Extract from StockTrades sheet → Trades table."""
     ws = wb["StockTrades"]
     stmts = []
@@ -388,7 +361,7 @@ def extract_stock_trades(wb, account_id: int) -> list[str]:
     return stmts
 
 
-def extract_option_positions_log(wb, account_id: int) -> list[str]:
+def extract_option_positions_log(wb, account_id: int | str) -> list[str]:
     """Extract from OptionPositionsLog sheet."""
     ws = wb["OptionPositionsLog"]
     stmts = []
@@ -416,33 +389,74 @@ def extract_option_positions_log(wb, account_id: int) -> list[str]:
 # ── Main ─────────────────────────────────────────────────────────────────
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Extract XLSX → SQL seed script")
-    parser.add_argument("--account-id", type=int, default=1, help="AccountId to use (default: 1)")
-    parser.add_argument("--output", type=str, default=None, help="Output .sql file path")
-    parser.add_argument("--xlsx", type=str, default=str(XLSX_PATH), help="Input xlsx path")
-    args = parser.parse_args()
-
-    output_path = args.output or str(Path(args.xlsx).with_suffix(".sql"))
-
-    print(f"Reading {args.xlsx} ...")
-    wb = openpyxl.load_workbook(args.xlsx, data_only=False)
-
-    aid = args.account_id
-    lines: list[str] = []
-
-    lines.append("-- ==========================================================")
-    lines.append("-- Auto-generated seed script from Portfolio-Tracking 2026.xlsx")
-    lines.append(f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append(f"-- AccountId: {aid}")
-    lines.append("-- ==========================================================")
-    lines.append("")
+def emit_account_preamble(lines: list[str], ibkr_account_id: str) -> None:
+    """Shared SQL preamble: resolve account by IbkrAccountId or abort."""
     lines.append("SET NOCOUNT ON;")
     lines.append("BEGIN TRANSACTION;")
     lines.append("")
+    lines.append("DECLARE @AccountId INT;")
+    lines.append(
+        f"SELECT @AccountId = Id FROM Accounts "
+        f"WHERE IbkrAccountId = N'{ibkr_account_id}';"
+    )
+    lines.append("")
+    lines.append("IF @AccountId IS NULL")
+    lines.append("BEGIN")
+    lines.append(
+        f"    PRINT 'ERROR: No account found for IbkrAccountId {ibkr_account_id}';")
+    lines.append("    ROLLBACK;")
+    lines.append("    RETURN;")
+    lines.append("END")
+    lines.append("")
+    lines.append(
+        "PRINT 'Using AccountId ' + CAST(@AccountId AS VARCHAR) + "
+        f"' (IBKR: {ibkr_account_id})';"
+    )
+    lines.append("")
 
-    # Delete existing data for this account (reverse FK order)
-    lines.append("-- Clear existing data for this account")
+
+def run_full_seed(wb, args) -> None:
+    """Original mode: wipe account data and re-seed everything from Excel."""
+    output_path = args.output or str(Path(args.xlsx).with_suffix(".sql"))
+    aid = "@AccountId"
+    lines: list[str] = []
+
+    lines.append("-- ==========================================================")
+    lines.append("-- Auto-generated FULL seed script from Portfolio-Tracking 2026.xlsx")
+    lines.append(f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"-- IBKR Account: {args.ibkr_account_id}")
+    lines.append("-- ==========================================================")
+    lines.append("")
+
+    # Full seed creates account if missing
+    lines.append("SET NOCOUNT ON;")
+    lines.append("BEGIN TRANSACTION;")
+    lines.append("")
+    lines.append("DECLARE @AccountId INT;")
+    lines.append(
+        f"SELECT @AccountId = Id FROM Accounts "
+        f"WHERE IbkrAccountId = N'{args.ibkr_account_id}';"
+    )
+    lines.append("")
+    lines.append("IF @AccountId IS NULL")
+    lines.append("BEGIN")
+    lines.append(
+        f"    INSERT INTO Accounts (IbkrAccountId, Name, Host, Port, ClientId, IsDefault) "
+        f"VALUES (N'{args.ibkr_account_id}', N'IBKR {args.ibkr_account_id}', "
+        f"N'127.0.0.1', 7497, 1, 1);"
+    )
+    lines.append("    SET @AccountId = SCOPE_IDENTITY();")
+    lines.append(
+        f"    PRINT 'Created account for IbkrAccountId {args.ibkr_account_id} "
+        f"with Id ' + CAST(@AccountId AS VARCHAR);"
+    )
+    lines.append("END")
+    lines.append("")
+    lines.append("PRINT 'Using AccountId ' + CAST(@AccountId AS VARCHAR) + "
+                 f"' (IBKR: {args.ibkr_account_id})';")
+    lines.append("")
+
+    lines.append("-- Remove all existing data for this account")
     for table in [
         "OptionPositionsLogs",
         "OptionPositions",
@@ -452,10 +466,9 @@ def main():
         "WeeklyPreps",
         "Portfolios",
     ]:
-        lines.append(f"DELETE FROM {table} WHERE AccountId = {aid};")
+        lines.append(f"DELETE FROM {table} WHERE AccountId = @AccountId;")
     lines.append("")
 
-    # Enable identity insert per table, insert, then disable
     sections = [
         ("Portfolios", extract_portfolios(wb, aid)),
         ("WeeklyPreps", extract_weekly_preps(wb, aid)),
@@ -471,11 +484,9 @@ def main():
             lines.append(f"-- {table_name}: no data found")
             lines.append("")
             continue
-
         lines.append(f"-- {table_name} ({len(stmts)} rows)")
         lines.append(f"PRINT 'Inserting {len(stmts)} rows into {table_name}...';")
-        for s in stmts:
-            lines.append(s)
+        lines.extend(stmts)
         lines.append("")
 
     lines.append("COMMIT TRANSACTION;")
@@ -483,10 +494,134 @@ def main():
 
     Path(output_path).write_text("\n".join(lines), encoding="utf-8")
     print(f"Written {len(lines)} lines to {output_path}")
-
-    # Summary
     for table_name, stmts in sections:
         print(f"  {table_name}: {len(stmts)} rows")
+
+
+def extract_options_history_positions(wb, account_id: int | str) -> list[str]:
+    """Generate INSERT-if-not-exists statements for OptionPositions."""
+    ws = wb["OptionPositions"]
+    stmts = []
+    for row in ws.iter_rows(min_row=2):
+        symbol = row[0].value
+        contract_id = row[1].value
+        if symbol is None or contract_id is None:
+            continue
+        if is_formula(symbol):
+            continue
+
+        cid = sql_str(str(contract_id))
+        stmts.append(
+            f"IF NOT EXISTS (SELECT 1 FROM OptionPositions "
+            f"WHERE AccountId = {account_id} AND ContractId = {cid})\n"
+            f"  INSERT INTO OptionPositions (AccountId, Symbol, ContractId, ConId, "
+            f"Opened, Expiry, Closed, Pos, [Right], Strike, Cost, Commission, Multiplier) "
+            f"VALUES ({account_id}, {sql_str(symbol)}, {cid}, "
+            f"{sql_int(contract_id)}, "
+            f"{sql_datetime(row[2].value)}, {sql_datetime(row[3].value)}, "
+            f"{sql_datetime(row[4].value)}, "
+            f"{sql_int(row[5].value)}, {sql_enum(row[6].value, POSITION_RIGHT, '0')}, "
+            f"{sql_num(row[7].value)}, {sql_num(row[8].value)}, "
+            f"{sql_num(row[9].value)}, "
+            f"{sql_int(row[10].value) if row[10].value else '100'});"
+        )
+    return stmts
+
+
+def extract_options_history_logs(wb, account_id: int | str) -> list[str]:
+    """Generate INSERT-if-not-exists statements for OptionPositionsLog."""
+    ws = wb["OptionPositionsLog"]
+    stmts = []
+    for row in ws.iter_rows(min_row=2):
+        dt = row[0].value
+        contract_id = row[1].value
+        if dt is None or contract_id is None:
+            continue
+
+        cid = sql_str(str(contract_id))
+        dt_sql = sql_datetime(dt)
+        stmts.append(
+            f"IF NOT EXISTS (SELECT 1 FROM OptionPositionsLogs "
+            f"WHERE AccountId = {account_id} AND ContractId = {cid} AND DateTime = {dt_sql})\n"
+            f"  INSERT INTO OptionPositionsLogs (AccountId, DateTime, ContractId, "
+            f"Underlying, Iv, Price, TimeValue, Delta, Theta, Gamma, Vega, Margin) "
+            f"VALUES ({account_id}, {dt_sql}, {cid}, "
+            f"{sql_num(row[2].value, '0')}, {sql_num(row[3].value, '0')}, "
+            f"{sql_num(row[4].value, '0')}, {sql_num(row[5].value, '0')}, "
+            f"{sql_num(row[6].value, '0')}, {sql_num(row[7].value, '0')}, "
+            f"{sql_num(row[8].value, '0')}, {sql_num(row[9].value, '0')}, "
+            f"{sql_num(row[10].value, '0')});"
+        )
+    return stmts
+
+
+def run_options_history(wb, args) -> None:
+    """Import only OptionPositions + OptionPositionsLog, skipping existing rows."""
+    output_path = args.output or str(
+        Path(args.xlsx).with_name("import-options-history.sql")
+    )
+    aid = "@AccountId"
+    lines: list[str] = []
+
+    lines.append("-- ==========================================================")
+    lines.append("-- Import historical option positions + Greeks logs (skip existing)")
+    lines.append(f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"-- IBKR Account: {args.ibkr_account_id}")
+    lines.append("-- ==========================================================")
+    lines.append("")
+
+    emit_account_preamble(lines, args.ibkr_account_id)
+
+    sections = [
+        ("OptionPositions", extract_options_history_positions(wb, aid)),
+        ("OptionPositionsLogs", extract_options_history_logs(wb, aid)),
+    ]
+
+    for table_name, stmts in sections:
+        if not stmts:
+            lines.append(f"-- {table_name}: no data found")
+            lines.append("")
+            continue
+        lines.append(f"-- {table_name} ({len(stmts)} rows, skip existing)")
+        lines.append(f"PRINT 'Importing up to {len(stmts)} rows into {table_name}...';")
+        lines.extend(stmts)
+        lines.append("")
+
+    lines.append("COMMIT TRANSACTION;")
+    lines.append("PRINT 'Options history import complete.';")
+
+    Path(output_path).write_text("\n".join(lines), encoding="utf-8")
+    print(f"Written {len(lines)} lines to {output_path}")
+    for table_name, stmts in sections:
+        print(f"  {table_name}: {len(stmts)} rows")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Extract XLSX → SQL seed script")
+    parser.add_argument(
+        "--ibkr-account-id",
+        type=str,
+        default="8497",
+        help="IBKR Account ID to link data to (default: 8497)",
+    )
+    parser.add_argument("--output", type=str, default=None, help="Output .sql file path")
+    parser.add_argument("--xlsx", type=str, default=str(XLSX_PATH), help="Input xlsx path")
+    parser.add_argument(
+        "--mode",
+        choices=["full", "options-history"],
+        default="full",
+        help="full = wipe & reseed all data (default), "
+             "options-history = import only OptionPositions + logs (skip existing)",
+    )
+    args = parser.parse_args()
+
+    print(f"Reading {args.xlsx} (mode={args.mode}) ...")
+    wb = openpyxl.load_workbook(args.xlsx, data_only=False)
+
+    if args.mode == "options-history":
+        run_options_history(wb, args)
+    else:
+        run_full_seed(wb, args)
 
 
 if __name__ == "__main__":

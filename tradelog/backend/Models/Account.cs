@@ -27,4 +27,16 @@ public class Account
 
     [StringLength(500)]
     public string? LastSyncResult { get; set; }
+
+    // Flex Query credentials
+    [StringLength(64)]
+    public string? FlexToken { get; set; }
+
+    [StringLength(20)]
+    public string? FlexQueryId { get; set; }
+
+    public DateTime? LastFlexSyncAt { get; set; }
+
+    [StringLength(500)]
+    public string? LastFlexSyncResult { get; set; }
 }

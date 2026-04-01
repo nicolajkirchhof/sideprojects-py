@@ -45,6 +45,13 @@ public class OptionPosition : tradelog.Data.IAccountScoped
     [StringLength(10)]
     public string? SecType { get; set; }
 
+    /// <summary>Underlying ticker symbol (e.g., SPY for SPY options).</summary>
+    [StringLength(20)]
+    public string? UnderlyingSymbol { get; set; }
+
+    /// <summary>Underlying IBKR contract ID — stable reference across symbol changes.</summary>
+    public int? UnderlyingConid { get; set; }
+
     /// <summary>Best exit price the position could have achieved (for trade review).</summary>
     public decimal? BestExitPrice { get; set; }
 
