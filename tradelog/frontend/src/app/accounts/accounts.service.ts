@@ -10,15 +10,22 @@ export interface Account {
   port: number;
   clientId: number;
   isDefault: boolean;
+  flexToken?: string | null;
+  flexQueryId?: string | null;
   lastSyncAt?: string | null;
   lastSyncResult?: string | null;
+  lastFlexSyncAt?: string | null;
+  lastFlexSyncResult?: string | null;
 }
 
 export interface SyncStatus {
-  lastSyncAt: string | null;
-  lastSyncResult: string | null;
-  canSync: boolean;
-  cooldownRemainingSeconds: number | null;
+  flexConfigured: boolean;
+  lastFlexSyncAt: string | null;
+  lastFlexSyncResult: string | null;
+  lastLiveSyncAt: string | null;
+  lastLiveSyncResult: string | null;
+  canLiveSync: boolean;
+  liveSyncCooldownSeconds: number | null;
 }
 
 const STORAGE_KEY = 'tradelog-selected-account-id';
@@ -73,7 +80,11 @@ export class AccountsService {
     return this.http.get<SyncStatus>('/api/ibkr/sync/status');
   }
 
-  triggerSync(): Observable<any> {
-    return this.http.post('/api/ibkr/sync', {});
+  triggerFlexSync(): Observable<any> {
+    return this.http.post('/api/ibkr/flex-sync', {});
+  }
+
+  triggerLiveSync(): Observable<any> {
+    return this.http.post('/api/ibkr/live-sync', {});
   }
 }

@@ -7,7 +7,7 @@ public class Trade : tradelog.Data.IAccountScoped
     public int Id { get; set; }
     public int AccountId { get; set; }
 
-    [Required, StringLength(20)]
+    [Required, StringLength(60)]
     public string Symbol { get; set; } = string.Empty;
 
     [Required]

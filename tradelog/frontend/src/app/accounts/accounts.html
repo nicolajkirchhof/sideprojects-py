@@ -87,21 +87,57 @@
 
         <mat-checkbox formControlName="isDefault">Default Account</mat-checkbox>
 
+        <!-- Flex Query credentials -->
+        <div class="text-xs font-medium uppercase tracking-wide opacity-50 mt-2">Flex Query</div>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Flex Token</mat-label>
+          <input matInput type="password" formControlName="flexToken" placeholder="IBKR Flex Web Service token">
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Flex Query ID</mat-label>
+          <input matInput formControlName="flexQueryId" placeholder="e.g. 123456">
+        </mat-form-field>
+
         <!-- Sync section (only for existing accounts) -->
         @if (!isCreating && selected) {
           <mat-card appearance="outlined" class="mt-2">
-            <mat-card-content class="!p-3">
+            <mat-card-content class="!p-3 flex flex-col gap-3">
               <div class="flex items-center gap-3">
                 <button mat-flat-button type="button" color="accent"
-                        [disabled]="syncing || !(syncStatus?.canSync)"
-                        (click)="onSync()">
-                  <mat-icon class="mr-1">sync</mat-icon>
-                  {{ syncing ? 'Syncing...' : 'Sync Now' }}
+                        [disabled]="syncing || !syncStatus?.flexConfigured"
+                        (click)="onFlexSync()">
+                  <mat-icon class="mr-1">cloud_download</mat-icon>
+                  {{ syncing ? 'Syncing...' : 'Flex Sync' }}
                 </button>
-                <span class="text-xs opacity-60">{{ lastSyncLabel(selected) }}</span>
+                <span class="text-xs opacity-60">
+                  @if (syncStatus?.lastFlexSyncAt) {
+                    {{ syncStatus?.lastFlexSyncResult }}
+                  } @else if (!syncStatus?.flexConfigured) {
+                    Not configured
+                  } @else {
+                    Never
+                  }
+                </span>
+              </div>
+              <div class="flex items-center gap-3">
+                <button mat-flat-button type="button"
+                        [disabled]="syncing || !syncStatus?.canLiveSync"
+                        (click)="onLiveSync()">
+                  <mat-icon class="mr-1">sync</mat-icon>
+                  Live Sync
+                </button>
+                <span class="text-xs opacity-60">
+                  @if (syncStatus?.liveSyncCooldownSeconds) {
+                    {{ Math.ceil(syncStatus!.liveSyncCooldownSeconds! / 60) }}m cooldown
+                  } @else if (syncStatus?.lastLiveSyncAt) {
+                    {{ syncStatus?.lastLiveSyncResult }}
+                  } @else {
+                    Never
+                  }
+                </span>
               </div>
               @if (syncMessage) {
-                <div class="text-sm mt-2 p-2 rounded bg-white/5">{{ syncMessage }}</div>
+                <div class="text-sm p-2 rounded bg-white/5">{{ syncMessage }}</div>
               }
             </mat-card-content>
           </mat-card>

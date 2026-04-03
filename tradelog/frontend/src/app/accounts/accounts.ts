@@ -48,6 +48,7 @@ export class AccountsComponent implements OnInit {
 
   syncStatus: SyncStatus | null = null;
   syncing = false;
+  Math = Math;
   syncMessage: string | null = null;
 
   ngOnInit(): void {
@@ -60,6 +61,8 @@ export class AccountsComponent implements OnInit {
       port: [7497, [Validators.required, Validators.min(1), Validators.max(65535)]],
       clientId: [1, [Validators.required, Validators.min(0)]],
       isDefault: [false],
+      flexToken: [''],
+      flexQueryId: [''],
     });
   }
 
@@ -89,6 +92,8 @@ export class AccountsComponent implements OnInit {
       port: row.port,
       clientId: row.clientId,
       isDefault: row.isDefault,
+      flexToken: row.flexToken ?? '',
+      flexQueryId: row.flexQueryId ?? '',
     });
     this.showSidebar = true;
     this.syncMessage = null;
@@ -106,6 +111,8 @@ export class AccountsComponent implements OnInit {
       port: 7497,
       clientId: 1,
       isDefault: false,
+      flexToken: '',
+      flexQueryId: '',
     });
     this.showSidebar = true;
     this.syncMessage = null;
@@ -131,6 +138,8 @@ export class AccountsComponent implements OnInit {
       port: Number(v.port),
       clientId: Number(v.clientId),
       isDefault: v.isDefault,
+      flexToken: v.flexToken || null,
+      flexQueryId: v.flexQueryId || null,
     };
 
     if (this.isCreating || !payload.id) {
@@ -171,20 +180,38 @@ export class AccountsComponent implements OnInit {
     });
   }
 
-  onSync(): void {
+  onFlexSync(): void {
     if (!this.selected) return;
-    // Ensure this account is the selected one for the sync request
     this.service.selectAccount(this.selected.id);
     this.syncing = true;
     this.syncMessage = null;
-    this.service.triggerSync().subscribe({
+    this.service.triggerFlexSync().subscribe({
       next: (res) => {
-        this.syncMessage = res?.message ?? 'Sync completed.';
+        this.syncMessage = res?.message ?? 'Flex sync completed.';
         this.syncing = false;
         this.load();
       },
       error: (err) => {
-        this.syncMessage = err.error?.message ?? 'Sync failed.';
+        this.syncMessage = err.error?.message ?? 'Flex sync failed.';
+        this.syncing = false;
+        this.load();
+      },
+    });
+  }
+
+  onLiveSync(): void {
+    if (!this.selected) return;
+    this.service.selectAccount(this.selected.id);
+    this.syncing = true;
+    this.syncMessage = null;
+    this.service.triggerLiveSync().subscribe({
+      next: (res) => {
+        this.syncMessage = res?.message ?? 'Live sync completed.';
+        this.syncing = false;
+        this.load();
+      },
+      error: (err) => {
+        this.syncMessage = err.error?.message ?? 'Live sync failed.';
         this.syncing = false;
         this.load();
       },

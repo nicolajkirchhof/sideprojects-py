@@ -18,7 +18,19 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:www.interactivebrokers.co.in)",
       "Bash(dotnet sln:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(grep -r \"MatTheme\\\\|theme\\\\|Theme\" /e/sideprojects-py/tradelog/frontend/src --include=*.ts --include=*.html)",
+      "Bash(grep -E \"\\\\.\\(css|scss|ts\\)$\")",
+      "Bash(git add:*)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet test:*)",
+      "Bash(/tmp/extract_sections.txt:*)",
+      "Read(//tmp/**)",
+      "Bash(grep -v '^$')",
+      "Bash(cat \"E:/sideprojects-py/investing_framework/_research/Books/summaries/\"*.md)",
+      "Bash(\"E:/sideprojects-py/investing_framework/_research/_all_book_summaries.txt\")",
+      "Bash(dotnet run:*)"
     ]
   }
 }

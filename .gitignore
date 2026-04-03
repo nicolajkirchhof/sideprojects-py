@@ -155,3 +155,17 @@ flask_session/
 obj/
 bin/
 
+# Research source materials (keep summaries, exclude originals)
+*.pdf
+*.epub
+*.mobi
+*.azw
+*.djvu
+*.docx
+*.pptx
+*.xlsx
+
+# Research temp files
+investing_framework/_research/**/paper_extracts.txt
+investing_framework/_research/**/book_extracts.txt
+investing_framework/_research/**/extracts_chunk*.txt
