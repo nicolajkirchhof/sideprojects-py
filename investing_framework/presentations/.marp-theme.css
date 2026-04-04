@@ -1,0 +1,15 @@
+/* Custom Marp theme for Trading & Investing presentations */
+/* Usage: copy the @import or style block into each presentation's frontmatter */
+
+:root {
+  --color-primary: #1B2A4A;
+  --color-accent: #2E86AB;
+  --color-highlight: #E8B931;
+  --color-success: #27AE60;
+  --color-danger: #E74C3C;
+  --color-bg: #F8F9FA;
+  --color-bg-dark: #1B2A4A;
+  --color-text: #2C3E50;
+  --color-text-light: #F8F9FA;
+  --color-border: #DEE2E6;
+}
