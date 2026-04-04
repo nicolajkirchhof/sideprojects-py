@@ -1,7 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatSort, MatSortModule } from '@angular/material/sort';
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -31,21 +33,26 @@ import { NotificationService } from '../shared/notification.service';
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressBarModule,
+    MatSortModule,
+    MatPaginatorModule,
     DatePipe,
     DecimalPipe,
   ],
   templateUrl: './trades.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class Trades implements OnInit {
+export class Trades implements OnInit, AfterViewInit {
   private service = inject(TradesService);
   private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
+  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+
   loading = false;
 
-  trades: TradeDto[] = [];
+  dataSource = new MatTableDataSource<TradeDto>([]);
   displayedColumns = [
     'symbol', 'date', 'posChange', 'price', 'multiplier',
     'totalPos', 'avgPrice', 'pnl', 'commission',
@@ -62,6 +69,11 @@ export class Trades implements OnInit {
 
   // Filter
   filterSymbol = '';
+
+  ngAfterViewInit(): void {
+    this.dataSource.sort = this.sort;
+    this.dataSource.paginator = this.paginator;
+  }
 
   ngOnInit(): void {
     const qp = this.route.snapshot.queryParams;
@@ -86,8 +98,8 @@ export class Trades implements OnInit {
     if (this.filterSymbol.trim()) filters.symbol = this.filterSymbol.trim().toUpperCase();
     this.service.getAll(filters).subscribe({
       next: (data) => {
-        this.trades = data ?? [];
-        this.hasMultiplier = this.trades.some(t => t.multiplier !== 1);
+        this.dataSource.data = data ?? [];
+        this.hasMultiplier = this.dataSource.data.some(t => t.multiplier !== 1);
         this.displayedColumns = this.hasMultiplier
           ? ['symbol', 'date', 'posChange', 'price', 'multiplier', 'totalPos', 'avgPrice', 'pnl', 'commission']
           : ['symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission'];

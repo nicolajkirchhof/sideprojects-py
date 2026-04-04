@@ -1,7 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatSortModule, MatSort } from '@angular/material/sort';
+import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -27,6 +29,8 @@ import { NotificationService } from '../shared/notification.service';
   imports: [
     CommonModule,
     MatTableModule,
+    MatSortModule,
+    MatPaginatorModule,
     ContentArea,
     ReactiveFormsModule,
     MatFormFieldModule,
@@ -45,16 +49,19 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './option-positions.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class OptionPositions implements OnInit {
+export class OptionPositions implements OnInit, AfterViewInit {
   private service = inject(OptionPositionsService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
+  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+
   loading = false;
 
-  positions: OptionPositionDto[] = [];
+  dataSource = new MatTableDataSource<OptionPositionDto>([]);
   displayedColumns = [
     'symbol', 'contractId', 'right', 'strike', 'expiry', 'pos', 'cost',
     'lastPrice', 'unrealizedPnl', 'unrealizedPnlPct', 'realizedPnl',
@@ -97,13 +104,18 @@ export class OptionPositions implements OnInit {
     });
   }
 
+  ngAfterViewInit(): void {
+    this.dataSource.sort = this.sort;
+    this.dataSource.paginator = this.paginator;
+  }
+
   load(): void {
     this.loading = true;
     const filters: any = { status: this.statusFilter === 'all' ? undefined : this.statusFilter };
     if (this.filterSymbol.trim()) filters.symbol = this.filterSymbol.trim().toUpperCase();
     this.service.getAll(filters).subscribe({
       next: (data) => {
-        this.positions = data ?? [];
+        this.dataSource.data = data ?? [];
         this.loading = false;
       },
       error: () => {

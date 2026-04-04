@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -26,19 +27,23 @@ import {
     MatButtonToggleModule,
     DecimalPipe,
     MatProgressBarModule,
+    MatSortModule,
   ],
   templateUrl: './instrument-summaries.html',
   host: { class: 'flex flex-col flex-1 overflow-auto' },
 })
-export class InstrumentSummaries implements OnInit {
+export class InstrumentSummaries implements OnInit, AfterViewInit {
   private service = inject(InstrumentSummariesService);
   private router = inject(Router);
   private notify = inject(NotificationService);
 
+  @ViewChild('optionSort') optionSort!: MatSort;
+  @ViewChild('tradeSort') tradeSort!: MatSort;
+
   loading = false;
 
-  optionSummaries: OptionInstrumentSummary[] = [];
-  tradeSummaries: TradeInstrumentSummary[] = [];
+  optionDataSource = new MatTableDataSource<OptionInstrumentSummary>([]);
+  tradeDataSource = new MatTableDataSource<TradeInstrumentSummary>([]);
 
   optionColumns = [
     'symbol', 'status', 'currentSetup', 'strikes', 'dit', 'dte',
@@ -57,6 +62,11 @@ export class InstrumentSummaries implements OnInit {
     pnl: 0, delta: 0, theta: 0, vega: 0, gamma: 0, margin: 0,
   };
 
+  ngAfterViewInit(): void {
+    this.optionDataSource.sort = this.optionSort;
+    this.tradeDataSource.sort = this.tradeSort;
+  }
+
   ngOnInit(): void {
     this.load();
   }
@@ -69,7 +79,7 @@ export class InstrumentSummaries implements OnInit {
     const status = this.statusFilter === 'all' ? undefined : this.statusFilter;
     this.service.getOptionSummaries(status).subscribe({
       next: (data) => {
-        this.optionSummaries = data ?? [];
+        this.optionDataSource.data = data ?? [];
         this.computeTotals();
         done();
       },
@@ -80,7 +90,7 @@ export class InstrumentSummaries implements OnInit {
     });
     this.service.getTradeSummaries().subscribe({
       next: (data) => {
-        this.tradeSummaries = this.statusFilter === 'all'
+        this.tradeDataSource.data = this.statusFilter === 'all'
           ? (data ?? [])
           : (data ?? []).filter(t =>
               this.statusFilter === 'open' ? t.totalPos !== 0 : t.totalPos === 0);
@@ -107,13 +117,14 @@ export class InstrumentSummaries implements OnInit {
   }
 
   private computeTotals(): void {
+    const options = this.optionDataSource.data;
     this.totals = {
-      pnl: this.optionSummaries.reduce((s, r) => s + r.pnl, 0),
-      delta: this.optionSummaries.reduce((s, r) => s + r.delta, 0),
-      theta: this.optionSummaries.reduce((s, r) => s + r.theta, 0),
-      vega: this.optionSummaries.reduce((s, r) => s + r.vega, 0),
-      gamma: this.optionSummaries.reduce((s, r) => s + r.gamma, 0),
-      margin: this.optionSummaries.reduce((s, r) => s + r.margin, 0),
+      pnl: options.reduce((s, r) => s + r.pnl, 0),
+      delta: options.reduce((s, r) => s + r.delta, 0),
+      theta: options.reduce((s, r) => s + r.theta, 0),
+      vega: options.reduce((s, r) => s + r.vega, 0),
+      gamma: options.reduce((s, r) => s + r.gamma, 0),
+      margin: options.reduce((s, r) => s + r.margin, 0),
     };
   }
 }

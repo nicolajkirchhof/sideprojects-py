@@ -127,8 +127,12 @@ public class FlexSyncService
         {
             if (existingPositions.TryGetValue(conId, out var pos))
             {
-                // Position exists — update from trades
-                UpdatePositionFromTrades(pos, conIdTrades, ref closed);
+                // Position exists — recompute state from all trades (idempotent)
+                bool wasClosed = pos.Closed != null;
+                RecomputePositionFromTrades(pos, conIdTrades);
+                bool nowClosed = pos.Closed != null;
+                if (nowClosed && !wasClosed) closed++;
+                else if (!nowClosed && wasClosed) closed--;
             }
             else
             {
@@ -156,7 +160,7 @@ public class FlexSyncService
 
         return new OptionPosition
         {
-            Symbol = trade.Symbol,
+            Symbol = trade.UnderlyingSymbol ?? trade.Symbol,
             ContractId = trade.ConId.ToString(),
             ConId = trade.ConId,
             SecType = trade.AssetCategory,
@@ -197,6 +201,57 @@ public class FlexSyncService
                 pos.ClosePrice = null;
                 closedCount--;
             }
+        }
+    }
+
+    /// <summary>
+    /// Recomputes position state from all Flex trades for a ConId.
+    /// Idempotent: sets absolute values rather than incrementing.
+    /// </summary>
+    private static void RecomputePositionFromTrades(OptionPosition pos, IList<FlexTradeDto> allTrades)
+    {
+        int netPos = 0;
+        decimal totalCommission = 0;
+        DateTime? closedDate = null;
+        decimal? closePrice = null;
+
+        foreach (var trade in allTrades)
+        {
+            netPos += (int)trade.Quantity;
+            totalCommission += Math.Abs(trade.Commission);
+
+            if (netPos == 0 && closedDate == null)
+            {
+                closedDate = trade.DateTime.Date;
+                closePrice = trade.TradePrice;
+            }
+            else if (netPos != 0)
+            {
+                // Position reopened — clear close state
+                closedDate = null;
+                closePrice = null;
+            }
+        }
+
+        pos.Pos = netPos;
+        pos.Commission = totalCommission;
+
+        // Backfill underlying symbol if missing (fixes positions created before this change)
+        var firstTrade = allTrades[0];
+        if (firstTrade.UnderlyingSymbol != null)
+        {
+            pos.Symbol = firstTrade.UnderlyingSymbol;
+            pos.UnderlyingSymbol ??= firstTrade.UnderlyingSymbol;
+            pos.UnderlyingConid ??= firstTrade.UnderlyingConid;
+        }
+
+        // Only update close state from trades if trades actually close the position.
+        // If net qty != 0, the position may have been closed by an event (assignment/expiration)
+        // — preserve that state; SyncOptionEventsAsync handles it separately.
+        if (netPos == 0)
+        {
+            pos.Closed = closedDate;
+            pos.ClosePrice = closePrice;
         }
     }
 

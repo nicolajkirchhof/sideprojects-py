@@ -1,6 +1,8 @@
-import { Component, OnInit, inject, ViewChild, ElementRef } from '@angular/core';
+import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatSort, MatSortModule } from '@angular/material/sort';
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -30,20 +32,25 @@ import { NotificationService } from '../shared/notification.service';
     MatNativeDateModule,
     BaseChartDirective,
     MatProgressBarModule,
+    MatSortModule,
+    MatPaginatorModule,
     DatePipe,
     DecimalPipe,
   ],
   templateUrl: './capital.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class CapitalComponent implements OnInit {
+export class CapitalComponent implements OnInit, AfterViewInit {
   private service = inject(CapitalService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
+  @ViewChild(MatSort) sort!: MatSort;
+  @ViewChild(MatPaginator) paginator!: MatPaginator;
+
   loading = false;
 
-  capitals: Capital[] = [];
+  dataSource = new MatTableDataSource<Capital>([]);
   displayedColumns = [
     'date', 'netLiquidity', 'maintenance', 'maintenancePct',
     'excessLiquidity', 'bpr', 'totalPnl', 'netDelta', 'netTheta', 'totalMargin',
@@ -76,6 +83,11 @@ export class CapitalComponent implements OnInit {
     },
   };
 
+  ngAfterViewInit(): void {
+    this.dataSource.sort = this.sort;
+    this.dataSource.paginator = this.paginator;
+  }
+
   ngOnInit(): void {
     this.load();
     this.form = this.fb.group({
@@ -92,7 +104,7 @@ export class CapitalComponent implements OnInit {
     this.loading = true;
     this.service.getAll().subscribe({
       next: (data) => {
-        this.capitals = data ?? [];
+        this.dataSource.data = data ?? [];
         this.updateChart();
         this.loading = false;
       },
@@ -181,7 +193,7 @@ export class CapitalComponent implements OnInit {
 
   private updateChart(): void {
     // Reverse to chronological order (API returns desc)
-    const sorted = [...this.capitals].reverse();
+    const sorted = [...this.dataSource.data].reverse();
     const labels = sorted.map(c => new Date(c.date).toLocaleDateString());
 
     this.chartData = {

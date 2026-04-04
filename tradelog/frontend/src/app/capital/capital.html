@@ -19,24 +19,24 @@
 
     <!-- Table -->
     <div class="mat-elevation-z8 m-4 overflow-auto">
-      <table mat-table [dataSource]="capitals" class="w-full whitespace-nowrap">
+      <table mat-table [dataSource]="dataSource" matSort class="w-full whitespace-nowrap">
         <ng-container matColumnDef="date">
-          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
           <td mat-cell *matCellDef="let c">{{ c.date | date:'shortDate' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="netLiquidity">
-          <th mat-header-cell *matHeaderCellDef>Net Liq</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Net Liq</th>
           <td mat-cell *matCellDef="let c">{{ c.netLiquidity | number:'1.0-0' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="maintenance">
-          <th mat-header-cell *matHeaderCellDef>Maint</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Maint</th>
           <td mat-cell *matCellDef="let c">{{ c.maintenance | number:'1.0-0' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="maintenancePct">
-          <th mat-header-cell *matHeaderCellDef>Maint %</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Maint %</th>
           <td mat-cell *matCellDef="let c"
               [class]="c.maintenancePct >= 50 ? 'text-red-400' : c.maintenancePct >= 30 ? 'text-yellow-400' : ''">
             {{ c.maintenancePct | number:'1.1-1' }}%
@@ -44,7 +44,7 @@
         </ng-container>
 
         <ng-container matColumnDef="excessLiquidity">
-          <th mat-header-cell *matHeaderCellDef>Excess Liq</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Excess Liq</th>
           <td mat-cell *matCellDef="let c">{{ c.excessLiquidity | number:'1.0-0' }}</td>
         </ng-container>
 
@@ -54,19 +54,19 @@
         </ng-container>
 
         <ng-container matColumnDef="totalPnl">
-          <th mat-header-cell *matHeaderCellDef>Total P/L</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Total P/L</th>
           <td mat-cell *matCellDef="let c" [class]="pnlColor(c.totalPnl)">
             {{ c.totalPnl | number:'1.2-2' }}
           </td>
         </ng-container>
 
         <ng-container matColumnDef="netDelta">
-          <th mat-header-cell *matHeaderCellDef>Delta</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Delta</th>
           <td mat-cell *matCellDef="let c">{{ c.netDelta | number:'1.2-4' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="netTheta">
-          <th mat-header-cell *matHeaderCellDef>Theta</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Theta</th>
           <td mat-cell *matCellDef="let c">{{ c.netTheta | number:'1.2-4' }}</td>
         </ng-container>
 
@@ -81,6 +81,7 @@
             class="cursor-pointer"
             [class.!bg-blue-900]="selected?.id === row.id"></tr>
       </table>
+      <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
     </div>
   </div>
 
