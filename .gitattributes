@@ -1,0 +1,27 @@
+# Enforce LF line endings for all text files
+* text=auto eol=lf
+
+# Explicitly mark binary files
+*.pdf binary
+*.xlsx binary
+*.pptx binary
+*.docx binary
+*.pkl binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.db binary
+*.sqlite binary
