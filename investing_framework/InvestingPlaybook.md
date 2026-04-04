@@ -88,20 +88,26 @@ The DRIFT portfolio exploits two distinct mechanisms depending on the underlying
 
 The structure depends on the underlying's behavior. Drift assets get directional structures. Range-bound assets get neutral structures.
 
-| Underlying | Asset Class | Behavior | Structure | Delta Profile |
-|-----------|------------|----------|-----------|--------------|
-| XSP | US Large Cap (cash-settled) | Positive drift | Short put + kicker call / XYZ | Long delta |
-| IWM | US Small Cap | Positive drift | Short put + kicker call | Long delta |
-| TQQQ | US Tech 3x leveraged | Positive drift (3x) | Short put + kicker call | Long delta |
-| ESTX50 | European Equity (futures) | Positive drift | Short put + kicker call | Long delta |
-| EEM | Emerging Markets (broad) | Positive drift (EM) | Short put + kicker call | Long delta |
-| FXI | China Large Cap | Positive drift (China) | Short put + kicker call | Long delta |
-| EWZ | Brazil | Positive drift (commodity-EM) | Short put + kicker call | Long delta |
-| GLD | Gold | Crisis asset / regime-dependent | Strangle (calm) · short put only (crisis) | Neutral / long |
-| SLV | Silver | Range-bound + industrial | Strangle / iron condor | Neutral |
-| TLT | 20+ Year Treasuries | Range-bound | Strangle / iron condor | Neutral |
-| USO | Crude Oil ETF | Range-bound + gap risk | Asymmetric strangle / iron condor | Slightly long |
-| NG (futures) | Natural Gas | Range-bound + extreme vol | Put spread / iron condor only | Neutral |
+| Underlying | Asset Class | Behavior | Structure | VRP | Tier | Backtest |
+|-----------|------------|----------|-----------|-----|------|----------|
+| XSP | US Large Cap (cash-settled) | Positive drift | Short put + kicker / XYZ | — | Core | — |
+| IWM | US Small Cap | Positive drift | Short put + kicker | — | Core | — |
+| TQQQ | US Tech 3x leveraged | Positive drift (3x) | Short put + kicker | — | Core | — |
+| ESTX50 | European Equity (futures) | Positive drift | Short put + kicker | — | Core | — |
+| EEM | Emerging Markets (broad) | Positive drift (EM) | IC (IVP>50) | +0.001 | Core | 58.6% win, +$90 |
+| FXI | China Large Cap | Positive drift (China) | IC (IVP>50, small) | -0.019 | Rotational | 51.8% win, +$71 |
+| EWZ | Brazil | Positive drift (commodity-EM) | IC (IVP>50) | +0.013 | Rotational | 56.7% win, +$155 |
+| UNG | Natural Gas ETF | Range-bound + extreme vol | **IC only** | +0.019 | **Tier 1** | **72.2% win, +$4,162** |
+| USO | Crude Oil ETF | Range-bound + gap risk | IC (IVP>50) | +0.017 | **Tier 1** | **58.4% win, +$571** |
+| GLD | Gold | Crisis asset / regime-dependent | Short put only (regime) | +0.009 | **Tier 1** | **73.7% win, +$57** |
+| WEAT | Wheat ETF | Seasonal range-bound | IC or strangle (IVP>50) | +0.130 | **Tier 1** | **76.8% win, +$170** |
+| PDBC | Broad commodity basket | Range-bound (optimized roll) | IC (IVP>50) | +0.243 | **Tier 1** | **79.1% win, +$44** |
+| DBA | Agriculture basket | Range-bound | Strangle or IC | +0.032 | **Tier 1** | **62.7% win, +$39** |
+| TLT | 20+ Year Treasuries | Range-bound | IC (IVP>50) | +0.002 | Tier 2 | 58.8% win, +$40 |
+| BNO | Brent Crude Oil | Range-bound | IC (IVP>50) | +0.029 | Tier 2 | 59.8% win, +$66 |
+| SLV | Silver | Whipsaw | IC (deprioritize) | +0.005 | Tier 3 | 45.0% win, +$30 |
+
+*Backtest: 45 DTE, 25Δ, 14-day entry interval, delta-approximation. See `finance/core_pm/backtest_findings.md` for full methodology and caveats.*
 
 ---
 
@@ -142,22 +148,22 @@ The structure depends on the underlying's behavior. Drift assets get directional
 - Role: **Always-on EM allocation.** Permanent 1–2 lot position.
 
 **FXI (iShares China Large Cap ETF) — Rotational EM**
-- Structure: Short 25Δ put + long 20Δ call
+- Structure: **Iron condor** (IVP > 50) — backtest shows IC outperforms short put + kicker on FXI
+- **Backtest result:** IC at 51.8% win, +$71 total. VRP is **negative** (-0.019) — the edge is structural diversification, not premium richness.
 - Why FXI: **Lowest correlation to SPY in the entire directional block (0.30–0.55).** Best single-country diversifier. China's economy is driven by CCP policy, domestic consumption, and tech regulation — largely independent of US macro.
 - IV: 25–45%. Rich premium — reflects event risk.
 - Options volume: ~24,000/day — liquid enough for 1-lot positions.
-- Price: ~$32/share. Small notional — fine-grained scaling.
-- Risk: Concentrated single-country bet. CCP policy announcements create overnight gaps. Trade with defined risk (put spreads or kicker call spread) when political uncertainty is elevated.
-- Role: **Rotational.** Add 1 lot when FXI IVP > 50 and China macro is constructive.
+- Risk: Concentrated single-country bet. CCP policy announcements create overnight gaps. Defined risk (IC) is essential — never naked short on FXI.
+- Role: **Rotational.** Add 1 lot when FXI IVP > 50 and China macro is constructive. Trade small — this is for diversification, not income.
 
 **EWZ (iShares MSCI Brazil ETF) — Rotational EM**
-- Structure: Short 25Δ put + long 20Δ call
-- Why EWZ: Commodity-linked EM — driven by iron ore, soybeans, oil prices + domestic Brazilian policy. Correlation to SPY ~0.40–0.60 and partially correlated to your commodity positions (USO, NG). Adds a return stream driven by LatAm cycles.
+- Structure: **Iron condor** (IVP > 50) — backtest shows IC is the best structure (+$155 total vs +$80 for strangle)
+- **Backtest result:** IC at 56.7% win rate, +$155 total. VRP +0.013. IVP filter adds +5% win rate — most impactful filter in the dataset.
+- Why EWZ: Commodity-linked EM — driven by iron ore, soybeans, oil prices + domestic Brazilian policy. Correlation to SPY ~0.40–0.60. Adds a return stream driven by LatAm cycles.
 - IV: 30–50%. **Richest premium of any non-leveraged country ETF.** Reflects political + FX risk.
 - Options volume: ~27,000/day — liquid, tradeable.
-- Price: ~$30/share. Small notional.
-- Risk: Brazilian politics create event risk (elections, fiscal policy shifts). BRL adds FX volatility on top of equity vol. Premium compensates — but be aware of gap risk around elections and fiscal announcements.
-- Role: **Rotational.** Add 1 lot when EWZ IVP > 50 and commodity backdrop is supportive. If both FXI and EWZ qualify, pick the one with higher IVP or lower recent correlation to SPY.
+- Risk: Brazilian politics create event risk (elections, fiscal policy shifts). BRL adds FX volatility. IC defined risk caps the damage.
+- Role: **Rotational.** Add 1 lot when EWZ IVP > 50 and commodity backdrop is supportive. If both FXI and EWZ qualify, pick EWZ — higher VRP and better backtest performance.
 
 **EM Rotation Rule:** EEM is always on. FXI and EWZ are rotational — add when IVP > 50, remove when IVP < 30 or regime deteriorates. Max 2 EM underlyings active at once (EEM + one rotational) to avoid over-concentrating in emerging markets.
 
@@ -176,12 +182,43 @@ The structure depends on the underlying's behavior. Drift assets get directional
 - Correlation to SPY: –0.05 to +0.15. **Best crisis diversifier in the portfolio.** When equities crash, GLD positions gain or hold while the directional block loses.
 - Note: GLD strangles during calm markets act as **income-generating hedges** — they earn theta while providing structural diversification. More capital-efficient than buying VIX calls.
 
-**SLV (iShares Silver Trust)**
-- Structure: Strangle (sell 25Δ put + sell 15-20Δ call) or iron condor
-- Why asymmetric strikes: Silver rallies are faster and more violent than declines — commodity vol expands on upside moves. Widen the call side to 15-20Δ, or use a call spread for defined risk.
-- IV: 25–45%. **Richest premium of any non-leveraged ETF.** *(Options volume ~62,000/day — highly liquid)*
-- Correlation to SPY: +0.15 to +0.35. Partially correlated (industrial demand) but still diversifying.
-- Range: $18–35 over the last 5 years. Both strangle sides work within this range.
+**WEAT (Teucrium Wheat Fund)**
+- Structure: Iron condor or strangle (IVP > 50)
+- **Backtest validated:** IC at 76.8% win rate, +$170 total. VRP +0.130 — **second highest VRP tested.**
+- Why it works: Wheat is strongly seasonal and range-bound between crop cycles. IV massively overestimates actual moves. Producer hedging inflates put prices — same mechanism as oil but even stronger for agriculture.
+- IV: 25–50%. Very rich relative to underlying movement.
+- Correlation to SPY: Near zero. Driven by weather, crop reports, and seasonal cycles.
+- **Liquidity warning:** ~2,000 options contracts/day — thin. Use limit orders, 1 lot only. If bid-ask > $0.20 on target strikes, skip.
+
+**PDBC (Invesco Optimum Yield Diversified Commodity, No K-1)**
+- Structure: Iron condor (IVP > 50)
+- **Backtest validated:** IC at 79.1% win rate (filtered) — **highest win rate of any IC tested.** VRP +0.243 — **highest VRP in the entire study.**
+- Why it works: Diversified 14-commodity basket (energy, metals, agriculture) with an optimized futures roll. The roll strategy reduces realized vol below what IV implies, widening the VRP artificially. You capture the gap.
+- IV: 15–25%. Modest per-contract premium, but the win rate compensates.
+- Correlation to SPY: +0.20 to +0.40. Partially correlated through energy component.
+- Tax advantage: No K-1 filing — cleaner for tax reporting than DBC.
+- **Liquidity warning:** ~1,000–2,000 options contracts/day. Limit orders only, 1 lot.
+
+**DBA (Invesco DB Agriculture Fund)**
+- Structure: Strangle or iron condor
+- **Backtest validated:** Strangle at 62.7% win rate — **highest strangle win rate of all underlyings.** VRP +0.032.
+- Why it works: Agriculture basket (corn, soybeans, wheat, sugar, cocoa, coffee, cattle, hogs). Seasonal + producer hedging creates the widest IV-RV gap. The basket diversification dampens single-commodity spikes that blow up strangles.
+- IV: 15–30%. Moderate, but the range stability makes strangles highly reliable.
+- Correlation to SPY: Near zero. Driven by weather, crop cycles, and food demand.
+- **Liquidity warning:** ~1,000–3,000 options contracts/day. 1 lot only.
+
+**BNO (United States Brent Oil Fund) — Optional**
+- Structure: Iron condor (IVP > 50)
+- **Backtest validated:** IC at 59.8% win rate, +$66 total. VRP +0.029.
+- Why BNO: Adds Brent crude alongside USO (WTI). Different supply dynamics — Brent is driven by OPEC+, WTI by US shale. Modest diversification benefit within energy.
+- Role: Only add if you want second oil exposure. Not essential — USO covers the energy VRP adequately.
+
+**SLV (iShares Silver Trust) — Deprioritized**
+- Structure: Iron condor only
+- **Backtest result: 45.0% win rate, +$30 total.** Whipsaw behavior eats the premium. Stop rate 65.8%.
+- IV: 25–45%. Premium is rich but silver moves too violently to keep.
+- Correlation to SPY: +0.15 to +0.35.
+- Role: **Lower priority than GLD, WEAT, PDBC.** Only add if all higher-priority underlyings are deployed and you have remaining BP.
 
 **TLT (iShares 20+ Year Treasury Bond ETF)**
 - Structure: Strangle (symmetric 25Δ/25Δ) or iron condor
@@ -198,14 +235,15 @@ The structure depends on the underlying's behavior. Drift assets get directional
 - At $50k: Use USO options (1–2 lots). USO ~$65/share, $6,500 notional per lot. Graduate to CL futures options at $100k+ (CL = ~$65,000 notional per lot — too large at $50k).
 - **Weekend risk:** Oil gaps on geopolitical events. Never hold naked short calls on oil over weekends with active geopolitical risk.
 
-**NG (Natural Gas Futures Options, CME)**
-- Structure: **Put spread or iron condor only.** No naked shorts — ever.
+**UNG (United States Natural Gas Fund) / NG Futures Options**
+- Structure: **Iron condor only.** No naked shorts — ever.
 - Why defined risk only: NG has the highest IV (40–80%) and the most extreme gap behavior of any liquid market. NG can move 10-20% in a single session on weather or storage data. Naked strangles on NG are portfolio-ending trades.
-- IV: 40–80%. **Richest premium of any liquid futures market.** The width between implied and realized vol is massive — but so are the tails.
-- Range: NG trades in observable multi-year ranges ($1.50–$4.50 in recent years) driven by seasonality, weather, and storage. *(Your Range-Bound Commodities thesis applies here)*
+- IV: 40–80%. **Richest premium of any liquid market.** The width between implied and realized vol is massive — but so are the tails.
+- **Backtest validated:** IC at 72.2% win rate, +$4,162 total P&L — **strongest edge of all underlyings tested.** The iron condor captures the massive VRP (+0.019) while the wings cap the gap risk.
+- Range: NG trades in observable multi-year ranges ($1.50–$4.50 in recent years) driven by seasonality, weather, and storage.
 - Correlation to SPY: –0.05 to +0.10. **Near-zero equity correlation.** Truly independent return stream.
 - Seasonality: Winter demand peaks (Nov–Feb) drive IV expansion. Summer is calmer. Premium is richest in Oct–Nov (heading into uncertainty).
-- **Research gap:** Systematic backtest of NG iron condor performance across seasonal cycles is not yet done. Trade cautiously — 1 lot maximum — until this research is complete.
+- At $50k: Use UNG options (1–2 lots). Graduate to NG futures options at $100k+.
 
 ---
 
@@ -213,8 +251,24 @@ The structure depends on the underlying's behavior. Drift assets get directional
 
 | Block | Underlyings | % of DRIFT BP | Delta Profile | Purpose |
 |-------|------------|--------------|--------------|---------|
-| **Directional** | XSP, IWM, TQQQ, ESTX50, EEM, FXI/EWZ (rotational) | 60% | Long delta | Harvest VRP + equity drift |
-| **Neutral** | GLD, SLV, TLT, USO, NG | 40% | Neutral delta | Harvest VRP from both sides + crisis diversification |
+| **Directional** | XSP, IWM, TQQQ, ESTX50, EEM, FXI/EWZ (rotational) | 50% | Long delta | Harvest VRP + equity drift |
+| **Neutral** | UNG, USO, GLD, WEAT, PDBC, DBA, TLT, BNO, SLV | 50% | Neutral delta | Harvest VRP from both sides + crisis diversification |
+
+**Neutral block allocation priority (by backtest performance):**
+
+| Priority | Underlying | Win% | VRP | Liquidity | Role |
+|----------|-----------|------|-----|-----------|------|
+| 1 | UNG | 72.2% | +0.019 | Good (ETF) | Core — strongest edge |
+| 2 | USO | 58.4% | +0.017 | Excellent | Core — oil VRP + hedging pressure |
+| 3 | GLD | 73.7% | +0.009 | Excellent | Core — crisis diversifier |
+| 4 | WEAT | 76.8% | +0.130 | Thin (~2k/day) | Core — highest commodity VRP |
+| 5 | PDBC | 79.1% | +0.243 | Thin (~1-2k/day) | Core — highest win rate, broad basket |
+| 6 | DBA | 62.7% | +0.032 | Thin (~1-3k/day) | Core — best strangle candidate |
+| 7 | TLT | 58.8% | +0.002 | Excellent | Selective — Fed regime filter required |
+| 8 | BNO | 59.8% | +0.029 | Moderate | Optional — Brent diversification |
+| 9 | SLV | 45.0% | +0.005 | Excellent | Low priority — whipsaw kills edge |
+
+Deploy from top to bottom as BP allows. At $50k, run 4–6 neutral underlyings simultaneously. At $100k+, expand to 7–8.
 
 **Geographic diversification within the directional block:**
 
@@ -224,11 +278,11 @@ The structure depends on the underlying's behavior. Drift assets get directional
 | Europe | ESTX50 | 0.65 | 20% of directional |
 | Emerging Markets | EEM + FXI or EWZ | 0.30–0.70 | 40% of directional |
 
-This splits your equity delta across three economic zones. In a US-centric selloff, ESTX50 and EM positions may hold or decline less. In a global crash, the neutral block provides the offset.
+**Why the 50/50 split (revised from 60/40):** The backtest shows the neutral block generates stronger risk-adjusted returns than expected. Agriculture (WEAT, DBA, PDBC) and energy (UNG, USO) have VRPs 5–10x larger than equity indices. The neutral block earns comparable theta while providing crisis diversification — it should carry equal weight.
 
-**Why this split matters:** In an equity crash, the directional block loses. But the neutral block — especially GLD (negative equity correlation) and NG (zero correlation) — holds or gains. The neutral positions earn theta income while acting as structural hedges. This is more capital-efficient than paying 1–2%/year for tail protection via VIX calls.
+**Why this matters in a crash:** The directional block loses. The neutral block — GLD (negative equity correlation), UNG and WEAT (zero equity correlation) — holds or gains. The neutral positions earn theta income while acting as structural hedges. This is more capital-efficient than paying 1–2%/year for tail protection via VIX calls.
 
-The EM rotation (EEM always-on + one of FXI/EWZ when IVP > 50) adds the lowest-correlation equity exposure in the portfolio without over-concentrating in any single country.
+The EM rotation (EEM always-on + one of FXI/EWZ when IVP > 50) adds the lowest-correlation equity exposure in the directional block.
 
 **Vol direction by asset class — affects call side sizing:**
 

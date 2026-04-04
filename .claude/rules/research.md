@@ -15,15 +15,18 @@ Refining a personal investing and trading framework through structured documents
 
 ## Two Strategies
 
-1. **Investing (LONG-TERM + DRIFT):** Buy & hold ETFs on Five Factor Model + short volatility on indices/commodities at 30–360 DTE. Framework in `investing_framework/Investing.md`.
-2. **Trading (Momentum Swing):** 5–50 day momentum swing trades on stocks/options. Framework in `investing_framework/BreakoutStrategy.md` and `investing_framework/Trading_new.md`.
+1. **Investing (LONG-TERM + DRIFT):** Buy & hold ETFs on Five Factor Model + short volatility on indices/commodities at 30–360 DTE. Framework in `investing_framework/InvestingPlaybook.md`.
+2. **Trading (Momentum Swing):** 5–50 day momentum swing trades on stocks/options. Framework in `investing_framework/TradingPlaybook.md`.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `investing_framework/Investing.md` | Consolidated investing strategy doc |
-| `investing_framework/BreakoutStrategy.md` | Momentum swing trading playbook |
+| `investing_framework/InvestingPlaybook.md` | LONG-TERM portfolio + DRIFT options income |
+| `investing_framework/TradingPlaybook.md` | Swing trading: profit mechanisms, setups, entries, exits |
+| `investing_framework/TradingJourney.md` | Personal roadmap, goals, learnings, performance tracking |
+| `investing_framework/OptionsStrategyReference.md` | All options structures with management rules |
+| `investing_framework/BreakoutStrategy.md` | Breakout-specific playbook (presentation format) |
 | `investing_framework/_research/by-role/` | Research summaries sorted by trader/investor/shared |
 | `investing_framework/_research/paper_summaries.md` | All 161 paper summaries |
 | `investing_framework/_research/book_summaries.md` | All 114 book summaries |
