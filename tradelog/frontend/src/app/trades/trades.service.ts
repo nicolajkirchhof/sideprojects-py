@@ -88,6 +88,37 @@ export interface Trade {
   learnings?: string | null;
 }
 
+export interface TradeDetail extends Trade {
+  optionPositions: OptionLegDto[];
+  stockPositions: StockLegDto[];
+}
+
+export interface OptionLegDto {
+  id: number;
+  symbol: string;
+  contractId: string;
+  right: string;
+  strike: number;
+  expiry: string;
+  pos: number;
+  cost: number;
+  closed?: string | null;
+  unrealizedPnl?: number | null;
+  realizedPnl?: number | null;
+  delta?: number | null;
+  theta?: number | null;
+}
+
+export interface StockLegDto {
+  id: number;
+  symbol: string;
+  date: string;
+  posChange: number;
+  price: number;
+  totalPos: number;
+  pnl: number;
+}
+
 export type TradeUpsert = Omit<Trade, 'id'> & Partial<Pick<Trade, 'id'>>;
 
 // Display labels for enums
@@ -151,8 +182,8 @@ export class TradesService {
     return this.http.get<Trade[]>('/api/trades', { params });
   }
 
-  getById(id: number): Observable<Trade> {
-    return this.http.get<Trade>(`/api/trades/${id}`);
+  getById(id: number): Observable<TradeDetail> {
+    return this.http.get<TradeDetail>(`/api/trades/${id}`);
   }
 
   create(payload: TradeUpsert): Observable<Trade> {
@@ -165,5 +196,26 @@ export class TradesService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`/api/trades/${id}`);
+  }
+
+  // Position assignment
+  getUnassignedOptionPositions(symbol?: string): Observable<OptionLegDto[]> {
+    let params = new HttpParams().set('unassigned', 'true').set('status', 'open');
+    if (symbol) params = params.set('symbol', symbol);
+    return this.http.get<OptionLegDto[]>('/api/option-positions', { params });
+  }
+
+  getUnassignedStockPositions(symbol?: string): Observable<StockLegDto[]> {
+    let params = new HttpParams().set('unassigned', 'true');
+    if (symbol) params = params.set('symbol', symbol);
+    return this.http.get<StockLegDto[]>('/api/stock-positions', { params });
+  }
+
+  assignOptionPosition(positionId: number, tradeId: number | null): Observable<void> {
+    return this.http.patch<void>(`/api/option-positions/${positionId}/assign`, { tradeId });
+  }
+
+  assignStockPosition(positionId: number, tradeId: number | null): Observable<void> {
+    return this.http.patch<void>(`/api/stock-positions/${positionId}/assign`, { tradeId });
   }
 }

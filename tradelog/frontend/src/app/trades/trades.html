@@ -225,6 +225,102 @@
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" theme="snow"></quill-editor>
         </div>
 
+        <!-- Legs section (edit mode only) -->
+        @if (!isCreating() && selected()) {
+          <div class="border-t border-white/10 pt-3 mt-2">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium uppercase tracking-wide opacity-50">Legs</span>
+              <button mat-stroked-button type="button" class="!text-xs !min-h-[28px] !h-7" (click)="onOpenLegPicker()">
+                <mat-icon class="!text-sm !w-4 !h-4 mr-1">add</mat-icon> Add Leg
+              </button>
+            </div>
+
+            <!-- Assigned option positions -->
+            @for (leg of optionLegs(); track leg.id) {
+              <div class="flex items-center gap-2 text-sm py-1 border-b border-white/5">
+                <span class="font-medium w-12">{{ leg.symbol }}</span>
+                <span class="opacity-70 w-6">{{ leg.right === 'Put' ? 'P' : 'C' }}</span>
+                <span class="w-12">{{ leg.strike }}</span>
+                <span class="opacity-70 w-20 text-xs">{{ leg.expiry | date:'shortDate' }}</span>
+                <span class="w-8 text-right">{{ leg.pos }}</span>
+                <span class="flex-1 text-right" [class]="leg.unrealizedPnl != null ? (leg.unrealizedPnl! >= 0 ? 'text-green-400' : 'text-red-400') : ''">
+                  {{ leg.unrealizedPnl != null ? (leg.unrealizedPnl | number:'1.0-0') : (leg.realizedPnl != null ? (leg.realizedPnl | number:'1.0-0') : '—') }}
+                </span>
+                <button mat-icon-button type="button" class="!w-6 !h-6 !p-0" (click)="onUnassignOption(leg.id)">
+                  <mat-icon class="!text-sm !w-4 !h-4 opacity-40">close</mat-icon>
+                </button>
+              </div>
+            }
+
+            <!-- Assigned stock positions -->
+            @for (leg of stockLegs(); track leg.id) {
+              <div class="flex items-center gap-2 text-sm py-1 border-b border-white/5">
+                <span class="font-medium w-12">{{ leg.symbol }}</span>
+                <span class="opacity-70 w-6">STK</span>
+                <span class="w-12">{{ leg.price | number:'1.2-2' }}</span>
+                <span class="opacity-70 w-20 text-xs">{{ leg.date | date:'shortDate' }}</span>
+                <span class="w-8 text-right">{{ leg.posChange > 0 ? '+' : '' }}{{ leg.posChange }}</span>
+                <span class="flex-1 text-right" [class]="leg.pnl >= 0 ? 'text-green-400' : 'text-red-400'">
+                  {{ leg.pnl | number:'1.0-0' }}
+                </span>
+                <button mat-icon-button type="button" class="!w-6 !h-6 !p-0" (click)="onUnassignStock(leg.id)">
+                  <mat-icon class="!text-sm !w-4 !h-4 opacity-40">close</mat-icon>
+                </button>
+              </div>
+            }
+
+            @if (optionLegs().length === 0 && stockLegs().length === 0) {
+              <div class="text-xs opacity-40 py-2">No positions assigned</div>
+            }
+          </div>
+
+          <!-- Leg picker -->
+          @if (showLegPicker()) {
+            <div class="border border-white/20 rounded p-3 mt-2 bg-white/5">
+              <div class="text-xs font-medium mb-2">Unassigned positions for {{ selected()!.symbol }}</div>
+
+              @if (unassignedOptions().length > 0) {
+                <div class="text-xs opacity-50 mb-1">Options</div>
+                @for (pos of unassignedOptions(); track pos.id) {
+                  <label class="flex items-center gap-2 text-xs py-1 cursor-pointer hover:bg-white/5 rounded px-1">
+                    <input type="checkbox" [checked]="selectedLegIds().options.has(pos.id)"
+                           (change)="toggleLegSelection('options', pos.id)">
+                    <span class="font-medium">{{ pos.symbol }}</span>
+                    <span>{{ pos.right === 'Put' ? 'P' : 'C' }} {{ pos.strike }}</span>
+                    <span class="opacity-70">{{ pos.expiry | date:'shortDate' }}</span>
+                    <span>x{{ pos.pos }}</span>
+                  </label>
+                }
+              }
+
+              @if (unassignedStocks().length > 0) {
+                <div class="text-xs opacity-50 mb-1 mt-2">Stocks</div>
+                @for (pos of unassignedStocks(); track pos.id) {
+                  <label class="flex items-center gap-2 text-xs py-1 cursor-pointer hover:bg-white/5 rounded px-1">
+                    <input type="checkbox" [checked]="selectedLegIds().stocks.has(pos.id)"
+                           (change)="toggleLegSelection('stocks', pos.id)">
+                    <span class="font-medium">{{ pos.symbol }}</span>
+                    <span>{{ pos.posChange > 0 ? '+' : '' }}{{ pos.posChange }} @ {{ pos.price | number:'1.2-2' }}</span>
+                    <span class="opacity-70">{{ pos.date | date:'shortDate' }}</span>
+                  </label>
+                }
+              }
+
+              @if (unassignedOptions().length === 0 && unassignedStocks().length === 0) {
+                <div class="text-xs opacity-40">No unassigned positions found</div>
+              }
+
+              <div class="flex gap-2 justify-end mt-2">
+                <button mat-stroked-button type="button" class="!text-xs !min-h-[28px] !h-7" (click)="showLegPicker.set(false)">Cancel</button>
+                <button mat-flat-button type="button" color="primary" class="!text-xs !min-h-[28px] !h-7" (click)="onAssignSelected()"
+                        [disabled]="selectedLegIds().options.size === 0 && selectedLegIds().stocks.size === 0">
+                  Assign Selected
+                </button>
+              </div>
+            </div>
+          }
+        }
+
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
           @if (!isCreating() && selected()) {

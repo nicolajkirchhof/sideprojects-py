@@ -1,5 +1,7 @@
 using tradelog.Data;
+using tradelog.Dtos;
 using tradelog.Models;
+using tradelog.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -36,11 +38,58 @@ public class TradesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<Trade>> GetById(int id)
+    public async Task<ActionResult<TradeDetailDto>> GetById(int id)
     {
         var trade = await _context.Trades.FindAsync(id);
         if (trade == null) return NotFound();
-        return trade;
+
+        var optionPositions = await _context.OptionPositions
+            .Where(p => p.TradeId == id)
+            .OrderBy(p => p.Symbol).ThenBy(p => p.Expiry)
+            .ToListAsync();
+
+        var contractIds = optionPositions.Select(p => p.ContractId).Distinct().ToList();
+        var latestLogs = await _context.OptionPositionsLogs
+            .Where(l => contractIds.Contains(l.ContractId))
+            .GroupBy(l => l.ContractId)
+            .Select(g => g.OrderByDescending(l => l.DateTime).First())
+            .ToDictionaryAsync(l => l.ContractId);
+
+        var stockPositions = await _context.StockPositions
+            .Where(p => p.TradeId == id)
+            .OrderBy(p => p.Symbol).ThenBy(p => p.Date).ThenBy(p => p.Id)
+            .ToListAsync();
+
+        return new TradeDetailDto
+        {
+            Id = trade.Id,
+            Symbol = trade.Symbol,
+            Date = trade.Date,
+            TypeOfTrade = trade.TypeOfTrade,
+            Notes = trade.Notes,
+            Directional = trade.Directional,
+            Timeframe = trade.Timeframe,
+            Budget = trade.Budget,
+            Strategy = trade.Strategy,
+            NewsCatalyst = trade.NewsCatalyst,
+            RecentEarnings = trade.RecentEarnings,
+            SectorSupport = trade.SectorSupport,
+            Ath = trade.Ath,
+            Rvol = trade.Rvol,
+            InstitutionalSupport = trade.InstitutionalSupport,
+            GapPct = trade.GapPct,
+            XAtrMove = trade.XAtrMove,
+            TaFaNotes = trade.TaFaNotes,
+            IntendedManagement = trade.IntendedManagement,
+            ActualManagement = trade.ActualManagement,
+            ManagementRating = trade.ManagementRating,
+            Learnings = trade.Learnings,
+            ParentTradeId = trade.ParentTradeId,
+            OptionPositions = optionPositions
+                .Select(p => OptionPositionDtoMapper.ToDto(p, latestLogs.GetValueOrDefault(p.ContractId)))
+                .ToList(),
+            StockPositions = StockPositionComputations.ComputeRunningFields(stockPositions),
+        };
     }
 
     [HttpPost]

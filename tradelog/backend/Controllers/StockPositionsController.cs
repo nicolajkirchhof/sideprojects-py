@@ -20,12 +20,17 @@ public class StockPositionsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<StockPositionDto>>> GetAll([FromQuery] string? symbol)
+    public async Task<ActionResult<IEnumerable<StockPositionDto>>> GetAll(
+        [FromQuery] string? symbol,
+        [FromQuery] bool? unassigned)
     {
         var query = _context.StockPositions.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(symbol))
             query = query.Where(t => t.Symbol == symbol);
+
+        if (unassigned == true)
+            query = query.Where(t => t.TradeId == null);
 
         var positions = await query.OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id).ToListAsync();
         return StockPositionComputations.ComputeRunningFields(positions);
@@ -73,6 +78,20 @@ public class StockPositionsController : ControllerBase
         if (existing == null) return NotFound();
 
         _context.Entry(existing).CurrentValues.SetValues(position);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPatch("{id:int}/assign")]
+    public async Task<IActionResult> Assign(int id, [FromBody] AssignTradeDto dto)
+    {
+        var position = await _context.StockPositions.FindAsync(id);
+        if (position == null) return NotFound();
+
+        if (dto.TradeId.HasValue && !await _context.Trades.AnyAsync(t => t.Id == dto.TradeId.Value))
+            return BadRequest("Trade not found");
+
+        position.TradeId = dto.TradeId;
         await _context.SaveChangesAsync();
         return NoContent();
     }

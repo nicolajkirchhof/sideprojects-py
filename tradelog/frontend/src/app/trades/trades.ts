@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -14,10 +14,11 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { QuillModule } from 'ngx-quill';
 import {
-  TradesService, Trade, TradeUpsert,
+  TradesService, Trade, TradeUpsert, OptionLegDto, StockLegDto,
   Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating,
   STRATEGY_LABELS, TYPE_OF_TRADE_LABELS, TIMEFRAME_LABELS, MANAGEMENT_RATING_LABELS,
 } from './trades.service';
+import { forkJoin, Observable } from 'rxjs';
 import { toIsoOrNull } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
 
@@ -39,6 +40,7 @@ import { NotificationService } from '../shared/notification.service';
     MatProgressBarModule,
     QuillModule,
     DatePipe,
+    DecimalPipe,
   ],
   templateUrl: './trades.html',
   host: { class: 'flex flex-col flex-1' },
@@ -76,6 +78,16 @@ export class Trades {
   typeOfTradeLabel: Record<string, string> = TYPE_OF_TRADE_LABELS;
   timeframeLabel: Record<string, string> = TIMEFRAME_LABELS;
   managementRatingLabel: Record<string, string> = MANAGEMENT_RATING_LABELS;
+
+  // Legs (assigned positions)
+  optionLegs = signal<OptionLegDto[]>([]);
+  stockLegs = signal<StockLegDto[]>([]);
+
+  // Leg picker
+  showLegPicker = signal(false);
+  unassignedOptions = signal<OptionLegDto[]>([]);
+  unassignedStocks = signal<StockLegDto[]>([]);
+  selectedLegIds = signal<{ options: Set<number>; stocks: Set<number> }>({ options: new Set(), stocks: new Set() });
 
   // Quill config
   showToolbar = signal(false);
@@ -167,6 +179,8 @@ export class Trades {
       learnings: row.learnings ?? '',
     });
     this.showSidebar.set(true);
+    this.showLegPicker.set(false);
+    this.loadLegs(row.id);
   }
 
   onNew(): void {
@@ -197,6 +211,9 @@ export class Trades {
       learnings: '',
     });
     this.showSidebar.set(true);
+    this.optionLegs.set([]);
+    this.stockLegs.set([]);
+    this.showLegPicker.set(false);
   }
 
   onCancel(): void {
@@ -264,6 +281,84 @@ export class Trades {
         this.onCancel();
       },
       error: () => this.notify.error('Failed to delete trade'),
+    });
+  }
+
+  // --- Leg management ---
+
+  loadLegs(tradeId: number): void {
+    this.service.getById(tradeId).subscribe({
+      next: (detail) => {
+        this.optionLegs.set(detail.optionPositions ?? []);
+        this.stockLegs.set(detail.stockPositions ?? []);
+      },
+      error: () => this.notify.error('Failed to load legs'),
+    });
+  }
+
+  onOpenLegPicker(): void {
+    const symbol = this.selected()?.symbol;
+    this.selectedLegIds.set({ options: new Set(), stocks: new Set() });
+    this.showLegPicker.set(true);
+
+    forkJoin([
+      this.service.getUnassignedOptionPositions(symbol),
+      this.service.getUnassignedStockPositions(symbol),
+    ]).subscribe({
+      next: ([options, stocks]) => {
+        this.unassignedOptions.set(options);
+        this.unassignedStocks.set(stocks);
+      },
+      error: () => this.notify.error('Failed to load unassigned positions'),
+    });
+  }
+
+  toggleLegSelection(type: 'options' | 'stocks', id: number): void {
+    this.selectedLegIds.update(prev => {
+      const set = new Set(prev[type]);
+      if (set.has(id)) set.delete(id); else set.add(id);
+      return { ...prev, [type]: set };
+    });
+  }
+
+  onAssignSelected(): void {
+    const tradeId = this.selected()?.id;
+    if (!tradeId) return;
+
+    const ids = this.selectedLegIds();
+    const assigns: Observable<void>[] = [];
+    ids.options.forEach(id => assigns.push(this.service.assignOptionPosition(id, tradeId)));
+    ids.stocks.forEach(id => assigns.push(this.service.assignStockPosition(id, tradeId)));
+
+    if (assigns.length === 0) return;
+
+    forkJoin(assigns).subscribe({
+      next: () => {
+        this.notify.success(`${assigns.length} position(s) assigned`);
+        this.showLegPicker.set(false);
+        this.loadLegs(tradeId);
+      },
+      error: () => this.notify.error('Failed to assign positions'),
+    });
+  }
+
+  onUnassignOption(positionId: number): void {
+    this.service.assignOptionPosition(positionId, null).subscribe({
+      next: () => {
+        this.optionLegs.update(legs => legs.filter(l => l.id !== positionId));
+        this.notify.success('Position unassigned');
+      },
+      error: () => this.notify.error('Failed to unassign'),
+    });
+  }
+
+  onUnassignStock(positionId: number): void {
+    this.service.assignStockPosition(positionId, null).subscribe({
+      next: () => {
+        this.stockLegs.update(legs => legs.filter(l => l.id !== positionId));
+        this.notify.success('Position unassigned');
+      },
+      error: () => this.notify.error('Failed to unassign'),
     });
   }
 }

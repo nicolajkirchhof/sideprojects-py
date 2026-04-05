@@ -36,7 +36,7 @@ public class StockPositionsControllerTests : IDisposable
         using var queryCtx = _fixture.CreateContext();
         var controller = new StockPositionsController(queryCtx);
 
-        var result = await controller.GetAll(null);
+        var result = await controller.GetAll(null, null);
 
         var trades = result.Value!;
         Assert.Equal(2, trades.Count());
@@ -91,11 +91,108 @@ public class StockPositionsControllerTests : IDisposable
         using var queryCtx = _fixture.CreateContext();
         var controller = new StockPositionsController(queryCtx);
 
-        var result = await controller.GetAll(null);
+        var result = await controller.GetAll(null, null);
 
         var trades = result.Value!.ToList();
         Assert.Single(trades);
         Assert.Equal("AAPL", trades[0].Symbol);
+    }
+
+    [Fact]
+    public async Task GetAll_UnassignedTrue_ReturnsOnlyUnassigned()
+    {
+        int tradeId;
+        using (var ctx = _fixture.CreateContext())
+        {
+            var trade = new Trade
+            {
+                Symbol = "AAPL", Date = new(2025, 6, 1),
+                TypeOfTrade = TypeOfTrade.LongStock, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                AccountId = _fixture.TestAccountId
+            };
+            ctx.Trades.Add(trade);
+            await ctx.SaveChangesAsync();
+            tradeId = trade.Id;
+
+            ctx.StockPositions.Add(new StockPosition { Symbol = "AAPL", Date = new(2025, 6, 1), PosChange = 100, Price = 200m, Multiplier = 1, TradeId = tradeId, AccountId = _fixture.TestAccountId });
+            ctx.StockPositions.Add(new StockPosition { Symbol = "AAPL", Date = new(2025, 6, 2), PosChange = 50, Price = 205m, Multiplier = 1, TradeId = null, AccountId = _fixture.TestAccountId });
+            await ctx.SaveChangesAsync();
+        }
+
+        using var queryCtx = _fixture.CreateContext();
+        var controller = new StockPositionsController(queryCtx);
+
+        var result = await controller.GetAll(null, true);
+
+        var positions = result.Value!.ToList();
+        Assert.Single(positions);
+        Assert.Equal(205m, positions[0].Price);
+    }
+
+    [Fact]
+    public async Task Assign_SetsTradeId()
+    {
+        int posId;
+        int tradeId;
+        using (var ctx = _fixture.CreateContext())
+        {
+            var trade = new Trade
+            {
+                Symbol = "AAPL", Date = new(2025, 6, 1),
+                TypeOfTrade = TypeOfTrade.LongStock, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                AccountId = _fixture.TestAccountId
+            };
+            ctx.Trades.Add(trade);
+            var pos = new StockPosition { Symbol = "AAPL", Date = new(2025, 6, 1), PosChange = 100, Price = 200m, Multiplier = 1, AccountId = _fixture.TestAccountId };
+            ctx.StockPositions.Add(pos);
+            await ctx.SaveChangesAsync();
+            posId = pos.Id;
+            tradeId = trade.Id;
+        }
+
+        using var cmdCtx = _fixture.CreateContext();
+        var controller = new StockPositionsController(cmdCtx);
+
+        var result = await controller.Assign(posId, new AssignTradeDto { TradeId = tradeId });
+
+        Assert.IsType<NoContentResult>(result);
+
+        using var verifyCtx = _fixture.CreateContext();
+        var updated = await verifyCtx.StockPositions.FindAsync(posId);
+        Assert.Equal(tradeId, updated!.TradeId);
+    }
+
+    [Fact]
+    public async Task Assign_WithNull_Unassigns()
+    {
+        int posId;
+        using (var ctx = _fixture.CreateContext())
+        {
+            var trade = new Trade
+            {
+                Symbol = "AAPL", Date = new(2025, 6, 1),
+                TypeOfTrade = TypeOfTrade.LongStock, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                AccountId = _fixture.TestAccountId
+            };
+            ctx.Trades.Add(trade);
+            await ctx.SaveChangesAsync();
+
+            var pos = new StockPosition { Symbol = "AAPL", Date = new(2025, 6, 1), PosChange = 100, Price = 200m, Multiplier = 1, TradeId = trade.Id, AccountId = _fixture.TestAccountId };
+            ctx.StockPositions.Add(pos);
+            await ctx.SaveChangesAsync();
+            posId = pos.Id;
+        }
+
+        using var cmdCtx = _fixture.CreateContext();
+        var controller = new StockPositionsController(cmdCtx);
+
+        var result = await controller.Assign(posId, new AssignTradeDto { TradeId = null });
+
+        Assert.IsType<NoContentResult>(result);
+
+        using var verifyCtx = _fixture.CreateContext();
+        var updated = await verifyCtx.StockPositions.FindAsync(posId);
+        Assert.Null(updated!.TradeId);
     }
 
     public void Dispose() => _fixture.Dispose();
