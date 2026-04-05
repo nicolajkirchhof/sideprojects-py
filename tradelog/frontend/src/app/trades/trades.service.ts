@@ -91,8 +91,32 @@ export interface Trade {
 
 export interface TradeDetail extends Trade {
   childTradeIds: number[];
+  events: TradeEventDto[];
   optionPositions: OptionLegDto[];
   stockPositions: StockLegDto[];
+}
+
+export enum TradeEventType {
+  ScaleIn = 'ScaleIn',
+  ProfitTake = 'ProfitTake',
+  Roll = 'Roll',
+  Stop = 'Stop',
+}
+
+export const TRADE_EVENT_TYPE_LABELS: Record<TradeEventType, string> = {
+  [TradeEventType.ScaleIn]: 'Scale In',
+  [TradeEventType.ProfitTake]: 'Profit Take',
+  [TradeEventType.Roll]: 'Roll',
+  [TradeEventType.Stop]: 'Stop',
+};
+
+export interface TradeEventDto {
+  id: number;
+  tradeId: number;
+  type: string;
+  date: string;
+  notes?: string | null;
+  pnlImpact?: number | null;
 }
 
 export interface OptionLegDto {
@@ -198,6 +222,19 @@ export class TradesService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`/api/trades/${id}`);
+  }
+
+  // Trade events
+  getEvents(tradeId: number): Observable<TradeEventDto[]> {
+    return this.http.get<TradeEventDto[]>(`/api/trades/${tradeId}/events`);
+  }
+
+  createEvent(tradeId: number, event: Partial<TradeEventDto>): Observable<TradeEventDto> {
+    return this.http.post<TradeEventDto>(`/api/trades/${tradeId}/events`, event);
+  }
+
+  deleteEvent(eventId: number): Observable<void> {
+    return this.http.delete<void>(`/api/trade-events/${eventId}`);
   }
 
   getChain(id: number): Observable<Trade[]> {

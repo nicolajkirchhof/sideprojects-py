@@ -14,9 +14,9 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { QuillModule } from 'ngx-quill';
 import {
-  TradesService, Trade, TradeUpsert, OptionLegDto, StockLegDto,
-  Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating,
-  STRATEGY_LABELS, TYPE_OF_TRADE_LABELS, TIMEFRAME_LABELS, MANAGEMENT_RATING_LABELS,
+  TradesService, Trade, TradeUpsert, OptionLegDto, StockLegDto, TradeEventDto,
+  Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating, TradeEventType,
+  STRATEGY_LABELS, TYPE_OF_TRADE_LABELS, TIMEFRAME_LABELS, MANAGEMENT_RATING_LABELS, TRADE_EVENT_TYPE_LABELS,
 } from './trades.service';
 import { forkJoin, Observable } from 'rxjs';
 import { toIsoOrNull } from '../shared/utils';
@@ -92,6 +92,13 @@ export class Trades {
   unassignedStocks = signal<StockLegDto[]>([]);
   selectedLegIds = signal<{ options: Set<number>; stocks: Set<number> }>({ options: new Set(), stocks: new Set() });
 
+  // Trade events
+  events = signal<TradeEventDto[]>([]);
+  showEventForm = signal(false);
+  eventTypes = Object.values(TradeEventType);
+  eventTypeLabel: Record<string, string> = TRADE_EVENT_TYPE_LABELS;
+  eventForm!: FormGroup;
+
   // Quill config
   showToolbar = signal(false);
   quillModules: any = {
@@ -131,6 +138,12 @@ export class Trades {
       managementRating: [null],
       learnings: [''],
       parentTradeId: [null],
+    });
+    this.eventForm = this.fb.group({
+      type: [null, [Validators.required]],
+      date: [null, [Validators.required]],
+      notes: [''],
+      pnlImpact: [null],
     });
   }
 
@@ -219,7 +232,9 @@ export class Trades {
     this.showSidebar.set(true);
     this.optionLegs.set([]);
     this.stockLegs.set([]);
+    this.events.set([]);
     this.showLegPicker.set(false);
+    this.showEventForm.set(false);
   }
 
   onCancel(): void {
@@ -299,6 +314,7 @@ export class Trades {
         this.optionLegs.set(detail.optionPositions ?? []);
         this.stockLegs.set(detail.stockPositions ?? []);
         this.childTradeIds.set(detail.childTradeIds ?? []);
+        this.events.set(detail.events ?? []);
       },
       error: () => this.notify.error('Failed to load legs'),
     });
@@ -394,7 +410,9 @@ export class Trades {
     this.optionLegs.set([]);
     this.stockLegs.set([]);
     this.childTradeIds.set([]);
+    this.events.set([]);
     this.showLegPicker.set(false);
+    this.showEventForm.set(false);
   }
 
   onSelectTradeById(tradeId: number): void {
@@ -416,6 +434,48 @@ export class Trades {
         this.notify.success('Position unassigned');
       },
       error: () => this.notify.error('Failed to unassign'),
+    });
+  }
+
+  // --- Trade events ---
+
+  onOpenEventForm(): void {
+    this.eventForm.reset({ type: null, date: new Date(), notes: '', pnlImpact: null });
+    this.showEventForm.set(true);
+  }
+
+  onSaveEvent(): void {
+    if (this.eventForm.invalid) {
+      this.eventForm.markAllAsTouched();
+      return;
+    }
+    const tradeId = this.selected()?.id;
+    if (!tradeId) return;
+
+    const v = this.eventForm.getRawValue();
+    this.service.createEvent(tradeId, {
+      type: v.type,
+      date: toIsoOrNull(v.date) as string,
+      notes: v.notes || null,
+      pnlImpact: v.pnlImpact ? Number(v.pnlImpact) : null,
+    }).subscribe({
+      next: (created) => {
+        this.events.update(list => [...list, created].sort((a, b) => a.date.localeCompare(b.date)));
+        this.showEventForm.set(false);
+        this.notify.success('Event added');
+      },
+      error: () => this.notify.error('Failed to add event'),
+    });
+  }
+
+  onDeleteEvent(eventId: number): void {
+    if (!confirm('Delete this event?')) return;
+    this.service.deleteEvent(eventId).subscribe({
+      next: () => {
+        this.events.update(list => list.filter(e => e.id !== eventId));
+        this.notify.success('Event deleted');
+      },
+      error: () => this.notify.error('Failed to delete event'),
     });
   }
 }
