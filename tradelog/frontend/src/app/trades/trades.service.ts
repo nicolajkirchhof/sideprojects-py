@@ -86,9 +86,11 @@ export interface Trade {
   actualManagement?: string | null;
   managementRating?: ManagementRating | null;
   learnings?: string | null;
+  parentTradeId?: number | null;
 }
 
 export interface TradeDetail extends Trade {
+  childTradeIds: number[];
   optionPositions: OptionLegDto[];
   stockPositions: StockLegDto[];
 }
@@ -196,6 +198,10 @@ export class TradesService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`/api/trades/${id}`);
+  }
+
+  getChain(id: number): Observable<Trade[]> {
+    return this.http.get<Trade[]>(`/api/trades/${id}/chain`);
   }
 
   // Position assignment

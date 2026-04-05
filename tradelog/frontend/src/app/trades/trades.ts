@@ -79,6 +79,9 @@ export class Trades {
   timeframeLabel: Record<string, string> = TIMEFRAME_LABELS;
   managementRatingLabel: Record<string, string> = MANAGEMENT_RATING_LABELS;
 
+  // Follow-up chain
+  childTradeIds = signal<number[]>([]);
+
   // Legs (assigned positions)
   optionLegs = signal<OptionLegDto[]>([]);
   stockLegs = signal<StockLegDto[]>([]);
@@ -127,6 +130,7 @@ export class Trades {
       actualManagement: [''],
       managementRating: [null],
       learnings: [''],
+      parentTradeId: [null],
     });
   }
 
@@ -177,6 +181,7 @@ export class Trades {
       actualManagement: row.actualManagement ?? '',
       managementRating: row.managementRating ?? null,
       learnings: row.learnings ?? '',
+      parentTradeId: row.parentTradeId ?? null,
     });
     this.showSidebar.set(true);
     this.showLegPicker.set(false);
@@ -209,6 +214,7 @@ export class Trades {
       actualManagement: '',
       managementRating: null,
       learnings: '',
+      parentTradeId: null,
     });
     this.showSidebar.set(true);
     this.optionLegs.set([]);
@@ -255,6 +261,7 @@ export class Trades {
       actualManagement: v.actualManagement || null,
       managementRating: v.managementRating || null,
       learnings: v.learnings || null,
+      parentTradeId: v.parentTradeId || null,
     };
 
     const obs = this.isCreating() || !payload.id
@@ -291,6 +298,7 @@ export class Trades {
       next: (detail) => {
         this.optionLegs.set(detail.optionPositions ?? []);
         this.stockLegs.set(detail.stockPositions ?? []);
+        this.childTradeIds.set(detail.childTradeIds ?? []);
       },
       error: () => this.notify.error('Failed to load legs'),
     });
@@ -350,6 +358,55 @@ export class Trades {
       },
       error: () => this.notify.error('Failed to unassign'),
     });
+  }
+
+  onCreateFollowUp(): void {
+    const parent = this.selected();
+    if (!parent) return;
+
+    this.isCreating.set(true);
+    this.selected.set(null);
+    this.form.reset({
+      id: null,
+      symbol: parent.symbol,
+      date: new Date(),
+      typeOfTrade: parent.typeOfTrade,
+      notes: '',
+      directional: parent.directional ?? null,
+      timeframe: parent.timeframe ?? null,
+      budget: parent.budget,
+      strategy: parent.strategy,
+      newsCatalyst: false,
+      recentEarnings: false,
+      sectorSupport: false,
+      ath: false,
+      rvol: null,
+      institutionalSupport: '',
+      gapPct: null,
+      xAtrMove: null,
+      taFaNotes: '',
+      intendedManagement: '',
+      actualManagement: '',
+      managementRating: null,
+      learnings: '',
+      parentTradeId: parent.id,
+    });
+    this.optionLegs.set([]);
+    this.stockLegs.set([]);
+    this.childTradeIds.set([]);
+    this.showLegPicker.set(false);
+  }
+
+  onSelectTradeById(tradeId: number): void {
+    const trade = this.trades().find(t => t.id === tradeId);
+    if (trade) {
+      this.onRowSelect(trade);
+    } else {
+      this.service.getById(tradeId).subscribe({
+        next: (detail) => this.onRowSelect(detail),
+        error: () => this.notify.error('Trade not found — try clearing filters'),
+      });
+    }
   }
 
   onUnassignStock(positionId: number): void {

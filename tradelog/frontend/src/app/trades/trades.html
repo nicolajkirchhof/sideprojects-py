@@ -32,7 +32,12 @@
       <table mat-table [dataSource]="trades()" class="w-full">
         <ng-container matColumnDef="symbol">
           <th mat-header-cell *matHeaderCellDef>Symbol</th>
-          <td mat-cell *matCellDef="let e">{{ e.symbol }}</td>
+          <td mat-cell *matCellDef="let e">
+            @if (e.parentTradeId) {
+              <span class="opacity-40 mr-1">→</span>
+            }
+            {{ e.symbol }}
+          </td>
         </ng-container>
 
         <ng-container matColumnDef="date">
@@ -84,6 +89,13 @@
             <mat-label>ID</mat-label>
             <input matInput formControlName="id" readonly>
           </mat-form-field>
+        }
+
+        @if (isCreating() && form.get('parentTradeId')?.value) {
+          <div class="text-xs bg-blue-900/30 border border-blue-500/30 rounded px-3 py-2">
+            <mat-icon class="!text-sm !w-4 !h-4 mr-1 align-text-bottom">call_split</mat-icon>
+            Follow-up of Trade #{{ form.get('parentTradeId')?.value }}
+          </div>
         }
 
         <!-- Core fields -->
@@ -224,6 +236,35 @@
         <div class="min-h-[60px]">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" theme="snow"></quill-editor>
         </div>
+
+        <!-- Chain links (edit mode only) -->
+        @if (!isCreating() && selected()) {
+          @if (selected()!.parentTradeId) {
+            <div class="text-xs opacity-60 mt-2">
+              <span class="opacity-50">Follow-up of:</span>
+              <button type="button" class="text-blue-400 hover:underline ml-1" (click)="onSelectTradeById(selected()!.parentTradeId!)">
+                Trade #{{ selected()!.parentTradeId }}
+              </button>
+            </div>
+          }
+          @if (childTradeIds().length > 0) {
+            <div class="text-xs opacity-60 mt-1">
+              <span class="opacity-50">Follow-ups:</span>
+              @for (childId of childTradeIds(); track childId) {
+                <button type="button" class="text-blue-400 hover:underline ml-1" (click)="onSelectTradeById(childId)">
+                  #{{ childId }}
+                </button>
+              }
+            </div>
+          }
+        }
+
+        <!-- Follow-up button -->
+        @if (!isCreating() && selected()) {
+          <button mat-stroked-button type="button" class="!text-xs !min-h-[28px] !h-7 mt-2" (click)="onCreateFollowUp()">
+            <mat-icon class="!text-sm !w-4 !h-4 mr-1">call_split</mat-icon> Create Follow-up
+          </button>
+        }
 
         <!-- Legs section (edit mode only) -->
         @if (!isCreating() && selected()) {

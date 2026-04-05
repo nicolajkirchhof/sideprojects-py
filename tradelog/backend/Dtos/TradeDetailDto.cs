@@ -28,6 +28,9 @@ public class TradeDetailDto
     public string? Learnings { get; set; }
     public int? ParentTradeId { get; set; }
 
+    // Follow-up chain
+    public List<int> ChildTradeIds { get; set; } = [];
+
     // Linked positions
     public List<OptionPositionDto> OptionPositions { get; set; } = [];
     public List<StockPositionDto> StockPositions { get; set; } = [];

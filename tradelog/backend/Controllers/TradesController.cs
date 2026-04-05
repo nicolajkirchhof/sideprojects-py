@@ -85,6 +85,10 @@ public class TradesController : ControllerBase
             ManagementRating = trade.ManagementRating,
             Learnings = trade.Learnings,
             ParentTradeId = trade.ParentTradeId,
+            ChildTradeIds = await _context.Trades
+                .Where(t => t.ParentTradeId == id)
+                .Select(t => t.Id)
+                .ToListAsync(),
             OptionPositions = optionPositions
                 .Select(p => OptionPositionDtoMapper.ToDto(p, latestLogs.GetValueOrDefault(p.ContractId)))
                 .ToList(),
@@ -113,11 +117,54 @@ public class TradesController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Returns the full chain for a trade: walks up to the root, then returns
+    /// all descendants in date order (root first).
+    /// </summary>
+    [HttpGet("{id:int}/chain")]
+    public async Task<ActionResult<IEnumerable<Trade>>> GetChain(int id)
+    {
+        var trade = await _context.Trades.FindAsync(id);
+        if (trade == null) return NotFound();
+
+        // Walk up to root
+        var root = trade;
+        while (root.ParentTradeId.HasValue)
+        {
+            root = await _context.Trades.FindAsync(root.ParentTradeId.Value);
+            if (root == null) return NotFound();
+        }
+
+        // Collect all descendants via BFS
+        var chain = new List<Trade> { root };
+        var queue = new Queue<int>();
+        queue.Enqueue(root!.Id);
+
+        while (queue.Count > 0)
+        {
+            var parentId = queue.Dequeue();
+            var children = await _context.Trades
+                .Where(t => t.ParentTradeId == parentId)
+                .OrderBy(t => t.Date)
+                .ToListAsync();
+            foreach (var child in children)
+            {
+                chain.Add(child);
+                queue.Enqueue(child.Id);
+            }
+        }
+
+        return chain;
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
         var trade = await _context.Trades.FindAsync(id);
         if (trade == null) return NotFound();
+
+        if (await _context.Trades.AnyAsync(t => t.ParentTradeId == id))
+            return BadRequest("Cannot delete a trade that has follow-up trades. Delete the children first.");
 
         _context.Trades.Remove(trade);
         await _context.SaveChangesAsync();
