@@ -1,20 +1,24 @@
-import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
-import { MatTableModule, MatTableDataSource } from '@angular/material/table';
-import { MatSort, MatSortModule } from '@angular/material/sort';
-import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
+import { MatTableModule } from '@angular/material/table';
 import { ContentArea } from '../shared/content-area/content-area';
-import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { TradesService, TradeDto, TradeUpsert } from './trades.service';
-import { toIsoOrNull, pnlColor } from '../shared/utils';
+import { QuillModule } from 'ngx-quill';
+import {
+  TradesService, Trade, TradeUpsert,
+  Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating,
+  STRATEGY_LABELS, TYPE_OF_TRADE_LABELS, TIMEFRAME_LABELS, MANAGEMENT_RATING_LABELS,
+} from './trades.service';
+import { toIsoOrNull } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
 
 @Component({
@@ -25,84 +29,104 @@ import { NotificationService } from '../shared/notification.service';
     MatTableModule,
     ContentArea,
     ReactiveFormsModule,
-    FormsModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     MatIconModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressBarModule,
-    MatSortModule,
-    MatPaginatorModule,
+    QuillModule,
     DatePipe,
-    DecimalPipe,
   ],
   templateUrl: './trades.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class Trades implements OnInit, AfterViewInit {
+export class Trades implements OnInit {
   private service = inject(TradesService);
-  private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  @ViewChild(MatSort) sort!: MatSort;
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
-
   loading = false;
 
-  dataSource = new MatTableDataSource<TradeDto>([]);
-  displayedColumns = [
-    'symbol', 'date', 'posChange', 'price', 'multiplier',
-    'totalPos', 'avgPrice', 'pnl', 'commission',
-  ];
-
-  // Check if any trade has multiplier != 1 to show/hide the column
-  hasMultiplier = false;
+  trades: Trade[] = [];
+  displayedColumns = ['symbol', 'date', 'typeOfTrade', 'directional', 'budget', 'strategy', 'managementRating'];
 
   // Sidebar state
   showSidebar = false;
   form!: FormGroup;
   isCreating = false;
-  selected: TradeDto | null = null;
+  selected: Trade | null = null;
 
-  // Filter
-  filterSymbol = '';
+  // Filter state
+  filterBudget: Budget | null = null;
+  filterStrategy: Strategy | null = null;
 
-  ngAfterViewInit(): void {
-    this.dataSource.sort = this.sort;
-    this.dataSource.paginator = this.paginator;
-  }
+  // Enum values for dropdowns
+  budgets = Object.values(Budget);
+  strategies = Object.values(Strategy);
+  typesOfTrade = Object.values(TypeOfTrade);
+  directionalOptions = Object.values(DirectionalBias);
+  timeframes = Object.values(Timeframe);
+  managementRatings = Object.values(ManagementRating);
+
+  // Labels (cast to index-friendly type for template access)
+  strategyLabel: Record<string, string> = STRATEGY_LABELS;
+  typeOfTradeLabel: Record<string, string> = TYPE_OF_TRADE_LABELS;
+  timeframeLabel: Record<string, string> = TIMEFRAME_LABELS;
+  managementRatingLabel: Record<string, string> = MANAGEMENT_RATING_LABELS;
+
+  // Quill config
+  showToolbar = false;
+  quillModules: any = {
+    toolbar: [
+      ['bold', 'italic', 'underline'],
+      [{ header: [1, 2, 3, false] }],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link', 'blockquote'],
+      ['clean'],
+    ],
+  };
+  quillModulesOff: any = { toolbar: false };
 
   ngOnInit(): void {
-    const qp = this.route.snapshot.queryParams;
-    if (qp['symbol']) this.filterSymbol = qp['symbol'];
     this.load();
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
       symbol: ['', [Validators.required]],
       date: [null, [Validators.required]],
-      posChange: [null, [Validators.required]],
-      price: [null, [Validators.required]],
-      commission: [0],
-      multiplier: [1],
-      bestExitPrice: [null],
-      bestExitDate: [null],
+      typeOfTrade: [null, [Validators.required]],
+      notes: [''],
+      directional: [null],
+      timeframe: [null],
+      budget: [null, [Validators.required]],
+      strategy: [null, [Validators.required]],
+      newsCatalyst: [false],
+      recentEarnings: [false],
+      sectorSupport: [false],
+      ath: [false],
+      rvol: [null],
+      institutionalSupport: [''],
+      gapPct: [null],
+      xAtrMove: [null],
+      taFaNotes: [''],
+      intendedManagement: [''],
+      actualManagement: [''],
+      managementRating: [null],
+      learnings: [''],
     });
   }
 
   load(): void {
     this.loading = true;
     const filters: any = {};
-    if (this.filterSymbol.trim()) filters.symbol = this.filterSymbol.trim().toUpperCase();
+    if (this.filterBudget) filters.budget = this.filterBudget;
+    if (this.filterStrategy) filters.strategy = this.filterStrategy;
     this.service.getAll(filters).subscribe({
       next: (data) => {
-        this.dataSource.data = data ?? [];
-        this.hasMultiplier = this.dataSource.data.some(t => t.multiplier !== 1);
-        this.displayedColumns = this.hasMultiplier
-          ? ['symbol', 'date', 'posChange', 'price', 'multiplier', 'totalPos', 'avgPrice', 'pnl', 'commission']
-          : ['symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission'];
+        this.trades = data ?? [];
         this.loading = false;
       },
       error: () => {
@@ -116,19 +140,32 @@ export class Trades implements OnInit, AfterViewInit {
     this.load();
   }
 
-  onRowSelect(row: TradeDto): void {
+  onRowSelect(row: Trade): void {
     this.isCreating = false;
     this.selected = row;
     this.form.reset({
       id: row.id,
       symbol: row.symbol,
       date: row.date ? new Date(row.date) : null,
-      posChange: row.posChange,
-      price: row.price,
-      commission: row.commission,
-      multiplier: row.multiplier,
-      bestExitPrice: row.bestExitPrice ?? null,
-      bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
+      typeOfTrade: row.typeOfTrade,
+      notes: row.notes ?? '',
+      directional: row.directional ?? null,
+      timeframe: row.timeframe ?? null,
+      budget: row.budget,
+      strategy: row.strategy,
+      newsCatalyst: row.newsCatalyst,
+      recentEarnings: row.recentEarnings,
+      sectorSupport: row.sectorSupport,
+      ath: row.ath,
+      rvol: row.rvol ?? null,
+      institutionalSupport: row.institutionalSupport ?? '',
+      gapPct: row.gapPct ?? null,
+      xAtrMove: row.xAtrMove ?? null,
+      taFaNotes: row.taFaNotes ?? '',
+      intendedManagement: row.intendedManagement ?? '',
+      actualManagement: row.actualManagement ?? '',
+      managementRating: row.managementRating ?? null,
+      learnings: row.learnings ?? '',
     });
     this.showSidebar = true;
   }
@@ -140,12 +177,25 @@ export class Trades implements OnInit, AfterViewInit {
       id: null,
       symbol: '',
       date: new Date(),
-      posChange: null,
-      price: null,
-      commission: 0,
-      multiplier: 1,
-      bestExitPrice: null,
-      bestExitDate: null,
+      typeOfTrade: null,
+      notes: '',
+      directional: null,
+      timeframe: Timeframe.OneDay,
+      budget: null,
+      strategy: null,
+      newsCatalyst: false,
+      recentEarnings: false,
+      sectorSupport: false,
+      ath: false,
+      rvol: null,
+      institutionalSupport: '',
+      gapPct: null,
+      xAtrMove: null,
+      taFaNotes: '',
+      intendedManagement: '',
+      actualManagement: '',
+      managementRating: null,
+      learnings: '',
     });
     this.showSidebar = true;
   }
@@ -154,6 +204,10 @@ export class Trades implements OnInit, AfterViewInit {
     this.showSidebar = false;
     this.selected = null;
     this.isCreating = false;
+  }
+
+  toggleQuillToolbar(): void {
+    this.showToolbar = !this.showToolbar;
   }
 
   onSave(): void {
@@ -166,12 +220,25 @@ export class Trades implements OnInit, AfterViewInit {
       id: v.id ?? undefined,
       symbol: v.symbol.toUpperCase().trim(),
       date: toIsoOrNull(v.date) as string,
-      posChange: Number(v.posChange),
-      price: Number(v.price),
-      commission: Number(v.commission ?? 0),
-      multiplier: Number(v.multiplier ?? 1),
-      bestExitPrice: v.bestExitPrice ? Number(v.bestExitPrice) : null,
-      bestExitDate: toIsoOrNull(v.bestExitDate),
+      typeOfTrade: v.typeOfTrade,
+      notes: v.notes || null,
+      directional: v.directional || null,
+      timeframe: v.timeframe || null,
+      budget: v.budget,
+      strategy: v.strategy,
+      newsCatalyst: v.newsCatalyst ?? false,
+      recentEarnings: v.recentEarnings ?? false,
+      sectorSupport: v.sectorSupport ?? false,
+      ath: v.ath ?? false,
+      rvol: v.rvol ? Number(v.rvol) : null,
+      institutionalSupport: v.institutionalSupport || null,
+      gapPct: v.gapPct ? Number(v.gapPct) : null,
+      xAtrMove: v.xAtrMove ? Number(v.xAtrMove) : null,
+      taFaNotes: v.taFaNotes || null,
+      intendedManagement: v.intendedManagement || null,
+      actualManagement: v.actualManagement || null,
+      managementRating: v.managementRating || null,
+      learnings: v.learnings || null,
     };
 
     const obs = this.isCreating || !payload.id
@@ -190,7 +257,7 @@ export class Trades implements OnInit, AfterViewInit {
 
   onDelete(): void {
     if (!this.selected) return;
-    if (!confirm(`Delete ${this.selected.symbol} trade from ${new Date(this.selected.date).toLocaleDateString()}?`)) return;
+    if (!confirm(`Delete trade for ${this.selected.symbol}?`)) return;
     this.service.delete(this.selected.id).subscribe({
       next: () => {
         this.notify.success('Trade deleted');
@@ -200,6 +267,4 @@ export class Trades implements OnInit, AfterViewInit {
       error: () => this.notify.error('Failed to delete trade'),
     });
   }
-
-  pnlColor = pnlColor;
 }

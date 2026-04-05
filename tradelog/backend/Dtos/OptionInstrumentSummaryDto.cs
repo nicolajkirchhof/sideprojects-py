@@ -9,7 +9,7 @@ public class OptionInstrumentSummaryDto
     public int? Dte { get; set; }
     public string Status { get; set; } = "Closed";
 
-    // From latest TradeEntry
+    // From latest Trade
     public string? Budget { get; set; }
     public string? CurrentSetup { get; set; }
     public string? Strikes { get; set; }

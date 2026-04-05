@@ -1,7 +1,5 @@
 using tradelog.Data;
-using tradelog.Dtos;
 using tradelog.Models;
-using tradelog.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,48 +18,37 @@ public class TradesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TradeDto>>> GetAll([FromQuery] string? symbol)
+    public async Task<ActionResult<IEnumerable<Trade>>> GetAll(
+        [FromQuery] string? symbol,
+        [FromQuery] Budget? budget,
+        [FromQuery] Strategy? strategy)
     {
         var query = _context.Trades.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(symbol))
-            query = query.Where(t => t.Symbol == symbol);
+            query = query.Where(e => e.Symbol == symbol);
+        if (budget.HasValue)
+            query = query.Where(e => e.Budget == budget.Value);
+        if (strategy.HasValue)
+            query = query.Where(e => e.Strategy == strategy.Value);
 
-        var trades = await query.OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id).ToListAsync();
-        return TradeComputations.ComputeRunningFields(trades);
+        return await query.OrderByDescending(e => e.Date).ToListAsync();
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<TradeDto>> GetById(int id)
+    public async Task<ActionResult<Trade>> GetById(int id)
     {
         var trade = await _context.Trades.FindAsync(id);
         if (trade == null) return NotFound();
-
-        var allForSymbol = await _context.Trades
-            .Where(t => t.Symbol == trade.Symbol)
-            .OrderBy(t => t.Date).ThenBy(t => t.Id)
-            .ToListAsync();
-
-        var dtos = TradeComputations.ComputeRunningFields(allForSymbol);
-        var dto = dtos.FirstOrDefault(d => d.Id == id);
-        if (dto == null) return NotFound();
-        return dto;
+        return trade;
     }
 
     [HttpPost]
-    public async Task<ActionResult<TradeDto>> Create(Trade trade)
+    public async Task<ActionResult<Trade>> Create(Trade trade)
     {
         _context.Trades.Add(trade);
         await _context.SaveChangesAsync();
-
-        var allForSymbol = await _context.Trades
-            .Where(t => t.Symbol == trade.Symbol)
-            .OrderBy(t => t.Date).ThenBy(t => t.Id)
-            .ToListAsync();
-
-        var dtos = TradeComputations.ComputeRunningFields(allForSymbol);
-        var dto = dtos.First(d => d.Id == trade.Id);
-        return CreatedAtAction(nameof(GetById), new { id = trade.Id }, dto);
+        return CreatedAtAction(nameof(GetById), new { id = trade.Id }, trade);
     }
 
     [HttpPut("{id:int}")]

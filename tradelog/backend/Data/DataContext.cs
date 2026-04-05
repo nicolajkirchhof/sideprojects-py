@@ -17,10 +17,11 @@ public class DataContext : DbContext
     }
 
     public DbSet<Account> Accounts { get; set; }
-    public DbSet<TradeEntry> TradeEntries { get; set; }
+    public DbSet<Trade> Trades { get; set; }
     public DbSet<OptionPosition> OptionPositions { get; set; }
     public DbSet<OptionPositionsLog> OptionPositionsLogs { get; set; }
-    public DbSet<Trade> Trades { get; set; }
+    public DbSet<StockPosition> StockPositions { get; set; }
+    public DbSet<TradeEvent> TradeEvents { get; set; }
     public DbSet<Capital> Capitals { get; set; }
     public DbSet<WeeklyPrep> WeeklyPreps { get; set; }
     public DbSet<Portfolio> Portfolios { get; set; }
@@ -47,10 +48,11 @@ public class DataContext : DbContext
         // parameterizes the filter and re-evaluates it per query execution.
         // ────────────────────────────────────────────
 
-        modelBuilder.Entity<TradeEntry>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<Trade>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<OptionPosition>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<OptionPositionsLog>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
-        modelBuilder.Entity<Trade>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<StockPosition>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<TradeEvent>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<Capital>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<WeeklyPrep>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<Portfolio>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
@@ -67,16 +69,49 @@ public class DataContext : DbContext
 
         modelBuilder.Entity<OptionPosition>().HasIndex(e => e.Symbol);
         modelBuilder.Entity<OptionPosition>().HasIndex(e => e.ContractId);
-        modelBuilder.Entity<Trade>().HasIndex(e => new { e.Symbol, e.Date });
-        modelBuilder.Entity<TradeEntry>().HasIndex(e => e.Symbol);
+        modelBuilder.Entity<StockPosition>().HasIndex(e => new { e.Symbol, e.Date });
+        modelBuilder.Entity<Trade>().HasIndex(e => e.Symbol);
         modelBuilder.Entity<StockPriceCache>().HasIndex(e => e.Symbol).IsUnique();
-        modelBuilder.Entity<Trade>().HasIndex(e => e.ExecutionId);
+        modelBuilder.Entity<StockPosition>().HasIndex(e => e.ExecutionId);
         modelBuilder.Entity<Account>().HasIndex(e => e.IbkrAccountId).IsUnique();
 
         // Store CloseReasons bitmask as int
         modelBuilder.Entity<OptionPosition>()
             .Property(e => e.CloseReasons)
             .HasConversion<int?>();
+
+        // Store TradeEventType as string
+        modelBuilder.Entity<TradeEvent>()
+            .Property(e => e.Type)
+            .HasConversion<string>();
+
+        // ────────────────────────────────────────────
+        // Foreign key configurations
+        // ────────────────────────────────────────────
+
+        modelBuilder.Entity<Trade>()
+            .HasOne<Trade>()
+            .WithMany()
+            .HasForeignKey(t => t.ParentTradeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<OptionPosition>()
+            .HasOne<Trade>()
+            .WithMany(t => t.OptionPositions)
+            .HasForeignKey(p => p.TradeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<StockPosition>()
+            .HasOne<Trade>()
+            .WithMany(t => t.StockPositions)
+            .HasForeignKey(p => p.TradeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<TradeEvent>()
+            .HasOne<Trade>()
+            .WithMany(t => t.TradeEvents)
+            .HasForeignKey(e => e.TradeId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override int SaveChanges()

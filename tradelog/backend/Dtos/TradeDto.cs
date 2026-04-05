@@ -1,6 +1,6 @@
 namespace tradelog.Dtos;
 
-public class TradeDto
+public class StockPositionDto
 {
     // Stored fields
     public int Id { get; set; }

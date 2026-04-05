@@ -22,10 +22,10 @@ public static class PortfolioAggregationService
 
         var optionAgg = OptionComputations.ComputePortfolioAggregation(positions, latestLogs);
 
-        var trades = await context.Trades
+        var trades = await context.StockPositions
             .OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id)
             .ToListAsync();
-        var tradeDtos = TradeComputations.ComputeRunningFields(trades);
+        var tradeDtos = StockPositionComputations.ComputeRunningFields(trades);
         var tradeRealizedPnl = tradeDtos.Sum(d => d.Pnl);
         var tradeCommissions = tradeDtos.Sum(d => d.Commission);
 

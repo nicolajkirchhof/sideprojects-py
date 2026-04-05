@@ -6,11 +6,11 @@ using tradelog.Tests.Fixtures;
 
 namespace tradelog.Tests.Controllers;
 
-public class TradesControllerTests : IDisposable
+public class StockPositionsControllerTests : IDisposable
 {
     private readonly TestDbFixture _fixture;
 
-    public TradesControllerTests()
+    public StockPositionsControllerTests()
     {
         _fixture = new TestDbFixture();
         SeedAccount();
@@ -28,13 +28,13 @@ public class TradesControllerTests : IDisposable
     {
         using (var ctx = _fixture.CreateContext())
         {
-            ctx.Trades.Add(new Trade { Symbol = "AAPL", Date = new(2025, 1, 1), PosChange = 100, Price = 150m, Multiplier = 1, AccountId = _fixture.TestAccountId });
-            ctx.Trades.Add(new Trade { Symbol = "AAPL", Date = new(2025, 1, 2), PosChange = -50, Price = 160m, Multiplier = 1, AccountId = _fixture.TestAccountId });
+            ctx.StockPositions.Add(new StockPosition { Symbol = "AAPL", Date = new(2025, 1, 1), PosChange = 100, Price = 150m, Multiplier = 1, AccountId = _fixture.TestAccountId });
+            ctx.StockPositions.Add(new StockPosition { Symbol = "AAPL", Date = new(2025, 1, 2), PosChange = -50, Price = 160m, Multiplier = 1, AccountId = _fixture.TestAccountId });
             await ctx.SaveChangesAsync();
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new StockPositionsController(queryCtx);
 
         var result = await controller.GetAll(null);
 
@@ -51,12 +51,12 @@ public class TradesControllerTests : IDisposable
     public async Task Create_ReturnsDtoWithRunningFields()
     {
         using var ctx = _fixture.CreateContext();
-        var controller = new TradesController(ctx);
+        var controller = new StockPositionsController(ctx);
 
-        var trade = new Trade { Symbol = "MSFT", Date = new(2025, 1, 1), PosChange = 50, Price = 400m, Multiplier = 1 };
+        var trade = new StockPosition { Symbol = "MSFT", Date = new(2025, 1, 1), PosChange = 50, Price = 400m, Multiplier = 1 };
         var result = await controller.Create(trade);
 
-        var created = (result.Result as CreatedAtActionResult)?.Value as TradeDto;
+        var created = (result.Result as CreatedAtActionResult)?.Value as StockPositionDto;
         Assert.NotNull(created);
         Assert.Equal(50, created!.TotalPos);
         Assert.Equal(400m, created.AvgPrice);
@@ -76,20 +76,20 @@ public class TradesControllerTests : IDisposable
         // Insert trade for other account using a context scoped to that account
         using (var otherCtx = _fixture.CreateContext(otherAccountId))
         {
-            otherCtx.Trades.Add(new Trade { Symbol = "SPY", Date = new(2025, 1, 1), PosChange = 10, Price = 500m, Multiplier = 1 });
+            otherCtx.StockPositions.Add(new StockPosition { Symbol = "SPY", Date = new(2025, 1, 1), PosChange = 10, Price = 500m, Multiplier = 1 });
             await otherCtx.SaveChangesAsync();
         }
 
         // Insert trade for test account
         using (var ctx = _fixture.CreateContext())
         {
-            ctx.Trades.Add(new Trade { Symbol = "AAPL", Date = new(2025, 1, 1), PosChange = 10, Price = 150m, Multiplier = 1 });
+            ctx.StockPositions.Add(new StockPosition { Symbol = "AAPL", Date = new(2025, 1, 1), PosChange = 10, Price = 150m, Multiplier = 1 });
             await ctx.SaveChangesAsync();
         }
 
         // Query with test account context (accountId=1) — should only see AAPL
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new StockPositionsController(queryCtx);
 
         var result = await controller.GetAll(null);
 

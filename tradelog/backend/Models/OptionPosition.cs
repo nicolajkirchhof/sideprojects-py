@@ -52,6 +52,8 @@ public class OptionPosition : tradelog.Data.IAccountScoped
     /// <summary>Underlying IBKR contract ID — stable reference across symbol changes.</summary>
     public int? UnderlyingConid { get; set; }
 
+    public int? TradeId { get; set; }
+
     /// <summary>Best exit price the position could have achieved (for trade review).</summary>
     public decimal? BestExitPrice { get; set; }
 

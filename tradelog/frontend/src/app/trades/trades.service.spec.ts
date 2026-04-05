@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TradesService, TradeUpsert } from './trades.service';
+import { TradesService, Budget, Strategy, TypeOfTrade, TradeUpsert } from './trades.service';
 
 describe('TradesService', () => {
   let service: TradesService;
@@ -17,7 +17,7 @@ describe('TradesService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('should GET all trades without filters', () => {
+  it('should GET all entries without filters', () => {
     service.getAll().subscribe();
     const req = httpMock.expectOne('/api/trades');
     expect(req.request.method).toBe('GET');
@@ -25,40 +25,56 @@ describe('TradesService', () => {
     req.flush([]);
   });
 
-  it('should GET trades with symbol filter', () => {
-    service.getAll({ symbol: 'MSFT' }).subscribe();
+  it('should GET entries with symbol filter', () => {
+    service.getAll({ symbol: 'AAPL' }).subscribe();
     const req = httpMock.expectOne((r) => r.url === '/api/trades');
-    expect(req.request.params.get('symbol')).toBe('MSFT');
+    expect(req.request.params.get('symbol')).toBe('AAPL');
     req.flush([]);
   });
 
-  it('should GET trade by id', () => {
-    service.getById(2).subscribe();
-    const req = httpMock.expectOne('/api/trades/2');
+  it('should GET entries with budget and strategy filters', () => {
+    service.getAll({ budget: Budget.Drift, strategy: Strategy.BreakoutMomentum }).subscribe();
+    const req = httpMock.expectOne((r) => r.url === '/api/trades');
+    expect(req.request.params.get('budget')).toBe('Drift');
+    expect(req.request.params.get('strategy')).toBe('BreakoutMomentum');
+    req.flush([]);
+  });
+
+  it('should GET entry by id', () => {
+    service.getById(5).subscribe();
+    const req = httpMock.expectOne('/api/trades/5');
     expect(req.request.method).toBe('GET');
     req.flush({});
   });
 
-  it('should POST to create trade', () => {
-    const payload: TradeUpsert = { symbol: 'MSFT', date: '2025-06-15', posChange: 100, price: 450.25, commission: 1.00, multiplier: 1 };
+  it('should POST to create entry', () => {
+    const payload: TradeUpsert = {
+      symbol: 'AAPL', date: '2025-06-15', typeOfTrade: TypeOfTrade.ShortStrangle,
+      budget: Budget.Drift, strategy: Strategy.PositiveDrift,
+      newsCatalyst: false, recentEarnings: false, sectorSupport: true, ath: false,
+    };
     service.create(payload).subscribe();
     const req = httpMock.expectOne('/api/trades');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body.symbol).toBe('MSFT');
+    expect(req.request.body.symbol).toBe('AAPL');
     req.flush({});
   });
 
-  it('should PUT to update trade', () => {
-    const payload: TradeUpsert = { symbol: 'MSFT', date: '2025-06-15', posChange: 100, price: 451.00, commission: 1.00, multiplier: 1 };
-    service.update(2, payload).subscribe();
-    const req = httpMock.expectOne('/api/trades/2');
+  it('should PUT to update entry', () => {
+    const payload: TradeUpsert = {
+      symbol: 'AAPL', date: '2025-06-15', typeOfTrade: TypeOfTrade.ShortStrangle,
+      budget: Budget.Drift, strategy: Strategy.PositiveDrift,
+      newsCatalyst: false, recentEarnings: false, sectorSupport: true, ath: false,
+    };
+    service.update(5, payload).subscribe();
+    const req = httpMock.expectOne('/api/trades/5');
     expect(req.request.method).toBe('PUT');
     req.flush({});
   });
 
-  it('should DELETE trade', () => {
-    service.delete(2).subscribe();
-    const req = httpMock.expectOne('/api/trades/2');
+  it('should DELETE entry', () => {
+    service.delete(5).subscribe();
+    const req = httpMock.expectOne('/api/trades/5');
     expect(req.request.method).toBe('DELETE');
     req.flush(null);
   });

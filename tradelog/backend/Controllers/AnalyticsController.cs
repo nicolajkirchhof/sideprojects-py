@@ -22,15 +22,15 @@ public class AnalyticsController : ControllerBase
     [HttpGet("strategies")]
     public async Task<ActionResult<IEnumerable<StrategyPerformanceDto>>> GetStrategyPerformance()
     {
-        var (pnlsBySymbol, tradeEntries) = await LoadClosedData();
+        var (pnlsBySymbol, trades) = await LoadClosedData();
 
-        // Group PNLs by strategy (via TradeEntry linkage by symbol)
+        // Group PNLs by strategy (via Trade linkage by symbol)
         var strategyPnls = new Dictionary<string, List<SymbolPnl>>();
         var strategyCommissions = new Dictionary<string, decimal>();
 
         foreach (var g in pnlsBySymbol.GroupBy(p => p.Symbol))
         {
-            var entry = tradeEntries.GetValueOrDefault(g.Key);
+            var entry = trades.GetValueOrDefault(g.Key);
             var strategy = entry?.Strategy.ToString() ?? "Unknown";
             if (!strategyPnls.ContainsKey(strategy))
             {
@@ -66,11 +66,11 @@ public class AnalyticsController : ControllerBase
     [HttpGet("strategies/{strategy}/equity-curve")]
     public async Task<ActionResult<IEnumerable<EquityCurvePointDto>>> GetStrategyEquityCurve(string strategy)
     {
-        var (pnlsBySymbol, tradeEntries) = await LoadClosedData();
+        var (pnlsBySymbol, trades) = await LoadClosedData();
 
         var filtered = pnlsBySymbol.Where(p =>
         {
-            var entry = tradeEntries.GetValueOrDefault(p.Symbol);
+            var entry = trades.GetValueOrDefault(p.Symbol);
             return entry?.Strategy.ToString() == strategy;
         }).ToList();
 
@@ -80,14 +80,14 @@ public class AnalyticsController : ControllerBase
     [HttpGet("budgets")]
     public async Task<ActionResult<IEnumerable<BudgetPerformanceDto>>> GetBudgetPerformance()
     {
-        var (pnlsBySymbol, tradeEntries) = await LoadClosedData();
+        var (pnlsBySymbol, trades) = await LoadClosedData();
 
         var budgetPnls = new Dictionary<string, List<SymbolPnl>>();
         var budgetCommissions = new Dictionary<string, decimal>();
 
         foreach (var g in pnlsBySymbol.GroupBy(p => p.Symbol))
         {
-            var entry = tradeEntries.GetValueOrDefault(g.Key);
+            var entry = trades.GetValueOrDefault(g.Key);
             var budget = entry?.Budget.ToString() ?? "Unknown";
             if (!budgetPnls.ContainsKey(budget))
             {
@@ -122,11 +122,11 @@ public class AnalyticsController : ControllerBase
     [HttpGet("budgets/{budget}/equity-curve")]
     public async Task<ActionResult<IEnumerable<EquityCurvePointDto>>> GetBudgetEquityCurve(string budget)
     {
-        var (pnlsBySymbol, tradeEntries) = await LoadClosedData();
+        var (pnlsBySymbol, trades) = await LoadClosedData();
 
         var filtered = pnlsBySymbol.Where(p =>
         {
-            var entry = tradeEntries.GetValueOrDefault(p.Symbol);
+            var entry = trades.GetValueOrDefault(p.Symbol);
             return entry?.Budget.ToString() == budget;
         }).ToList();
 
@@ -180,27 +180,27 @@ public class AnalyticsController : ControllerBase
     }
 
     /// <summary>
-    /// Load closed option positions + all trades, compute per-symbol P/L, and fetch TradeEntry metadata.
+    /// Load closed option positions + all stock positions, compute per-symbol P/L, and fetch Trade metadata.
     /// </summary>
-    private async Task<(List<SymbolPnl> pnls, Dictionary<string, TradeEntry> entries)> LoadClosedData()
+    private async Task<(List<SymbolPnl> pnls, Dictionary<string, Trade> trades)> LoadClosedData()
     {
         var closedOptions = await _context.OptionPositions
             .Where(p => p.Closed != null && p.ClosePrice != null)
             .ToListAsync();
 
-        var trades = await _context.Trades
+        var positions = await _context.StockPositions
             .OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id)
             .ToListAsync();
 
-        var pnls = AnalyticsComputations.ComputeClosedPnls(closedOptions, trades);
+        var pnls = AnalyticsComputations.ComputeClosedPnls(closedOptions, positions);
 
         var symbols = pnls.Select(p => p.Symbol).Distinct().ToList();
-        var entries = await _context.TradeEntries
+        var trades = await _context.Trades
             .Where(e => symbols.Contains(e.Symbol))
             .GroupBy(e => e.Symbol)
             .Select(g => g.OrderByDescending(e => e.Date).First())
             .ToDictionaryAsync(e => e.Symbol);
 
-        return (pnls, entries);
+        return (pnls, trades);
     }
 }

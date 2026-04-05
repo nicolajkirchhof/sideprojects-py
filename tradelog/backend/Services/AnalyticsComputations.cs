@@ -11,7 +11,7 @@ public static class AnalyticsComputations
     /// </summary>
     public static List<SymbolPnl> ComputeClosedPnls(
         List<OptionPosition> closedOptionPositions,
-        List<Trade> allTrades)
+        List<StockPosition> allStockPositions)
     {
         var results = new List<SymbolPnl>();
 
@@ -30,9 +30,9 @@ public static class AnalyticsComputations
         }
 
         // Stock/futures trades: aggregate realized P/L per symbol into one logical trade
-        if (allTrades.Count > 0)
+        if (allStockPositions.Count > 0)
         {
-            var tradeDtos = TradeComputations.ComputeRunningFields(allTrades);
+            var tradeDtos = StockPositionComputations.ComputeRunningFields(allStockPositions);
             foreach (var symbolGroup in tradeDtos.Where(d => d.Pnl != 0).GroupBy(d => d.Symbol))
             {
                 results.Add(new SymbolPnl

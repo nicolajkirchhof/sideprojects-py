@@ -35,9 +35,9 @@ public class InstrumentSummariesController : ControllerBase
             .Select(g => g.OrderByDescending(l => l.DateTime).First())
             .ToDictionaryAsync(l => l.ContractId);
 
-        // Fetch latest TradeEntry per symbol for metadata
+        // Fetch latest Trade per symbol for metadata
         var symbols = positions.Select(p => p.Symbol).Distinct().ToList();
-        var latestEntries = await GetLatestTradeEntries(symbols);
+        var latestEntries = await GetLatestTrades(symbols);
 
         var today = DateTime.UtcNow.Date;
         var grouped = positions.GroupBy(p => p.Symbol);
@@ -177,14 +177,14 @@ public class InstrumentSummariesController : ControllerBase
     [HttpGet("trades")]
     public async Task<ActionResult<IEnumerable<TradeInstrumentSummaryDto>>> GetTradeSummaries()
     {
-        var trades = await _context.Trades
+        var positions = await _context.StockPositions
             .OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id)
             .ToListAsync();
 
-        var dtos = TradeComputations.ComputeRunningFields(trades);
+        var dtos = StockPositionComputations.ComputeRunningFields(positions);
 
-        var symbols = trades.Select(t => t.Symbol).Distinct().ToList();
-        var latestEntries = await GetLatestTradeEntries(symbols);
+        var symbols = positions.Select(t => t.Symbol).Distinct().ToList();
+        var latestEntries = await GetLatestTrades(symbols);
 
         // Fetch cached stock prices for unrealized P/L
         var priceCache = await _context.StockPriceCaches
@@ -237,11 +237,11 @@ public class InstrumentSummariesController : ControllerBase
     }
 
     /// <summary>
-    /// Get the most recent TradeEntry per symbol (by date desc) for metadata lookups.
+    /// Get the most recent Trade per symbol (by date desc) for metadata lookups.
     /// </summary>
-    private async Task<Dictionary<string, TradeEntry>> GetLatestTradeEntries(List<string> symbols)
+    private async Task<Dictionary<string, Trade>> GetLatestTrades(List<string> symbols)
     {
-        return await _context.TradeEntries
+        return await _context.Trades
             .Where(e => symbols.Contains(e.Symbol))
             .GroupBy(e => e.Symbol)
             .Select(g => g.OrderByDescending(e => e.Date).First())

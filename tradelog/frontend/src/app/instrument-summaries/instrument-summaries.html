@@ -2,13 +2,17 @@
   @if (loading) {
     <mat-progress-bar mode="indeterminate"></mat-progress-bar>
   }
-  <!-- Filter -->
-  <div class="flex items-center gap-4">
+  <!-- Filters -->
+  <div class="flex items-center gap-3">
     <mat-button-toggle-group [value]="statusFilter" (change)="onStatusFilterChange($event.value)">
       <mat-button-toggle value="open">Open</mat-button-toggle>
       <mat-button-toggle value="closed">Closed</mat-button-toggle>
       <mat-button-toggle value="all">All</mat-button-toggle>
     </mat-button-toggle-group>
+    <mat-form-field appearance="outline" class="w-32" subscriptSizing="dynamic">
+      <mat-label>Symbol</mat-label>
+      <input matInput [(ngModel)]="filterSymbol" (input)="applyFilter()" placeholder="e.g. SPY">
+    </mat-form-field>
     <span class="text-sm opacity-60">{{ optionDataSource.data.length }} option instruments, {{ tradeDataSource.data.length }} trade instruments</span>
   </div>
 

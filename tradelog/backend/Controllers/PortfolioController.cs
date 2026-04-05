@@ -42,9 +42,9 @@ public class PortfolioController : ControllerBase
             .Select(g => g.OrderByDescending(l => l.DateTime).First())
             .ToDictionaryAsync(l => l.ContractId);
 
-        // Get budget per symbol from TradeEntry
+        // Get budget per symbol from Trade
         var symbols = openPositions.Select(p => p.Symbol).Distinct().ToList();
-        var latestEntries = await _context.TradeEntries
+        var latestEntries = await _context.Trades
             .Where(e => symbols.Contains(e.Symbol))
             .GroupBy(e => e.Symbol)
             .Select(g => g.OrderByDescending(e => e.Date).First())

@@ -3,13 +3,26 @@
     @if (loading) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
-    <!-- Filter + New button -->
-    <div class="flex items-center gap-4 mx-4 mb-2">
+    <!-- Filters -->
+    <div class="flex items-center gap-3 mx-4 mb-2 flex-wrap">
       <mat-button-toggle-group [value]="statusFilter" (change)="onStatusFilterChange($event.value)">
         <mat-button-toggle value="open">Open</mat-button-toggle>
         <mat-button-toggle value="closed">Closed</mat-button-toggle>
         <mat-button-toggle value="all">All</mat-button-toggle>
       </mat-button-toggle-group>
+      <mat-form-field appearance="outline" class="w-32" subscriptSizing="dynamic">
+        <mat-label>Symbol</mat-label>
+        <input matInput [(ngModel)]="filterSymbol" (input)="applyFilter()" placeholder="e.g. SPY">
+      </mat-form-field>
+      <mat-button-toggle-group [value]="filterRight" (change)="filterRight = $event.value; applyFilter()">
+        <mat-button-toggle value="">All</mat-button-toggle>
+        <mat-button-toggle value="Call">Call</mat-button-toggle>
+        <mat-button-toggle value="Put">Put</mat-button-toggle>
+      </mat-button-toggle-group>
+      <mat-form-field appearance="outline" class="w-36" subscriptSizing="dynamic">
+        <mat-label>Expiry (YYYY-MM)</mat-label>
+        <input matInput [(ngModel)]="filterExpiry" (input)="applyFilter()" placeholder="2026-04">
+      </mat-form-field>
       <span class="flex-1"></span>
       <button mat-raised-button color="primary" (click)="onNew()">New Position</button>
     </div>

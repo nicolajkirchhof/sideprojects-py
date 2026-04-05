@@ -167,11 +167,11 @@ public class TwsLiveSyncService
 
     private async Task<int> SyncStockPrices(IbkrConnectionManager tws)
     {
-        var trades = await _context.Trades
+        var trades = await _context.StockPositions
             .OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id)
             .ToListAsync();
 
-        var tradeDtos = TradeComputations.ComputeRunningFields(trades);
+        var tradeDtos = StockPositionComputations.ComputeRunningFields(trades);
         var openSymbols = tradeDtos
             .GroupBy(d => d.Symbol)
             .Where(g => g.Last().TotalPos != 0)

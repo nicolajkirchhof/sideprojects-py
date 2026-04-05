@@ -3,16 +3,16 @@ using tradelog.Models;
 
 namespace tradelog.Services;
 
-public static class TradeComputations
+public static class StockPositionComputations
 {
     /// <summary>
     /// Walk through trades in chronological order, maintaining running position and avg price.
     /// PnL is realized only when reducing (sign of posChange != sign of lastPos).
     /// Trades MUST be pre-sorted by Symbol, Date, Id.
     /// </summary>
-    public static List<TradeDto> ComputeRunningFields(List<Trade> trades)
+    public static List<StockPositionDto> ComputeRunningFields(List<StockPosition> trades)
     {
-        var result = new List<TradeDto>(trades.Count);
+        var result = new List<StockPositionDto>(trades.Count);
         var state = new Dictionary<string, (int totalPos, decimal avgPrice)>();
 
         foreach (var t in trades)
@@ -43,7 +43,7 @@ public static class TradeComputations
 
             state[t.Symbol] = (newTotal, newAvg);
 
-            result.Add(new TradeDto
+            result.Add(new StockPositionDto
             {
                 Id = t.Id,
                 Symbol = t.Symbol,

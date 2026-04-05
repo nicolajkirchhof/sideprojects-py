@@ -3,68 +3,66 @@
     @if (loading) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
-    <!-- Filter + New button -->
+    <!-- Filters + New button -->
     <div class="flex items-center gap-4 mx-4 mb-2">
       <mat-form-field appearance="outline" class="w-40" subscriptSizing="dynamic">
-        <mat-label>Symbol</mat-label>
-        <input matInput [(ngModel)]="filterSymbol" (keyup.enter)="onFilterChange()" placeholder="e.g. AAPL">
+        <mat-label>Budget</mat-label>
+        <mat-select [(value)]="filterBudget" (selectionChange)="onFilterChange()">
+          <mat-option [value]="null">All</mat-option>
+          @for (b of budgets; track b) {
+            <mat-option [value]="b">{{ b }}</mat-option>
+          }
+        </mat-select>
       </mat-form-field>
-      <button mat-stroked-button (click)="onFilterChange()">Filter</button>
+      <mat-form-field appearance="outline" class="w-48" subscriptSizing="dynamic">
+        <mat-label>Strategy</mat-label>
+        <mat-select [(value)]="filterStrategy" (selectionChange)="onFilterChange()">
+          <mat-option [value]="null">All</mat-option>
+          @for (s of strategies; track s) {
+            <mat-option [value]="s">{{ strategyLabel[s] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
       <span class="flex-1"></span>
       <button mat-raised-button color="primary" (click)="onNew()">New Trade</button>
     </div>
 
     <!-- Table -->
-    <div class="mat-elevation-z8 m-4 overflow-auto">
-      <table mat-table [dataSource]="dataSource" matSort class="w-full whitespace-nowrap">
+    <div class="mat-elevation-z8 m-4">
+      <table mat-table [dataSource]="trades" class="w-full">
         <ng-container matColumnDef="symbol">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Symbol</th>
-          <td mat-cell *matCellDef="let t">{{ t.symbol }}</td>
+          <th mat-header-cell *matHeaderCellDef>Symbol</th>
+          <td mat-cell *matCellDef="let e">{{ e.symbol }}</td>
         </ng-container>
 
         <ng-container matColumnDef="date">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
-          <td mat-cell *matCellDef="let t">{{ t.date | date:'shortDate' }}</td>
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let e">{{ e.date | date:'shortDate' }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="posChange">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Change</th>
-          <td mat-cell *matCellDef="let t"
-              [class]="t.posChange > 0 ? 'text-green-400' : 'text-red-400'">
-            {{ t.posChange > 0 ? '+' : '' }}{{ t.posChange }}
-          </td>
+        <ng-container matColumnDef="typeOfTrade">
+          <th mat-header-cell *matHeaderCellDef>Type</th>
+          <td mat-cell *matCellDef="let e">{{ typeOfTradeLabel[e.typeOfTrade] || e.typeOfTrade }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="price">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Price</th>
-          <td mat-cell *matCellDef="let t">{{ t.price | number:'1.2-4' }}</td>
+        <ng-container matColumnDef="directional">
+          <th mat-header-cell *matHeaderCellDef>Direction</th>
+          <td mat-cell *matCellDef="let e">{{ e.directional || '—' }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="multiplier">
-          <th mat-header-cell *matHeaderCellDef>Mult</th>
-          <td mat-cell *matCellDef="let t">{{ t.multiplier | number }}</td>
+        <ng-container matColumnDef="budget">
+          <th mat-header-cell *matHeaderCellDef>Budget</th>
+          <td mat-cell *matCellDef="let e">{{ e.budget }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="totalPos">
-          <th mat-header-cell *matHeaderCellDef>Position</th>
-          <td mat-cell *matCellDef="let t">{{ t.totalPos }}</td>
+        <ng-container matColumnDef="strategy">
+          <th mat-header-cell *matHeaderCellDef>Strategy</th>
+          <td mat-cell *matCellDef="let e">{{ strategyLabel[e.strategy] || e.strategy }}</td>
         </ng-container>
 
-        <ng-container matColumnDef="avgPrice">
-          <th mat-header-cell *matHeaderCellDef>Avg Price</th>
-          <td mat-cell *matCellDef="let t">{{ t.totalPos !== 0 ? (t.avgPrice | number:'1.2-4') : '—' }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="pnl">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>P/L</th>
-          <td mat-cell *matCellDef="let t" [class]="pnlColor(t.pnl)">
-            {{ t.pnl !== 0 ? (t.pnl | number:'1.2-2') : '—' }}
-          </td>
-        </ng-container>
-
-        <ng-container matColumnDef="commission">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Comm</th>
-          <td mat-cell *matCellDef="let t">{{ t.commission | number:'1.2-2' }}</td>
+        <ng-container matColumnDef="managementRating">
+          <th mat-header-cell *matHeaderCellDef>Rating</th>
+          <td mat-cell *matCellDef="let e">{{ managementRatingLabel[e.managementRating] || '—' }}</td>
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
@@ -73,7 +71,6 @@
             class="cursor-pointer"
             [class.!bg-blue-900]="selected?.id === row.id"></tr>
       </table>
-      <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
     </div>
   </div>
 
@@ -89,6 +86,7 @@
           </mat-form-field>
         }
 
+        <!-- Core fields -->
         <div class="flex gap-3">
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
             <mat-label>Symbol</mat-label>
@@ -104,56 +102,128 @@
 
         <div class="flex gap-3">
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
-            <mat-label>Pos Change (+ buy, - sell)</mat-label>
-            <input matInput type="number" formControlName="posChange">
+            <mat-label>Type of Trade</mat-label>
+            <mat-select formControlName="typeOfTrade">
+              @for (t of typesOfTrade; track t) {
+                <mat-option [value]="t">{{ typeOfTradeLabel[t] }}</mat-option>
+              }
+            </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
-            <mat-label>Price</mat-label>
-            <input matInput type="number" formControlName="price" step="0.01">
+            <mat-label>Direction</mat-label>
+            <mat-select formControlName="directional">
+              <mat-option [value]="null">—</mat-option>
+              @for (d of directionalOptions; track d) {
+                <mat-option [value]="d">{{ d }}</mat-option>
+              }
+            </mat-select>
           </mat-form-field>
         </div>
 
         <div class="flex gap-3">
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
-            <mat-label>Commission</mat-label>
-            <input matInput type="number" formControlName="commission" step="0.01">
+            <mat-label>Budget</mat-label>
+            <mat-select formControlName="budget">
+              @for (b of budgets; track b) {
+                <mat-option [value]="b">{{ b }}</mat-option>
+              }
+            </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
-            <mat-label>Multiplier</mat-label>
-            <input matInput type="number" formControlName="multiplier">
+            <mat-label>Strategy</mat-label>
+            <mat-select formControlName="strategy">
+              @for (s of strategies; track s) {
+                <mat-option [value]="s">{{ strategyLabel[s] }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Timeframe</mat-label>
+            <mat-select formControlName="timeframe">
+              <mat-option [value]="null">—</mat-option>
+              @for (t of timeframes; track t) {
+                <mat-option [value]="t">{{ timeframeLabel[t] }}</mat-option>
+              }
+            </mat-select>
           </mat-form-field>
         </div>
 
-        <!-- Best exit (trade review) -->
+        <!-- Catalysts (checkboxes in a row) -->
+        <div class="flex gap-4 flex-wrap items-center">
+          <mat-checkbox formControlName="newsCatalyst">News Catalyst</mat-checkbox>
+          <mat-checkbox formControlName="recentEarnings">Recent Earnings</mat-checkbox>
+          <mat-checkbox formControlName="sectorSupport">Sector Support</mat-checkbox>
+          <mat-checkbox formControlName="ath">ATH</mat-checkbox>
+        </div>
+
+        <!-- Numeric fields -->
         <div class="flex gap-3">
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
-            <mat-label>Best Exit Price</mat-label>
-            <input matInput type="number" formControlName="bestExitPrice" step="0.01">
+            <mat-label>RVOL</mat-label>
+            <input matInput type="number" formControlName="rvol" step="0.1">
           </mat-form-field>
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
-            <mat-label>Best Exit Date</mat-label>
-            <input matInput [matDatepicker]="dpBestExit" formControlName="bestExitDate">
-            <mat-datepicker-toggle matSuffix [for]="dpBestExit"></mat-datepicker-toggle>
-            <mat-datepicker #dpBestExit></mat-datepicker>
+            <mat-label>Gap %</mat-label>
+            <input matInput type="number" formControlName="gapPct" step="0.1">
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>x ATR Move</mat-label>
+            <input matInput type="number" formControlName="xAtrMove" step="0.1">
           </mat-form-field>
         </div>
 
-        <!-- Computed fields (read-only, edit mode) -->
-        @if (!isCreating && selected) {
-          <div class="border-t border-white/10 pt-3 mt-1">
-            <div class="text-xs opacity-50 mb-2">Computed</div>
-            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <span class="opacity-60">Last Pos:</span>
-              <span>{{ selected.lastPos }}</span>
-              <span class="opacity-60">Total Pos:</span>
-              <span>{{ selected.totalPos }}</span>
-              <span class="opacity-60">Avg Price:</span>
-              <span>{{ selected.totalPos !== 0 ? (selected.avgPrice | number:'1.2-4') : '—' }}</span>
-              <span class="opacity-60">P/L:</span>
-              <span [class]="pnlColor(selected.pnl)">{{ selected.pnl !== 0 ? (selected.pnl | number:'1.2-2') : '—' }}</span>
-            </div>
-          </div>
-        }
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Institutional Support</mat-label>
+          <input matInput formControlName="institutionalSupport">
+        </mat-form-field>
+
+        <!-- Management -->
+        <div class="flex gap-3">
+          <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
+            <mat-label>Management Rating</mat-label>
+            <mat-select formControlName="managementRating">
+              <mat-option [value]="null">—</mat-option>
+              @for (r of managementRatings; track r) {
+                <mat-option [value]="r">{{ managementRatingLabel[r] }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <!-- Rich text fields -->
+        <div class="flex items-center justify-between">
+          <label class="text-sm font-medium">Notes / Thesis</label>
+          <button mat-icon-button type="button" class="w-8 h-8 p-0" (click)="toggleQuillToolbar()">
+            <mat-icon>{{ showToolbar ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+        </div>
+        <div class="min-h-[120px]">
+          @if (showToolbar) {
+            <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="notes" theme="snow"></quill-editor>
+          } @else {
+            <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notes" theme="snow"></quill-editor>
+          }
+        </div>
+
+        <label class="text-sm font-medium">TA / FA Notes</label>
+        <div class="min-h-[80px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="taFaNotes" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Intended Management</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="intendedManagement" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Actual Management</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="actualManagement" theme="snow"></quill-editor>
+        </div>
+
+        <label class="text-sm font-medium">Learnings</label>
+        <div class="min-h-[60px]">
+          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" theme="snow"></quill-editor>
+        </div>
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">

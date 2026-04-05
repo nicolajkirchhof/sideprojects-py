@@ -2,20 +2,21 @@ namespace tradelog.Models;
 
 public enum Budget
 {
-    Core,
+    LongTerm,
+    Drift,
+    Swing,
     Speculative
 }
 
 public enum Strategy
 {
     PositiveDrift,
-    RangeBoundCommodities,
-    PEADS,
-    Momentum,
+    RangeBound,
+    PEAD,
+    BreakoutMomentum,
     IVMeanReversion,
     SectorStrength,
     SectorWeakness,
-    Breakout,
     GreenLineBreakout,
     Slingshot,
     PreEarnings
@@ -38,7 +39,11 @@ public enum TypeOfTrade
     ShortPut,
     ShortCall,
     LongStock,
-    ShortStock
+    ShortStock,
+    IronCondor,
+    XYZ,
+    PMCC,
+    CalendarSpread
 }
 
 public enum DirectionalBias
@@ -78,4 +83,12 @@ public enum CloseReasons
     AssumptionInvalidated = 8,
     TimeLimit = 16,
     Other = 32
+}
+
+public enum TradeEventType
+{
+    ScaleIn,
+    ProfitTake,
+    Roll,
+    Stop
 }

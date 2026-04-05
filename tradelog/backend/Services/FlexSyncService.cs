@@ -40,13 +40,13 @@ public class FlexSyncService
         return (created, updated, optCreated, optClosed);
     }
 
-    /// <summary>Upserts STK/FUT executions into the Trades table, deduplicating by TradeId → ExecutionId.</summary>
+    /// <summary>Upserts STK/FUT executions into the StockPositions table, deduplicating by TradeId → ExecutionId.</summary>
     private async Task<(int created, int updated)> SyncStockFutureTradesAsync(List<FlexTradeDto> trades)
     {
         if (trades.Count == 0) return (0, 0);
 
         var tradeIds = trades.Select(t => t.TradeId).ToList();
-        var existingByExecId = await _context.Trades
+        var existingByExecId = await _context.StockPositions
             .Where(t => t.ExecutionId != null && tradeIds.Contains(t.ExecutionId))
             .ToDictionaryAsync(t => t.ExecutionId!);
 
@@ -76,7 +76,7 @@ public class FlexSyncService
                 continue;
             }
 
-            _context.Trades.Add(new Trade
+            _context.StockPositions.Add(new StockPosition
             {
                 Symbol = flex.Symbol,
                 Date = flex.DateTime,

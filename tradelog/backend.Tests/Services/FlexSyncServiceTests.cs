@@ -195,7 +195,7 @@ public class FlexSyncServiceTests : IDisposable
         // Arrange: insert a trade without Tier 1 fields (simulating old TWS sync)
         using (var ctx = _fixture.CreateContext())
         {
-            ctx.Trades.Add(new Trade
+            ctx.StockPositions.Add(new StockPosition
             {
                 Symbol = "AAPL",
                 Date = new DateTime(2026, 1, 15),
@@ -238,7 +238,7 @@ public class FlexSyncServiceTests : IDisposable
         Assert.Equal(1, updated);
 
         using var verifyCtx = _fixture.CreateContext();
-        var trade = verifyCtx.Trades.Single(t => t.ExecutionId == "TRADE-1");
+        var trade = verifyCtx.StockPositions.Single(t => t.ExecutionId == "TRADE-1");
         Assert.Equal(1.05m, trade.Commission);
         Assert.Equal("NYSE", trade.Exchange);
         Assert.Equal(0.92m, trade.FxRateToBase);

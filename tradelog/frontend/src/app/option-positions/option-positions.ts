@@ -5,7 +5,7 @@ import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSortModule, MatSort } from '@angular/material/sort';
 import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
 import { ContentArea } from '../shared/content-area/content-area';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -33,6 +33,7 @@ import { NotificationService } from '../shared/notification.service';
     MatPaginatorModule,
     ContentArea,
     ReactiveFormsModule,
+    FormsModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -74,9 +75,11 @@ export class OptionPositions implements OnInit, AfterViewInit {
   isCreating = false;
   selected: OptionPositionDto | null = null;
 
-  // Filter
+  // Filters
   statusFilter = 'open';
   filterSymbol = '';
+  filterRight = '';
+  filterExpiry = '';
   rights = Object.values(PositionRight);
   rightLabel = POSITION_RIGHT_LABELS;
 
@@ -107,6 +110,16 @@ export class OptionPositions implements OnInit, AfterViewInit {
   ngAfterViewInit(): void {
     this.dataSource.sort = this.sort;
     this.dataSource.paginator = this.paginator;
+    this.dataSource.filterPredicate = (row: OptionPositionDto, filter: string) => {
+      const f = JSON.parse(filter);
+      if (f.symbol && !row.symbol.toLowerCase().includes(f.symbol))
+        return false;
+      if (f.right && row.right !== f.right)
+        return false;
+      if (f.expiry && row.expiry?.slice(0, 7) !== f.expiry)
+        return false;
+      return true;
+    };
   }
 
   load(): void {
@@ -122,6 +135,14 @@ export class OptionPositions implements OnInit, AfterViewInit {
         this.notify.error('Failed to load option positions');
         this.loading = false;
       },
+    });
+  }
+
+  applyFilter(): void {
+    this.dataSource.filter = JSON.stringify({
+      symbol: this.filterSymbol.trim().toLowerCase(),
+      right: this.filterRight,
+      expiry: this.filterExpiry,
     });
   }
 

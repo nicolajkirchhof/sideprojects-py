@@ -1,8 +1,8 @@
 import { Routes } from '@angular/router';
 import { InstrumentSummaries } from './instrument-summaries/instrument-summaries';
-import { TradeEntries } from './trade-entries/trade-entries';
-import { OptionPositions } from './option-positions/option-positions';
 import { Trades } from './trades/trades';
+import { OptionPositions } from './option-positions/option-positions';
+import { StockPositions } from './stock-positions/stock-positions';
 import { CapitalComponent } from './capital/capital';
 import { WeeklyPrepComponent } from './weekly-prep/weekly-prep';
 import { AnalyticsComponent } from './analytics/analytics';
@@ -13,9 +13,9 @@ import { About } from './about/about';
 
 export const routes: Routes = [
     { path: 'dashboard', component: InstrumentSummaries },
-    { path: 'trade-entries', component: TradeEntries },
-    { path: 'option-positions', component: OptionPositions },
     { path: 'trades', component: Trades },
+    { path: 'option-positions', component: OptionPositions },
+    { path: 'stock-positions', component: StockPositions },
     { path: 'capital', component: CapitalComponent },
     { path: 'weekly-prep', component: WeeklyPrepComponent },
     { path: 'analytics', component: AnalyticsComponent },

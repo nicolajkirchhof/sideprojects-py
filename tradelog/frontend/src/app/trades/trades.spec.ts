@@ -2,16 +2,16 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { TradeEntries } from './trade-entries';
+import { Trades } from './trades';
 
-describe('TradeEntries', () => {
-  let component: TradeEntries;
-  let fixture: ComponentFixture<TradeEntries>;
+describe('Trades', () => {
+  let component: Trades;
+  let fixture: ComponentFixture<Trades>;
   let httpMock: HttpTestingController;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [TradeEntries],
+      imports: [Trades],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -19,13 +19,13 @@ describe('TradeEntries', () => {
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(TradeEntries);
+    fixture = TestBed.createComponent(Trades);
     component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
 
     // Call ngOnInit directly to avoid template rendering (Quill requires a real DOM)
     component.ngOnInit();
-    httpMock.match('/api/trade-entries').forEach((r) => r.flush([]));
+    httpMock.match('/api/trades').forEach((r) => r.flush([]));
   });
 
   afterEach(() => {

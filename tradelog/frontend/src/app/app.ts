@@ -49,7 +49,7 @@ export class App {
   ).pipe(
     map(url => {
       if (url.startsWith('/dashboard')) return 'Dashboard';
-      if (url.startsWith('/trade-entries')) return 'Trade Entries';
+      if (url.startsWith('/stock-positions')) return 'Stock Positions';
       if (url.startsWith('/option-positions')) return 'Option Positions';
       if (url.startsWith('/trades')) return 'Trades';
       if (url.startsWith('/capital')) return 'Capital';

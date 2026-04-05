@@ -2,8 +2,11 @@ import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/co
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Router } from '@angular/router';
 import {
@@ -15,16 +18,19 @@ import { pnlColor } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
 import {
   TYPE_OF_TRADE_LABELS,
-} from '../trade-entries/trade-entries.service';
+} from '../trades/trades.service';
 
 @Component({
   selector: 'app-instrument-summaries',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatTableModule,
     MatButtonModule,
     MatButtonToggleModule,
+    MatFormFieldModule,
+    MatInputModule,
     DecimalPipe,
     MatProgressBarModule,
     MatSortModule,
@@ -54,6 +60,7 @@ export class InstrumentSummaries implements OnInit, AfterViewInit {
   ];
 
   statusFilter = 'open';
+  filterSymbol = '';
   typeOfTradeLabel: Record<string, string> = TYPE_OF_TRADE_LABELS;
   pnlColor = pnlColor;
 
@@ -65,6 +72,16 @@ export class InstrumentSummaries implements OnInit, AfterViewInit {
   ngAfterViewInit(): void {
     this.optionDataSource.sort = this.optionSort;
     this.tradeDataSource.sort = this.tradeSort;
+    const symbolFilter = (row: { symbol: string }, filter: string) =>
+      !filter || row.symbol.toLowerCase().includes(filter);
+    this.optionDataSource.filterPredicate = symbolFilter;
+    this.tradeDataSource.filterPredicate = symbolFilter;
+  }
+
+  applyFilter(): void {
+    const f = this.filterSymbol.trim().toLowerCase();
+    this.optionDataSource.filter = f;
+    this.tradeDataSource.filter = f;
   }
 
   ngOnInit(): void {
@@ -113,7 +130,7 @@ export class InstrumentSummaries implements OnInit, AfterViewInit {
   }
 
   onTradeRowClick(row: TradeInstrumentSummary): void {
-    this.router.navigate(['/trades'], { queryParams: { symbol: row.symbol } });
+    this.router.navigate(['/stock-positions'], { queryParams: { symbol: row.symbol } });
   }
 
   private computeTotals(): void {
