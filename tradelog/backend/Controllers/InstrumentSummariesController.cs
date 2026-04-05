@@ -237,6 +237,114 @@ public class InstrumentSummariesController : ControllerBase
     }
 
     /// <summary>
+    /// Returns one row per Trade with aggregated P/L and Greeks from linked positions.
+    /// Trades with no legs are included (with zero metrics).
+    /// </summary>
+    [HttpGet("trade-overview")]
+    public async Task<ActionResult<IEnumerable<TradeSummaryDto>>> GetTradeOverview(
+        [FromQuery] string? status)
+    {
+        var trades = await _context.Trades
+            .OrderByDescending(t => t.Date)
+            .ToListAsync();
+
+        var tradeIds = trades.Select(t => t.Id).ToList();
+
+        // Load all linked positions in batch
+        var optionPositions = await _context.OptionPositions
+            .Where(p => p.TradeId != null && tradeIds.Contains(p.TradeId.Value))
+            .ToListAsync();
+
+        var stockPositions = await _context.StockPositions
+            .Where(p => p.TradeId != null && tradeIds.Contains(p.TradeId.Value))
+            .ToListAsync();
+
+        // Batch-fetch latest log per contractId for Greeks
+        var contractIds = optionPositions.Select(p => p.ContractId).Distinct().ToList();
+        var latestLogs = contractIds.Count > 0
+            ? await _context.OptionPositionsLogs
+                .Where(l => contractIds.Contains(l.ContractId))
+                .GroupBy(l => l.ContractId)
+                .Select(g => g.OrderByDescending(l => l.DateTime).First())
+                .ToDictionaryAsync(l => l.ContractId)
+            : new Dictionary<string, OptionPositionsLog>();
+
+        var optionsByTrade = optionPositions.GroupBy(p => p.TradeId!.Value).ToDictionary(g => g.Key, g => g.ToList());
+        var stocksByTrade = stockPositions.GroupBy(p => p.TradeId!.Value).ToDictionary(g => g.Key, g => g.ToList());
+
+        var result = new List<TradeSummaryDto>();
+
+        foreach (var trade in trades)
+        {
+            var opts = optionsByTrade.GetValueOrDefault(trade.Id) ?? [];
+            var stks = stocksByTrade.GetValueOrDefault(trade.Id) ?? [];
+
+            // Compute stock running fields first (needed for status + P/L)
+            var stkDtos = StockPositionComputations.ComputeRunningFields(
+                stks.OrderBy(s => s.Date).ThenBy(s => s.Id).ToList());
+
+            // Determine status: open if any option leg is open or stock net position != 0
+            var hasOpenOptions = opts.Any(p => p.Closed == null);
+            var hasOpenStocks = stkDtos.Count > 0 && stkDtos.Last().TotalPos != 0;
+            var isOpen = hasOpenOptions || hasOpenStocks;
+
+            if (string.Equals(status, "open", StringComparison.OrdinalIgnoreCase) && !isOpen) continue;
+            if (string.Equals(status, "closed", StringComparison.OrdinalIgnoreCase) && isOpen) continue;
+
+            // Aggregate option P/L and Greeks
+            decimal sumUnrealizedPnl = 0, sumRealizedPnl = 0, sumCommissions = 0;
+            decimal sumDelta = 0, sumTheta = 0, sumGamma = 0, sumVega = 0, sumMargin = 0;
+
+            foreach (var p in opts)
+            {
+                sumCommissions += p.Commission;
+                var log = latestLogs.GetValueOrDefault(p.ContractId);
+
+                if (p.Closed == null && log != null)
+                {
+                    sumUnrealizedPnl += p.Pos * (log.Price - p.Cost) * p.Multiplier;
+                    sumDelta += log.Delta * p.Pos;
+                    sumTheta += log.Theta * p.Pos;
+                    sumGamma += log.Gamma;
+                    sumVega += log.Vega;
+                }
+                if (log != null) sumMargin += log.Margin;
+
+                if (p.Closed != null && p.ClosePrice.HasValue)
+                    sumRealizedPnl += (p.ClosePrice.Value - p.Cost) * p.Multiplier * p.Pos - p.Commission;
+            }
+
+            // Aggregate stock P/L
+            sumRealizedPnl += stkDtos.Sum(d => d.Pnl);
+            sumCommissions += stkDtos.Sum(d => d.Commission);
+
+            result.Add(new TradeSummaryDto
+            {
+                TradeId = trade.Id,
+                Symbol = trade.Symbol,
+                TypeOfTrade = trade.TypeOfTrade.ToString(),
+                Strategy = trade.Strategy.ToString(),
+                Budget = trade.Budget.ToString(),
+                Status = isOpen ? "Open" : "Closed",
+                Date = trade.Date,
+                OptionLegCount = opts.Count,
+                StockLegCount = stks.Count,
+                Pnl = sumUnrealizedPnl + sumRealizedPnl,
+                UnrealizedPnl = sumUnrealizedPnl,
+                RealizedPnl = sumRealizedPnl,
+                Commissions = sumCommissions,
+                Delta = Math.Round(sumDelta, 4),
+                Theta = Math.Round(sumTheta, 4),
+                Gamma = Math.Round(sumGamma, 4),
+                Vega = Math.Round(sumVega, 4),
+                Margin = sumMargin,
+            });
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Get the most recent Trade per symbol (by date desc) for metadata lookups.
     /// </summary>
     private async Task<Dictionary<string, Trade>> GetLatestTrades(List<string> symbols)

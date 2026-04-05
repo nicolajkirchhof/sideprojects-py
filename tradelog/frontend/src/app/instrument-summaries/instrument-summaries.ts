@@ -13,6 +13,7 @@ import {
   InstrumentSummariesService,
   OptionInstrumentSummary,
   TradeInstrumentSummary,
+  TradeSummary,
 } from './instrument-summaries.service';
 import { pnlColor } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
@@ -47,6 +48,8 @@ export class InstrumentSummaries {
 
   loading = signal(false);
 
+  tradeSummaries = signal<TradeSummary[]>([]);
+
   optionDataSource = new MatTableDataSource<OptionInstrumentSummary>([]);
   tradeDataSource = new MatTableDataSource<TradeInstrumentSummary>([]);
 
@@ -56,6 +59,9 @@ export class InstrumentSummaries {
   ];
   tradeColumns = [
     'symbol', 'status', 'positionType', 'totalPos', 'pnl', 'unrealizedPnlPct', 'realizedPnl', 'commissions',
+  ];
+  overviewColumns = [
+    'symbol', 'typeOfTrade', 'strategy', 'legs', 'pnl', 'delta', 'theta', 'margin',
   ];
 
   statusFilter = signal('open');
@@ -95,17 +101,29 @@ export class InstrumentSummaries {
 
   load(): void {
     this.loading.set(true);
-    let remaining = 2;
+    let remaining = 3;
     const done = () => { if (--remaining === 0) this.loading.set(false); };
 
     const status = this.statusFilter() === 'all' ? undefined : this.statusFilter();
+
+    this.service.getTradeOverview(status).subscribe({
+      next: (data) => {
+        this.tradeSummaries.set(data ?? []);
+        done();
+      },
+      error: () => {
+        this.notify.error('Failed to load trade overview');
+        done();
+      },
+    });
+
     this.service.getOptionSummaries(status).subscribe({
       next: (data) => {
         this.optionDataSource.data = data ?? [];
         this.computeTotals();
         done();
       },
-      error: (err) => {
+      error: () => {
         this.notify.error('Failed to load option summaries');
         done();
       },
@@ -118,7 +136,7 @@ export class InstrumentSummaries {
               this.statusFilter() === 'open' ? t.totalPos !== 0 : t.totalPos === 0);
         done();
       },
-      error: (err) => {
+      error: () => {
         this.notify.error('Failed to load trade summaries');
         done();
       },
@@ -128,6 +146,10 @@ export class InstrumentSummaries {
   onStatusFilterChange(value: string): void {
     this.statusFilter.set(value);
     this.load();
+  }
+
+  onTradeOverviewClick(row: TradeSummary): void {
+    this.router.navigate(['/trades'], { queryParams: { id: row.tradeId } });
   }
 
   onOptionRowClick(row: OptionInstrumentSummary): void {

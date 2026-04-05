@@ -50,6 +50,7 @@ describe('InstrumentSummaries', () => {
       makeSummary({ symbol: 'QQQ', pnl: -50, delta: 0.20, theta: 3, vega: -2, gamma: 0.01, margin: 3000 }),
     ]);
     httpMock.expectOne('/api/instrument-summaries/trades').flush([]);
+    httpMock.expectOne((r) => r.url === '/api/instrument-summaries/trade-overview').flush([]);
   }
 
   it('should compute portfolio totals from option summaries', () => {
@@ -69,6 +70,7 @@ describe('InstrumentSummaries', () => {
     expect(optReq.request.params.keys().length).toBe(0);
     optReq.flush([]);
     httpMock.expectOne('/api/instrument-summaries/trades').flush([]);
+    httpMock.expectOne((r) => r.url === '/api/instrument-summaries/trade-overview').flush([]);
   });
 
   it('should filter trade summaries client-side for open status', () => {
@@ -78,6 +80,7 @@ describe('InstrumentSummaries', () => {
       { symbol: 'AAPL', status: 'open', totalPos: 100, avgPrice: 200, multiplier: 1, pnl: 50, unrealizedPnl: 50, realizedPnl: 0, commissions: 1 },
       { symbol: 'MSFT', status: 'closed', totalPos: 0, avgPrice: 400, multiplier: 1, pnl: 20, unrealizedPnl: 0, realizedPnl: 20, commissions: 1 },
     ]);
+    httpMock.expectOne((r) => r.url === '/api/instrument-summaries/trade-overview').flush([]);
 
     // Default filter is 'open', so only AAPL (totalPos !== 0) should remain
     expect(component.tradeDataSource.data.length).toBe(1);

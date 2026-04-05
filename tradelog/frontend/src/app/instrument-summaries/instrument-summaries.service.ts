@@ -47,6 +47,27 @@ export interface TradeInstrumentSummary {
   commissions: number;
 }
 
+export interface TradeSummary {
+  tradeId: number;
+  symbol: string;
+  typeOfTrade: string;
+  strategy: string;
+  budget: string;
+  status: string;
+  date: string;
+  optionLegCount: number;
+  stockLegCount: number;
+  pnl: number;
+  unrealizedPnl: number;
+  realizedPnl: number;
+  commissions: number;
+  delta: number;
+  theta: number;
+  gamma: number;
+  vega: number;
+  margin: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class InstrumentSummariesService {
   private http = inject(HttpClient);
@@ -59,5 +80,11 @@ export class InstrumentSummariesService {
 
   getTradeSummaries(): Observable<TradeInstrumentSummary[]> {
     return this.http.get<TradeInstrumentSummary[]>('/api/instrument-summaries/trades');
+  }
+
+  getTradeOverview(status?: string): Observable<TradeSummary[]> {
+    let params = new HttpParams();
+    if (status) params = params.set('status', status);
+    return this.http.get<TradeSummary[]>('/api/instrument-summaries/trade-overview', { params });
   }
 }

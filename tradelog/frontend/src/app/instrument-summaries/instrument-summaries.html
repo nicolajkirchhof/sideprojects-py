@@ -13,8 +13,65 @@
       <mat-label>Symbol</mat-label>
       <input matInput [ngModel]="filterSymbol()" (ngModelChange)="filterSymbol.set($event)" (input)="applyFilter()" placeholder="e.g. SPY">
     </mat-form-field>
-    <span class="text-sm opacity-60">{{ optionDataSource.data.length }} option instruments, {{ tradeDataSource.data.length }} trade instruments</span>
+    <span class="text-sm opacity-60">{{ tradeSummaries().length }} trades, {{ optionDataSource.data.length }} option instruments, {{ tradeDataSource.data.length }} stock instruments</span>
   </div>
+
+  <!-- Trade Overview -->
+  @if (tradeSummaries().length > 0) {
+    <div>
+      <h3 class="text-sm font-medium opacity-70 mb-2">Trade Overview</h3>
+      <div class="mat-elevation-z8 overflow-auto">
+        <table mat-table [dataSource]="tradeSummaries()" class="w-full whitespace-nowrap">
+          <ng-container matColumnDef="symbol">
+            <th mat-header-cell *matHeaderCellDef>Symbol</th>
+            <td mat-cell *matCellDef="let r" class="font-medium">{{ r.symbol }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="typeOfTrade">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let r">{{ typeOfTradeLabel[r.typeOfTrade] || r.typeOfTrade }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="strategy">
+            <th mat-header-cell *matHeaderCellDef>Strategy</th>
+            <td mat-cell *matCellDef="let r">{{ r.strategy }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="legs">
+            <th mat-header-cell *matHeaderCellDef>Legs</th>
+            <td mat-cell *matCellDef="let r" class="text-xs opacity-70">
+              {{ r.optionLegCount }}opt + {{ r.stockLegCount }}stk
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="pnl">
+            <th mat-header-cell *matHeaderCellDef>P/L</th>
+            <td mat-cell *matCellDef="let r" [class]="pnlColor(r.pnl)">{{ r.pnl | number:'1.2-2' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="delta">
+            <th mat-header-cell *matHeaderCellDef>Delta</th>
+            <td mat-cell *matCellDef="let r">{{ r.delta | number:'1.2-4' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="theta">
+            <th mat-header-cell *matHeaderCellDef>Theta</th>
+            <td mat-cell *matCellDef="let r">{{ r.theta | number:'1.2-4' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="margin">
+            <th mat-header-cell *matHeaderCellDef>Margin</th>
+            <td mat-cell *matCellDef="let r">{{ r.margin | number:'1.0-0' }}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="overviewColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: overviewColumns;"
+              (click)="onTradeOverviewClick(row)"
+              class="cursor-pointer hover:bg-white/5"></tr>
+        </table>
+      </div>
+    </div>
+  }
 
   <!-- Option Instruments -->
   <div>
