@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter, Router } from '@angular/router';
 import { AccountSwitcherComponent } from './account-switcher';
 import { AccountsService, Account } from '../../accounts/accounts.service';
-import { provideAnimations } from '@angular/platform-browser/animations';
+import { provideZonelessChangeDetection } from '@angular/core';
 
 const MOCK_ACCOUNTS: Account[] = [
   { id: 1, ibkrAccountId: 'U111', name: 'Main', host: '127.0.0.1', port: 7497, clientId: 1, isDefault: false },
@@ -25,7 +25,7 @@ describe('AccountSwitcherComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        provideAnimations(),
+        provideZonelessChangeDetection(),
       ],
     }).compileComponents();
 

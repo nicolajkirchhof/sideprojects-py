@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideAnimations } from '@angular/platform-browser/animations';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { AccountsComponent } from './accounts';
 
 describe('AccountsComponent', () => {
@@ -16,7 +16,7 @@ describe('AccountsComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideAnimations(),
+        provideZonelessChangeDetection(),
       ],
     }).compileComponents();
 

@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { provideAnimations } from '@angular/platform-browser/animations';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { InstrumentSummaries } from './instrument-summaries';
 import { OptionInstrumentSummary } from './instrument-summaries.service';
 
@@ -29,7 +29,7 @@ describe('InstrumentSummaries', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        provideAnimations(),
+        provideZonelessChangeDetection(),
       ],
     }).compileComponents();
 
@@ -80,7 +80,7 @@ describe('InstrumentSummaries', () => {
     ]);
 
     // Default filter is 'open', so only AAPL (totalPos !== 0) should remain
-    expect(component.tradeSummaries.length).toBe(1);
-    expect(component.tradeSummaries[0].symbol).toBe('AAPL');
+    expect(component.tradeDataSource.data.length).toBe(1);
+    expect(component.tradeDataSource.data[0].symbol).toBe('AAPL');
   });
 });

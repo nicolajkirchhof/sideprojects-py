@@ -94,9 +94,16 @@ describe('AccountsService', () => {
     req.flush({ canSync: true });
   });
 
-  it('should POST to trigger sync', () => {
-    service.triggerSync().subscribe();
-    const req = httpMock.expectOne('/api/ibkr/sync');
+  it('should POST to trigger flex sync', () => {
+    service.triggerFlexSync().subscribe();
+    const req = httpMock.expectOne('/api/ibkr/flex-sync');
+    expect(req.request.method).toBe('POST');
+    req.flush({});
+  });
+
+  it('should POST to trigger live sync', () => {
+    service.triggerLiveSync().subscribe();
+    const req = httpMock.expectOne('/api/ibkr/live-sync');
     expect(req.request.method).toBe('POST');
     req.flush({});
   });
