@@ -49,8 +49,8 @@ describe('AccountSwitcherComponent', () => {
     fixture.detectChanges();
     httpMock.expectOne('/api/accounts').flush(MOCK_ACCOUNTS);
 
-    expect(component.accounts.length).toBe(2);
-    expect(component.selectedId).toBe(2);
+    expect(component.accounts().length).toBe(2);
+    expect(accountsService.selectedAccountId()).toBe(2);
     expect(accountsService.selectAccount).toHaveBeenCalledWith(2);
   });
 
@@ -62,7 +62,7 @@ describe('AccountSwitcherComponent', () => {
     fixture.detectChanges();
     httpMock.expectOne('/api/accounts').flush(noDefault);
 
-    expect(component.selectedId).toBe(1);
+    expect(accountsService.selectedAccountId()).toBe(1);
   });
 
   it('should update service and reload route on change', () => {
@@ -72,7 +72,7 @@ describe('AccountSwitcherComponent', () => {
 
     component.onChange(3);
 
-    expect(component.selectedId).toBe(3);
+    expect(accountsService.selectedAccountId()).toBe(3);
     expect(accountsService.selectAccount).toHaveBeenCalledWith(3);
     expect(router.navigateByUrl).toHaveBeenCalled();
   });

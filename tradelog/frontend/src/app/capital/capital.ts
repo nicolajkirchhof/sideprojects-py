@@ -1,5 +1,5 @@
-import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
-import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
+import { Component, signal, viewChild, effect, inject } from '@angular/core';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -21,7 +21,6 @@ import { NotificationService } from '../shared/notification.service';
   selector: 'app-capital',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     ContentArea,
     ReactiveFormsModule,
@@ -40,15 +39,15 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './capital.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class CapitalComponent implements OnInit, AfterViewInit {
+export class CapitalComponent {
   private service = inject(CapitalService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  @ViewChild(MatSort) sort!: MatSort;
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  sort = viewChild(MatSort);
+  paginator = viewChild(MatPaginator);
 
-  loading = false;
+  loading = signal(false);
 
   dataSource = new MatTableDataSource<Capital>([]);
   displayedColumns = [
@@ -56,15 +55,15 @@ export class CapitalComponent implements OnInit, AfterViewInit {
     'excessLiquidity', 'bpr', 'totalPnl', 'netDelta', 'netTheta', 'totalMargin',
   ];
 
-  showSidebar = false;
+  showSidebar = signal(false);
   form!: FormGroup;
-  isCreating = false;
-  selected: Capital | null = null;
+  isCreating = signal(false);
+  selected = signal<Capital | null>(null);
 
   pnlColor = pnlColor;
 
   // Chart
-  chartData: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
+  chartData = signal<ChartConfiguration<'line'>['data']>({ labels: [], datasets: [] });
   chartOptions: ChartConfiguration<'line'>['options'] = {
     responsive: true,
     maintainAspectRatio: false,
@@ -83,13 +82,7 @@ export class CapitalComponent implements OnInit, AfterViewInit {
     },
   };
 
-  ngAfterViewInit(): void {
-    this.dataSource.sort = this.sort;
-    this.dataSource.paginator = this.paginator;
-  }
-
-  ngOnInit(): void {
-    this.load();
+  constructor() {
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
       date: [null, [Validators.required]],
@@ -98,26 +91,34 @@ export class CapitalComponent implements OnInit, AfterViewInit {
       excessLiquidity: [null, [Validators.required]],
       bpr: [null, [Validators.required]],
     });
+    this.load();
+
+    effect(() => {
+      const sort = this.sort();
+      const paginator = this.paginator();
+      if (sort) this.dataSource.sort = sort;
+      if (paginator) this.dataSource.paginator = paginator;
+    });
   }
 
   load(): void {
-    this.loading = true;
+    this.loading.set(true);
     this.service.getAll().subscribe({
       next: (data) => {
         this.dataSource.data = data ?? [];
         this.updateChart();
-        this.loading = false;
+        this.loading.set(false);
       },
       error: () => {
         this.notify.error('Failed to load capital snapshots');
-        this.loading = false;
+        this.loading.set(false);
       },
     });
   }
 
   onRowSelect(row: Capital): void {
-    this.isCreating = false;
-    this.selected = row;
+    this.isCreating.set(false);
+    this.selected.set(row);
     this.form.reset({
       id: row.id,
       date: row.date ? new Date(row.date) : null,
@@ -126,12 +127,12 @@ export class CapitalComponent implements OnInit, AfterViewInit {
       excessLiquidity: row.excessLiquidity,
       bpr: row.bpr,
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onNew(): void {
-    this.isCreating = true;
-    this.selected = null;
+    this.isCreating.set(true);
+    this.selected.set(null);
     this.form.reset({
       id: null,
       date: new Date(),
@@ -140,13 +141,13 @@ export class CapitalComponent implements OnInit, AfterViewInit {
       excessLiquidity: null,
       bpr: null,
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onCancel(): void {
-    this.showSidebar = false;
-    this.selected = null;
-    this.isCreating = false;
+    this.showSidebar.set(false);
+    this.selected.set(null);
+    this.isCreating.set(false);
   }
 
   onSave(): void {
@@ -164,13 +165,13 @@ export class CapitalComponent implements OnInit, AfterViewInit {
       bpr: Number(v.bpr),
     };
 
-    const obs = this.isCreating || !payload.id
+    const obs = this.isCreating() || !payload.id
       ? this.service.create(payload)
       : this.service.update(payload.id as number, payload);
 
     obs.subscribe({
       next: () => {
-        this.notify.success(this.isCreating ? 'Snapshot created' : 'Snapshot updated');
+        this.notify.success(this.isCreating() ? 'Snapshot created' : 'Snapshot updated');
         this.load();
         this.onCancel();
       },
@@ -179,9 +180,9 @@ export class CapitalComponent implements OnInit, AfterViewInit {
   }
 
   onDelete(): void {
-    if (!this.selected) return;
+    if (!this.selected()) return;
     if (!confirm('Delete this capital snapshot?')) return;
-    this.service.delete(this.selected.id).subscribe({
+    this.service.delete(this.selected()!.id).subscribe({
       next: () => {
         this.notify.success('Snapshot deleted');
         this.load();
@@ -196,7 +197,7 @@ export class CapitalComponent implements OnInit, AfterViewInit {
     const sorted = [...this.dataSource.data].reverse();
     const labels = sorted.map(c => new Date(c.date).toLocaleDateString());
 
-    this.chartData = {
+    this.chartData.set({
       labels,
       datasets: [
         {
@@ -218,6 +219,6 @@ export class CapitalComponent implements OnInit, AfterViewInit {
           yAxisID: 'y1',
         },
       ],
-    };
+    });
   }
 }

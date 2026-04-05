@@ -54,11 +54,11 @@ describe('InstrumentSummaries', () => {
 
   it('should compute portfolio totals from option summaries', () => {
     flushInit();
-    expect(component.totals.pnl).toBe(150);
-    expect(component.totals.delta).toBeCloseTo(0.10);
-    expect(component.totals.theta).toBe(8);
-    expect(component.totals.vega).toBe(-5);
-    expect(component.totals.margin).toBe(8400);
+    expect(component.totals().pnl).toBe(150);
+    expect(component.totals().delta).toBeCloseTo(0.10);
+    expect(component.totals().theta).toBe(8);
+    expect(component.totals().vega).toBe(-5);
+    expect(component.totals().margin).toBe(8400);
   });
 
   it('should reload with no status param when filter is "all"', () => {

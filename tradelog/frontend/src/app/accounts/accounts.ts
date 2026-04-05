@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
@@ -31,27 +31,27 @@ import { AccountsService, Account, SyncStatus } from './accounts.service';
   templateUrl: './accounts.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class AccountsComponent implements OnInit {
+export class AccountsComponent {
   private service = inject(AccountsService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  loading = false;
+  loading = signal(false);
 
-  accounts: Account[] = [];
+  accounts = signal<Account[]>([]);
   displayedColumns = ['name', 'ibkrAccountId', 'host', 'port', 'clientId', 'isDefault', 'lastSyncAt'];
 
-  showSidebar = false;
+  showSidebar = signal(false);
   form!: FormGroup;
-  isCreating = false;
-  selected: Account | null = null;
+  isCreating = signal(false);
+  selected = signal<Account | null>(null);
 
-  syncStatus: SyncStatus | null = null;
-  syncing = false;
+  syncStatus = signal<SyncStatus | null>(null);
+  syncing = signal(false);
   Math = Math;
-  syncMessage: string | null = null;
+  syncMessage = signal<string | null>(null);
 
-  ngOnInit(): void {
+  constructor() {
     this.load();
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
@@ -67,23 +67,23 @@ export class AccountsComponent implements OnInit {
   }
 
   load(): void {
-    this.loading = true;
+    this.loading.set(true);
     this.service.getAll().subscribe({
       next: (data) => {
-        this.accounts = data ?? [];
-        this.loading = false;
+        this.accounts.set(data ?? []);
+        this.loading.set(false);
       },
       error: () => {
         this.notify.error('Failed to load accounts');
-        this.loading = false;
+        this.loading.set(false);
       },
     });
     this.refreshSyncStatus();
   }
 
   onRowSelect(row: Account): void {
-    this.isCreating = false;
-    this.selected = row;
+    this.isCreating.set(false);
+    this.selected.set(row);
     this.form.reset({
       id: row.id,
       name: row.name,
@@ -95,14 +95,14 @@ export class AccountsComponent implements OnInit {
       flexToken: row.flexToken ?? '',
       flexQueryId: row.flexQueryId ?? '',
     });
-    this.showSidebar = true;
-    this.syncMessage = null;
+    this.showSidebar.set(true);
+    this.syncMessage.set(null);
     this.refreshSyncStatus();
   }
 
   onNew(): void {
-    this.isCreating = true;
-    this.selected = null;
+    this.isCreating.set(true);
+    this.selected.set(null);
     this.form.reset({
       id: null,
       name: '',
@@ -114,14 +114,14 @@ export class AccountsComponent implements OnInit {
       flexToken: '',
       flexQueryId: '',
     });
-    this.showSidebar = true;
-    this.syncMessage = null;
+    this.showSidebar.set(true);
+    this.syncMessage.set(null);
   }
 
   onCancel(): void {
-    this.showSidebar = false;
-    this.selected = null;
-    this.isCreating = false;
+    this.showSidebar.set(false);
+    this.selected.set(null);
+    this.isCreating.set(false);
   }
 
   onSave(): void {
@@ -142,14 +142,14 @@ export class AccountsComponent implements OnInit {
       flexQueryId: v.flexQueryId || null,
     };
 
-    if (this.isCreating || !payload.id) {
+    if (this.isCreating() || !payload.id) {
       this.service.create(payload).subscribe({
         next: (created) => {
           this.notify.success('Account created');
           this.load();
           this.onCancel();
           // Auto-select if first account
-          if (this.accounts.length === 0) {
+          if (this.accounts().length === 0) {
             this.service.selectAccount(created.id);
           }
         },
@@ -168,9 +168,9 @@ export class AccountsComponent implements OnInit {
   }
 
   onDelete(): void {
-    if (!this.selected) return;
-    if (!confirm(`Delete account "${this.selected.name}"?`)) return;
-    this.service.delete(this.selected.id).subscribe({
+    if (!this.selected()) return;
+    if (!confirm(`Delete account "${this.selected()!.name}"?`)) return;
+    this.service.delete(this.selected()!.id).subscribe({
       next: () => {
         this.notify.success('Account deleted');
         this.load();
@@ -181,38 +181,38 @@ export class AccountsComponent implements OnInit {
   }
 
   onFlexSync(): void {
-    if (!this.selected) return;
-    this.service.selectAccount(this.selected.id);
-    this.syncing = true;
-    this.syncMessage = null;
+    if (!this.selected()) return;
+    this.service.selectAccount(this.selected()!.id);
+    this.syncing.set(true);
+    this.syncMessage.set(null);
     this.service.triggerFlexSync().subscribe({
       next: (res) => {
-        this.syncMessage = res?.message ?? 'Flex sync completed.';
-        this.syncing = false;
+        this.syncMessage.set(res?.message ?? 'Flex sync completed.');
+        this.syncing.set(false);
         this.load();
       },
       error: (err) => {
-        this.syncMessage = err.error?.message ?? 'Flex sync failed.';
-        this.syncing = false;
+        this.syncMessage.set(err.error?.message ?? 'Flex sync failed.');
+        this.syncing.set(false);
         this.load();
       },
     });
   }
 
   onLiveSync(): void {
-    if (!this.selected) return;
-    this.service.selectAccount(this.selected.id);
-    this.syncing = true;
-    this.syncMessage = null;
+    if (!this.selected()) return;
+    this.service.selectAccount(this.selected()!.id);
+    this.syncing.set(true);
+    this.syncMessage.set(null);
     this.service.triggerLiveSync().subscribe({
       next: (res) => {
-        this.syncMessage = res?.message ?? 'Live sync completed.';
-        this.syncing = false;
+        this.syncMessage.set(res?.message ?? 'Live sync completed.');
+        this.syncing.set(false);
         this.load();
       },
       error: (err) => {
-        this.syncMessage = err.error?.message ?? 'Live sync failed.';
-        this.syncing = false;
+        this.syncMessage.set(err.error?.message ?? 'Live sync failed.');
+        this.syncing.set(false);
         this.load();
       },
     });
@@ -220,7 +220,7 @@ export class AccountsComponent implements OnInit {
 
   private refreshSyncStatus(): void {
     this.service.getSyncStatus().subscribe({
-      next: (status) => (this.syncStatus = status),
+      next: (status) => this.syncStatus.set(status),
     });
   }
 

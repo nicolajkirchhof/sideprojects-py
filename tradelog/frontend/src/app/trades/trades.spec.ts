@@ -23,8 +23,7 @@ describe('Trades', () => {
     component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
 
-    // Call ngOnInit directly to avoid template rendering (Quill requires a real DOM)
-    component.ngOnInit();
+    // Constructor already triggers load — flush the pending request
     httpMock.match('/api/trades').forEach((r) => r.flush([]));
   });
 
@@ -67,9 +66,9 @@ describe('Trades', () => {
   it('should open sidebar in create mode with defaults', () => {
     component.onNew();
 
-    expect(component.showSidebar).toBe(true);
-    expect(component.isCreating).toBe(true);
-    expect(component.selected).toBeNull();
+    expect(component.showSidebar()).toBe(true);
+    expect(component.isCreating()).toBe(true);
+    expect(component.selected()).toBeNull();
     expect(component.form.get('timeframe')!.value).toBe('OneDay');
   });
 
@@ -81,9 +80,9 @@ describe('Trades', () => {
     };
     component.onRowSelect(entry as any);
 
-    expect(component.showSidebar).toBe(true);
-    expect(component.isCreating).toBe(false);
-    expect(component.selected).toEqual(entry as any);
+    expect(component.showSidebar()).toBe(true);
+    expect(component.isCreating()).toBe(false);
+    expect(component.selected()).toEqual(entry as any);
     expect(component.form.getRawValue().symbol).toBe('AAPL');
   });
 
@@ -101,8 +100,8 @@ describe('Trades', () => {
     component.onNew();
     component.onCancel();
 
-    expect(component.showSidebar).toBe(false);
-    expect(component.isCreating).toBe(false);
-    expect(component.selected).toBeNull();
+    expect(component.showSidebar()).toBe(false);
+    expect(component.isCreating()).toBe(false);
+    expect(component.selected()).toBeNull();
   });
 });

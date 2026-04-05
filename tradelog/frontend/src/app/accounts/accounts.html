@@ -1,6 +1,6 @@
-<app-content-area [showRightSidebar]="showSidebar">
+<app-content-area [showRightSidebar]="showSidebar()">
   <div main>
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
     <div class="flex items-center gap-4 mx-4 mb-2">
@@ -9,7 +9,7 @@
     </div>
 
     <div class="mat-elevation-z8 m-4">
-      <table mat-table [dataSource]="accounts" class="w-full">
+      <table mat-table [dataSource]="accounts()" class="w-full">
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef>Name</th>
           <td mat-cell *matCellDef="let a">{{ a.name }}</td>
@@ -43,16 +43,16 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"
             (click)="onRowSelect(row)"
             class="cursor-pointer"
-            [class.!bg-blue-900]="selected?.id === row.id"></tr>
+            [class.!bg-blue-900]="selected()?.id === row.id"></tr>
       </table>
     </div>
   </div>
 
   <div sidebar class="flex flex-1">
-    @if (showSidebar) {
+    @if (showSidebar()) {
       <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
 
-        @if (!isCreating) {
+        @if (!isCreating()) {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>ID</mat-label>
             <input matInput formControlName="id" readonly>
@@ -99,20 +99,20 @@
         </mat-form-field>
 
         <!-- Sync section (only for existing accounts) -->
-        @if (!isCreating && selected) {
+        @if (!isCreating() && selected()) {
           <mat-card appearance="outlined" class="mt-2">
             <mat-card-content class="!p-3 flex flex-col gap-3">
               <div class="flex items-center gap-3">
                 <button mat-flat-button type="button" color="accent"
-                        [disabled]="syncing || !syncStatus?.flexConfigured"
+                        [disabled]="syncing() || !syncStatus()?.flexConfigured"
                         (click)="onFlexSync()">
                   <mat-icon class="mr-1">cloud_download</mat-icon>
-                  {{ syncing ? 'Syncing...' : 'Flex Sync' }}
+                  {{ syncing() ? 'Syncing...' : 'Flex Sync' }}
                 </button>
                 <span class="text-xs opacity-60">
-                  @if (syncStatus?.lastFlexSyncAt) {
-                    {{ syncStatus?.lastFlexSyncResult }}
-                  } @else if (!syncStatus?.flexConfigured) {
+                  @if (syncStatus()?.lastFlexSyncAt) {
+                    {{ syncStatus()?.lastFlexSyncResult }}
+                  } @else if (!syncStatus()?.flexConfigured) {
                     Not configured
                   } @else {
                     Never
@@ -121,23 +121,23 @@
               </div>
               <div class="flex items-center gap-3">
                 <button mat-flat-button type="button"
-                        [disabled]="syncing || !syncStatus?.canLiveSync"
+                        [disabled]="syncing() || !syncStatus()?.canLiveSync"
                         (click)="onLiveSync()">
                   <mat-icon class="mr-1">sync</mat-icon>
                   Live Sync
                 </button>
                 <span class="text-xs opacity-60">
-                  @if (syncStatus?.liveSyncCooldownSeconds) {
-                    {{ Math.ceil(syncStatus!.liveSyncCooldownSeconds! / 60) }}m cooldown
-                  } @else if (syncStatus?.lastLiveSyncAt) {
-                    {{ syncStatus?.lastLiveSyncResult }}
+                  @if (syncStatus()?.liveSyncCooldownSeconds) {
+                    {{ Math.ceil(syncStatus()!.liveSyncCooldownSeconds! / 60) }}m cooldown
+                  } @else if (syncStatus()?.lastLiveSyncAt) {
+                    {{ syncStatus()?.lastLiveSyncResult }}
                   } @else {
                     Never
                   }
                 </span>
               </div>
-              @if (syncMessage) {
-                <div class="text-sm p-2 rounded bg-white/5">{{ syncMessage }}</div>
+              @if (syncMessage()) {
+                <div class="text-sm p-2 rounded bg-white/5">{{ syncMessage() }}</div>
               }
             </mat-card-content>
           </mat-card>
@@ -145,7 +145,7 @@
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
-          @if (!isCreating && selected) {
+          @if (!isCreating() && selected()) {
             <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
           }
           <span class="flex-1"></span>

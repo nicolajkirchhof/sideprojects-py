@@ -1,13 +1,13 @@
-<app-content-area [showRightSidebar]="showSidebar">
+<app-content-area [showRightSidebar]="showSidebar()">
   <div main>
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
     <!-- Chart -->
     <div class="mx-4 mb-4" style="height: 250px;">
       <canvas baseChart
               [type]="'line'"
-              [data]="chartData"
+              [data]="chartData()"
               [options]="chartOptions">
       </canvas>
     </div>
@@ -79,7 +79,7 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"
             (click)="onRowSelect(row)"
             class="cursor-pointer"
-            [class.!bg-blue-900]="selected?.id === row.id"></tr>
+            [class.!bg-blue-900]="selected()?.id === row.id"></tr>
       </table>
       <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
     </div>
@@ -87,10 +87,10 @@
 
   <!-- Sidebar form -->
   <div sidebar class="flex flex-1">
-    @if (showSidebar) {
+    @if (showSidebar()) {
       <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
 
-        @if (!isCreating) {
+        @if (!isCreating()) {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>ID</mat-label>
             <input matInput formControlName="id" readonly>
@@ -125,39 +125,39 @@
         </mat-form-field>
 
         <!-- Snapshotted values (read-only, edit mode) -->
-        @if (!isCreating && selected) {
+        @if (!isCreating() && selected()) {
           <div class="border-t border-white/10 pt-3 mt-1">
             <div class="text-xs opacity-50 mb-2">Snapshotted Aggregations</div>
             <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               <span class="opacity-60">Maintenance %:</span>
-              <span>{{ selected.maintenancePct | number:'1.1-1' }}%</span>
+              <span>{{ selected()!.maintenancePct | number:'1.1-1' }}%</span>
               <span class="opacity-60">Total P/L:</span>
-              <span [class]="pnlColor(selected.totalPnl)">{{ selected.totalPnl | number:'1.2-2' }}</span>
+              <span [class]="pnlColor(selected()!.totalPnl)">{{ selected()!.totalPnl | number:'1.2-2' }}</span>
               <span class="opacity-60">Unrealized P/L:</span>
-              <span [class]="pnlColor(selected.unrealizedPnl)">{{ selected.unrealizedPnl | number:'1.2-2' }}</span>
+              <span [class]="pnlColor(selected()!.unrealizedPnl)">{{ selected()!.unrealizedPnl | number:'1.2-2' }}</span>
               <span class="opacity-60">Realized P/L:</span>
-              <span [class]="pnlColor(selected.realizedPnl)">{{ selected.realizedPnl | number:'1.2-2' }}</span>
+              <span [class]="pnlColor(selected()!.realizedPnl)">{{ selected()!.realizedPnl | number:'1.2-2' }}</span>
               <span class="opacity-60">Delta:</span>
-              <span>{{ selected.netDelta | number:'1.2-4' }}</span>
+              <span>{{ selected()!.netDelta | number:'1.2-4' }}</span>
               <span class="opacity-60">Theta:</span>
-              <span>{{ selected.netTheta | number:'1.2-4' }}</span>
+              <span>{{ selected()!.netTheta | number:'1.2-4' }}</span>
               <span class="opacity-60">Vega:</span>
-              <span>{{ selected.netVega | number:'1.2-4' }}</span>
+              <span>{{ selected()!.netVega | number:'1.2-4' }}</span>
               <span class="opacity-60">Gamma:</span>
-              <span>{{ selected.netGamma | number:'1.2-4' }}</span>
+              <span>{{ selected()!.netGamma | number:'1.2-4' }}</span>
               <span class="opacity-60">Avg IV:</span>
-              <span>{{ selected.avgIv | number:'1.0-1' }}%</span>
+              <span>{{ selected()!.avgIv | number:'1.0-1' }}%</span>
               <span class="opacity-60">Margin:</span>
-              <span>{{ selected.totalMargin | number:'1.0-0' }}</span>
+              <span>{{ selected()!.totalMargin | number:'1.0-0' }}</span>
               <span class="opacity-60">Commissions:</span>
-              <span>{{ selected.totalCommissions | number:'1.2-2' }}</span>
+              <span>{{ selected()!.totalCommissions | number:'1.2-2' }}</span>
             </div>
           </div>
         }
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
-          @if (!isCreating && selected) {
+          @if (!isCreating() && selected()) {
             <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
           }
           <span class="flex-1"></span>

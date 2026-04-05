@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -14,18 +14,18 @@ import { OptionPositionsLogService, OptionPositionsLog } from '../option-positio
   templateUrl: './greeks-history.html',
   host: { class: 'flex flex-col flex-1 overflow-auto' },
 })
-export class GreeksHistoryComponent implements OnInit {
+export class GreeksHistoryComponent {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private logService = inject(OptionPositionsLogService);
 
-  contractId = '';
-  logs: OptionPositionsLog[] = [];
+  contractId = signal('');
+  logs = signal<OptionPositionsLog[]>([]);
 
-  deltaChart: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
-  thetaChart: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
-  ivChart: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
-  priceChart: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
+  deltaChart = signal<ChartConfiguration<'line'>['data']>({ labels: [], datasets: [] });
+  thetaChart = signal<ChartConfiguration<'line'>['data']>({ labels: [], datasets: [] });
+  ivChart = signal<ChartConfiguration<'line'>['data']>({ labels: [], datasets: [] });
+  priceChart = signal<ChartConfiguration<'line'>['data']>({ labels: [], datasets: [] });
 
   chartOptions: ChartConfiguration<'line'>['options'] = {
     responsive: true,
@@ -47,12 +47,13 @@ export class GreeksHistoryComponent implements OnInit {
     },
   };
 
-  ngOnInit(): void {
-    this.contractId = this.route.snapshot.queryParamMap.get('contractId') ?? '';
-    if (this.contractId) {
-      this.logService.getByContract(this.contractId).subscribe({
+  constructor() {
+    const id = this.route.snapshot.queryParamMap.get('contractId') ?? '';
+    this.contractId.set(id);
+    if (id) {
+      this.logService.getByContract(id).subscribe({
         next: (data) => {
-          this.logs = data;
+          this.logs.set(data);
           this.buildCharts();
         },
       });
@@ -60,38 +61,39 @@ export class GreeksHistoryComponent implements OnInit {
   }
 
   private buildCharts(): void {
-    const labels = this.logs.map(l => new Date(l.dateTime).toLocaleDateString());
+    const logs = this.logs();
+    const labels = logs.map(l => new Date(l.dateTime).toLocaleDateString());
 
-    this.deltaChart = {
+    this.deltaChart.set({
       labels,
       datasets: [
-        { label: 'Delta', data: this.logs.map(l => l.delta), borderColor: '#48dbfb', tension: 0.3, fill: false },
-        { label: 'Gamma', data: this.logs.map(l => l.gamma), borderColor: '#feca57', tension: 0.3, fill: false, yAxisID: 'y1' as any },
+        { label: 'Delta', data: logs.map(l => l.delta), borderColor: '#48dbfb', tension: 0.3, fill: false },
+        { label: 'Gamma', data: logs.map(l => l.gamma), borderColor: '#feca57', tension: 0.3, fill: false, yAxisID: 'y1' as any },
       ],
-    };
+    });
 
-    this.thetaChart = {
+    this.thetaChart.set({
       labels,
       datasets: [
-        { label: 'Theta', data: this.logs.map(l => l.theta), borderColor: '#ff6b6b', tension: 0.3, fill: false },
-        { label: 'Vega', data: this.logs.map(l => l.vega), borderColor: '#54a0ff', tension: 0.3, fill: false, yAxisID: 'y1' as any },
+        { label: 'Theta', data: logs.map(l => l.theta), borderColor: '#ff6b6b', tension: 0.3, fill: false },
+        { label: 'Vega', data: logs.map(l => l.vega), borderColor: '#54a0ff', tension: 0.3, fill: false, yAxisID: 'y1' as any },
       ],
-    };
+    });
 
-    this.ivChart = {
+    this.ivChart.set({
       labels,
       datasets: [
-        { label: 'IV', data: this.logs.map(l => l.iv * 100), borderColor: '#f368e0', tension: 0.3, fill: false },
+        { label: 'IV', data: logs.map(l => l.iv * 100), borderColor: '#f368e0', tension: 0.3, fill: false },
       ],
-    };
+    });
 
-    this.priceChart = {
+    this.priceChart.set({
       labels,
       datasets: [
-        { label: 'Price', data: this.logs.map(l => l.price), borderColor: '#48dbfb', tension: 0.3, fill: false },
-        { label: 'Time Value', data: this.logs.map(l => l.timeValue), borderColor: '#feca57', tension: 0.3, fill: false, yAxisID: 'y1' as any },
+        { label: 'Price', data: logs.map(l => l.price), borderColor: '#48dbfb', tension: 0.3, fill: false },
+        { label: 'Time Value', data: logs.map(l => l.timeValue), borderColor: '#feca57', tension: 0.3, fill: false, yAxisID: 'y1' as any },
       ],
-    };
+    });
   }
 
   goBack(): void {

@@ -81,9 +81,9 @@ describe('AccountsComponent', () => {
 
   it('should open sidebar in create mode', () => {
     component.onNew();
-    expect(component.showSidebar).toBe(true);
-    expect(component.isCreating).toBe(true);
-    expect(component.selected).toBeNull();
+    expect(component.showSidebar()).toBe(true);
+    expect(component.isCreating()).toBe(true);
+    expect(component.selected()).toBeNull();
   });
 
   it('should open sidebar in edit mode on row select', () => {
@@ -94,17 +94,17 @@ describe('AccountsComponent', () => {
       canSync: true, lastSyncAt: null, lastSyncResult: null, cooldownRemainingSeconds: null,
     });
 
-    expect(component.showSidebar).toBe(true);
-    expect(component.isCreating).toBe(false);
-    expect(component.selected).toEqual(account);
+    expect(component.showSidebar()).toBe(true);
+    expect(component.isCreating()).toBe(false);
+    expect(component.selected()).toEqual(account);
     expect(component.form.getRawValue().name).toBe('Test');
   });
 
   it('should close sidebar on cancel', () => {
     component.onNew();
     component.onCancel();
-    expect(component.showSidebar).toBe(false);
-    expect(component.isCreating).toBe(false);
+    expect(component.showSidebar()).toBe(false);
+    expect(component.isCreating()).toBe(false);
   });
 
   it('should return "Never" for account with no sync', () => {

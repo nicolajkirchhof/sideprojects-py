@@ -1,5 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -20,7 +20,6 @@ import { NotificationService } from '../shared/notification.service';
   selector: 'app-weekly-prep',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     ContentArea,
     ReactiveFormsModule,
@@ -38,22 +37,22 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './weekly-prep.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class WeeklyPrepComponent implements OnInit {
+export class WeeklyPrepComponent {
   private service = inject(WeeklyPrepService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  loading = false;
+  loading = signal(false);
 
-  entries: WeeklyPrepModel[] = [];
+  entries = signal<WeeklyPrepModel[]>([]);
   displayedColumns = ['date', 'indexBias', 'breadth', 'currentPortfolioRisk', 'scanningFor'];
 
-  showSidebar = false;
+  showSidebar = signal(false);
   form!: FormGroup;
-  isCreating = false;
-  selected: WeeklyPrepModel | null = null;
+  isCreating = signal(false);
+  selected = signal<WeeklyPrepModel | null>(null);
 
-  filterYear: number | null = null;
+  filterYear = signal<number | null>(null);
   availableYears: number[] = [];
 
   quillModules: any = {
@@ -66,7 +65,7 @@ export class WeeklyPrepComponent implements OnInit {
   };
   quillModulesOff: any = { toolbar: false };
 
-  ngOnInit(): void {
+  constructor() {
     const currentYear = new Date().getFullYear();
     this.availableYears = Array.from({ length: 5 }, (_, i) => currentYear - i);
     this.load();
@@ -90,17 +89,17 @@ export class WeeklyPrepComponent implements OnInit {
   }
 
   load(): void {
-    this.loading = true;
+    this.loading.set(true);
     const filters: any = {};
-    if (this.filterYear) filters.year = this.filterYear;
+    if (this.filterYear()) filters.year = this.filterYear();
     this.service.getAll(filters).subscribe({
       next: (data) => {
-        this.entries = data ?? [];
-        this.loading = false;
+        this.entries.set(data ?? []);
+        this.loading.set(false);
       },
       error: () => {
         this.notify.error('Failed to load weekly prep entries');
-        this.loading = false;
+        this.loading.set(false);
       },
     });
   }
@@ -110,8 +109,8 @@ export class WeeklyPrepComponent implements OnInit {
   }
 
   onRowSelect(row: WeeklyPrepModel): void {
-    this.isCreating = false;
-    this.selected = row;
+    this.isCreating.set(false);
+    this.selected.set(row);
     this.form.reset({
       id: row.id,
       date: row.date ? new Date(row.date) : null,
@@ -129,12 +128,12 @@ export class WeeklyPrepComponent implements OnInit {
       focusForImprovement: row.focusForImprovement ?? '',
       externalComments: row.externalComments ?? '',
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onNew(): void {
-    this.isCreating = true;
-    this.selected = null;
+    this.isCreating.set(true);
+    this.selected.set(null);
     // Pre-fill date to the upcoming Monday
     const now = new Date();
     const day = now.getDay();
@@ -159,13 +158,13 @@ export class WeeklyPrepComponent implements OnInit {
       focusForImprovement: '',
       externalComments: '',
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onCancel(): void {
-    this.showSidebar = false;
-    this.selected = null;
-    this.isCreating = false;
+    this.showSidebar.set(false);
+    this.selected.set(null);
+    this.isCreating.set(false);
   }
 
   onSave(): void {
@@ -192,13 +191,13 @@ export class WeeklyPrepComponent implements OnInit {
       externalComments: v.externalComments || null,
     };
 
-    const obs = this.isCreating || !payload.id
+    const obs = this.isCreating() || !payload.id
       ? this.service.create(payload)
       : this.service.update(payload.id as number, payload);
 
     obs.subscribe({
       next: () => {
-        this.notify.success(this.isCreating ? 'Weekly prep created' : 'Weekly prep updated');
+        this.notify.success(this.isCreating() ? 'Weekly prep created' : 'Weekly prep updated');
         this.load();
         this.onCancel();
       },
@@ -207,9 +206,9 @@ export class WeeklyPrepComponent implements OnInit {
   }
 
   onDelete(): void {
-    if (!this.selected) return;
-    if (!confirm(`Delete weekly prep for ${this.selected.date}?`)) return;
-    this.service.delete(this.selected.id).subscribe({
+    if (!this.selected()) return;
+    if (!confirm(`Delete weekly prep for ${this.selected()!.date}?`)) return;
+    this.service.delete(this.selected()!.id).subscribe({
       next: () => {
         this.notify.success('Weekly prep deleted');
         this.load();

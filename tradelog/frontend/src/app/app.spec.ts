@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { App } from './app';
 
 describe('App', () => {
@@ -17,6 +18,7 @@ describe('App', () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideZonelessChangeDetection(),
       ],
     }).compileComponents();
     httpMock = TestBed.inject(HttpTestingController);
@@ -43,11 +45,10 @@ describe('App', () => {
     // Flush the last-sync request
     httpMock.expectOne('/api/option-positions-log/last-sync').flush({ lastSync: null });
 
-    let result: { label: string; stale: boolean } | undefined;
-    fixture.componentInstance.lastSyncInfo$.subscribe((v) => (result = v));
+    const result = fixture.componentInstance.lastSyncInfo();
 
-    expect(result!.label).toBe('Never synced');
-    expect(result!.stale).toBe(true);
+    expect(result.label).toBe('Never synced');
+    expect(result.stale).toBe(true);
   });
 
   it('should emit minutes-ago label for recent sync', async () => {
@@ -59,11 +60,10 @@ describe('App', () => {
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     httpMock.expectOne('/api/option-positions-log/last-sync').flush({ lastSync: fiveMinAgo });
 
-    let result: { label: string; stale: boolean } | undefined;
-    fixture.componentInstance.lastSyncInfo$.subscribe((v) => (result = v));
+    const result = fixture.componentInstance.lastSyncInfo();
 
-    expect(result!.label).toBe('Synced 5m ago');
-    expect(result!.stale).toBe(false);
+    expect(result.label).toBe('Synced 5m ago');
+    expect(result.stale).toBe(false);
   });
 
   it('should mark sync as stale after 24h', async () => {
@@ -75,10 +75,9 @@ describe('App', () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString();
     httpMock.expectOne('/api/option-positions-log/last-sync').flush({ lastSync: twoDaysAgo });
 
-    let result: { label: string; stale: boolean } | undefined;
-    fixture.componentInstance.lastSyncInfo$.subscribe((v) => (result = v));
+    const result = fixture.componentInstance.lastSyncInfo();
 
-    expect(result!.label).toBe('Synced 2d ago');
-    expect(result!.stale).toBe(true);
+    expect(result.label).toBe('Synced 2d ago');
+    expect(result.stale).toBe(true);
   });
 });

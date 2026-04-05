@@ -1,5 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { MatTableModule } from '@angular/material/table';
 import { MatCardModule } from '@angular/material/card';
@@ -21,7 +21,6 @@ import { NotificationService } from '../shared/notification.service';
   selector: 'app-analytics',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     MatCardModule,
     MatButtonToggleModule,
@@ -32,14 +31,14 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './analytics.html',
   host: { class: 'flex flex-col flex-1 overflow-auto' },
 })
-export class AnalyticsComponent implements OnInit {
+export class AnalyticsComponent {
   private service = inject(AnalyticsService);
   private notify = inject(NotificationService);
 
-  loading = false;
-  overall: OverallPerformance | null = null;
-  strategies: StrategyPerformance[] = [];
-  budgets: BudgetPerformance[] = [];
+  loading = signal(false);
+  overall = signal<OverallPerformance | null>(null);
+  strategies = signal<StrategyPerformance[]>([]);
+  budgets = signal<BudgetPerformance[]>([]);
 
   strategyColumns = ['strategy', 'tradeCount', 'totalPnl', 'winRate', 'avgWin', 'avgLoss', 'expectancy', 'maxDrawdown'];
   budgetColumns = ['budget', 'tradeCount', 'totalPnl', 'winRate', 'avgWin', 'avgLoss', 'expectancy'];
@@ -47,8 +46,8 @@ export class AnalyticsComponent implements OnInit {
   pnlColor = pnlColor;
 
   // Equity curve chart
-  curveMode: 'overall' | 'strategy' | 'budget' = 'overall';
-  chartData: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
+  curveMode = signal<'overall' | 'strategy' | 'budget'>('overall');
+  chartData = signal<ChartConfiguration<'line'>['data']>({ labels: [], datasets: [] });
   chartOptions: ChartConfiguration<'line'>['options'] = {
     responsive: true,
     maintainAspectRatio: false,
@@ -64,21 +63,21 @@ export class AnalyticsComponent implements OnInit {
 
   private readonly COLORS = ['#48dbfb', '#ff6b6b', '#feca57', '#54a0ff', '#5f27cd', '#01a3a4', '#f368e0', '#ff9f43'];
 
-  ngOnInit(): void {
-    this.loading = true;
+  constructor() {
+    this.loading.set(true);
     let remaining = 3;
-    const done = () => { if (--remaining === 0) this.loading = false; };
+    const done = () => { if (--remaining === 0) this.loading.set(false); };
 
     this.service.getOverall().subscribe({
-      next: (data) => { this.overall = data; done(); },
+      next: (data) => { this.overall.set(data); done(); },
       error: () => { this.notify.error('Failed to load overall analytics'); done(); },
     });
     this.service.getStrategies().subscribe({
-      next: (data) => { this.strategies = data; done(); },
+      next: (data) => { this.strategies.set(data); done(); },
       error: () => { this.notify.error('Failed to load strategy data'); done(); },
     });
     this.service.getBudgets().subscribe({
-      next: (data) => { this.budgets = data; done(); },
+      next: (data) => { this.budgets.set(data); done(); },
       error: () => { this.notify.error('Failed to load budget data'); done(); },
     });
     this.loadEquityCurve();
@@ -89,16 +88,16 @@ export class AnalyticsComponent implements OnInit {
   }
 
   private loadEquityCurve(): void {
-    if (this.curveMode === 'overall') {
+    if (this.curveMode() === 'overall') {
       this.service.getOverallEquityCurve().subscribe({
         next: (curve) => this.setChartSingle('Portfolio', curve),
         error: () => this.notify.error('Failed to load equity curve'),
       });
-    } else if (this.curveMode === 'strategy') {
+    } else if (this.curveMode() === 'strategy') {
       this.service.getStrategies().subscribe({
         next: (strats) => {
           if (strats.length === 0) {
-            this.chartData = { labels: [], datasets: [] };
+            this.chartData.set({ labels: [], datasets: [] });
             return;
           }
           const curveRequests = strats.map(s =>
@@ -116,7 +115,7 @@ export class AnalyticsComponent implements OnInit {
       this.service.getBudgets().subscribe({
         next: (budgets) => {
           if (budgets.length === 0) {
-            this.chartData = { labels: [], datasets: [] };
+            this.chartData.set({ labels: [], datasets: [] });
             return;
           }
           const curveRequests = budgets.map(b =>
@@ -134,7 +133,7 @@ export class AnalyticsComponent implements OnInit {
   }
 
   private setChartSingle(label: string, curve: EquityCurvePoint[]): void {
-    this.chartData = {
+    this.chartData.set({
       labels: curve.map(p => new Date(p.date).toLocaleDateString()),
       datasets: [
         {
@@ -146,7 +145,7 @@ export class AnalyticsComponent implements OnInit {
           tension: 0.3,
         },
       ],
-    };
+    });
   }
 
   private setChartMulti(datasets: { label: string; data: EquityCurvePoint[] }[]): void {
@@ -156,7 +155,7 @@ export class AnalyticsComponent implements OnInit {
     const sortedDates = [...allDates].sort();
     const labels = sortedDates.map(d => new Date(d).toLocaleDateString());
 
-    this.chartData = {
+    this.chartData.set({
       labels,
       datasets: datasets.map((ds, i) => {
         const dateMap = new Map(ds.data.map(p => [p.date, p.cumulativePnl]));
@@ -169,6 +168,6 @@ export class AnalyticsComponent implements OnInit {
           spanGaps: true,
         };
       }),
-    };
+    });
   }
 }

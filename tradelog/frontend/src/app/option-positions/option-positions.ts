@@ -1,6 +1,6 @@
-import { Component, OnInit, AfterViewInit, ViewChild, inject } from '@angular/core';
+import { Component, signal, viewChild, effect, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSortModule, MatSort } from '@angular/material/sort';
 import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
@@ -27,7 +27,6 @@ import { NotificationService } from '../shared/notification.service';
   selector: 'app-option-positions',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     MatSortModule,
     MatPaginatorModule,
@@ -50,17 +49,17 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './option-positions.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class OptionPositions implements OnInit, AfterViewInit {
+export class OptionPositions {
   private service = inject(OptionPositionsService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  @ViewChild(MatSort) sort!: MatSort;
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  sort = viewChild(MatSort);
+  paginator = viewChild(MatPaginator);
 
-  loading = false;
+  loading = signal(false);
 
   dataSource = new MatTableDataSource<OptionPositionDto>([]);
   displayedColumns = [
@@ -70,23 +69,22 @@ export class OptionPositions implements OnInit, AfterViewInit {
   ];
 
   // Sidebar state
-  showSidebar = false;
+  showSidebar = signal(false);
   form!: FormGroup;
-  isCreating = false;
-  selected: OptionPositionDto | null = null;
+  isCreating = signal(false);
+  selected = signal<OptionPositionDto | null>(null);
 
   // Filters
-  statusFilter = 'open';
-  filterSymbol = '';
-  filterRight = '';
-  filterExpiry = '';
+  statusFilter = signal('open');
+  filterSymbol = signal('');
+  filterRight = signal('');
+  filterExpiry = signal('');
   rights = Object.values(PositionRight);
   rightLabel = POSITION_RIGHT_LABELS;
 
-  ngOnInit(): void {
+  constructor() {
     const qp = this.route.snapshot.queryParams;
-    if (qp['symbol']) this.filterSymbol = qp['symbol'];
-    this.load();
+    if (qp['symbol']) this.filterSymbol.set(qp['symbol']);
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
       symbol: ['', [Validators.required]],
@@ -105,55 +103,57 @@ export class OptionPositions implements OnInit, AfterViewInit {
       bestExitPrice: [null],
       bestExitDate: [null],
     });
-  }
+    this.load();
 
-  ngAfterViewInit(): void {
-    this.dataSource.sort = this.sort;
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.filterPredicate = (row: OptionPositionDto, filter: string) => {
-      const f = JSON.parse(filter);
-      if (f.symbol && !row.symbol.toLowerCase().includes(f.symbol))
-        return false;
-      if (f.right && row.right !== f.right)
-        return false;
-      if (f.expiry && row.expiry?.slice(0, 7) !== f.expiry)
-        return false;
-      return true;
-    };
+    effect(() => {
+      const sort = this.sort();
+      const paginator = this.paginator();
+      if (sort) {
+        this.dataSource.sort = sort;
+        this.dataSource.filterPredicate = (row: OptionPositionDto, filter: string) => {
+          const f = JSON.parse(filter);
+          if (f.symbol && !row.symbol.toLowerCase().includes(f.symbol)) return false;
+          if (f.right && row.right !== f.right) return false;
+          if (f.expiry && row.expiry?.slice(0, 7) !== f.expiry) return false;
+          return true;
+        };
+      }
+      if (paginator) this.dataSource.paginator = paginator;
+    });
   }
 
   load(): void {
-    this.loading = true;
-    const filters: any = { status: this.statusFilter === 'all' ? undefined : this.statusFilter };
-    if (this.filterSymbol.trim()) filters.symbol = this.filterSymbol.trim().toUpperCase();
+    this.loading.set(true);
+    const filters: any = { status: this.statusFilter() === 'all' ? undefined : this.statusFilter() };
+    if (this.filterSymbol().trim()) filters.symbol = this.filterSymbol().trim().toUpperCase();
     this.service.getAll(filters).subscribe({
       next: (data) => {
         this.dataSource.data = data ?? [];
-        this.loading = false;
+        this.loading.set(false);
       },
       error: () => {
         this.notify.error('Failed to load option positions');
-        this.loading = false;
+        this.loading.set(false);
       },
     });
   }
 
   applyFilter(): void {
     this.dataSource.filter = JSON.stringify({
-      symbol: this.filterSymbol.trim().toLowerCase(),
-      right: this.filterRight,
-      expiry: this.filterExpiry,
+      symbol: this.filterSymbol().trim().toLowerCase(),
+      right: this.filterRight(),
+      expiry: this.filterExpiry(),
     });
   }
 
   onStatusFilterChange(value: string): void {
-    this.statusFilter = value;
+    this.statusFilter.set(value);
     this.load();
   }
 
   onRowSelect(row: OptionPositionDto): void {
-    this.isCreating = false;
-    this.selected = row;
+    this.isCreating.set(false);
+    this.selected.set(row);
     this.form.reset({
       id: row.id,
       symbol: row.symbol,
@@ -172,12 +172,12 @@ export class OptionPositions implements OnInit, AfterViewInit {
       bestExitPrice: row.bestExitPrice ?? null,
       bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onNew(): void {
-    this.isCreating = true;
-    this.selected = null;
+    this.isCreating.set(true);
+    this.selected.set(null);
     this.form.reset({
       id: null,
       symbol: '',
@@ -196,13 +196,13 @@ export class OptionPositions implements OnInit, AfterViewInit {
       bestExitPrice: null,
       bestExitDate: null,
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onCancel(): void {
-    this.showSidebar = false;
-    this.selected = null;
-    this.isCreating = false;
+    this.showSidebar.set(false);
+    this.selected.set(null);
+    this.isCreating.set(false);
   }
 
   openGreeksHistory(contractId: string, event: Event): void {
@@ -235,13 +235,13 @@ export class OptionPositions implements OnInit, AfterViewInit {
       bestExitDate: toIsoOrNull(v.bestExitDate),
     };
 
-    const obs = this.isCreating || !payload.id
+    const obs = this.isCreating() || !payload.id
       ? this.service.create(payload)
       : this.service.update(payload.id as number, payload);
 
     obs.subscribe({
       next: () => {
-        this.notify.success(this.isCreating ? 'Position created' : 'Position updated');
+        this.notify.success(this.isCreating() ? 'Position created' : 'Position updated');
         this.load();
         this.onCancel();
       },
@@ -250,9 +250,10 @@ export class OptionPositions implements OnInit, AfterViewInit {
   }
 
   onDelete(): void {
-    if (!this.selected) return;
-    if (!confirm(`Delete ${this.selected.symbol} ${this.selected.right} ${this.selected.strike} position?`)) return;
-    this.service.delete(this.selected.id).subscribe({
+    const sel = this.selected();
+    if (!sel) return;
+    if (!confirm(`Delete ${sel.symbol} ${sel.right} ${sel.strike} position?`)) return;
+    this.service.delete(sel.id).subscribe({
       next: () => {
         this.notify.success('Position deleted');
         this.load();

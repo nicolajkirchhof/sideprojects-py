@@ -1,13 +1,13 @@
-<app-content-area [showRightSidebar]="showSidebar">
+<app-content-area [showRightSidebar]="showSidebar()">
   <div main>
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
     <!-- Filters + New button -->
     <div class="flex items-center gap-4 mx-4 mb-2">
       <mat-form-field appearance="outline" class="w-40" subscriptSizing="dynamic">
         <mat-label>Budget</mat-label>
-        <mat-select [(value)]="filterBudget" (selectionChange)="onFilterChange()">
+        <mat-select [value]="filterBudget()" (selectionChange)="filterBudget.set($event.value); onFilterChange()">
           <mat-option [value]="null">All</mat-option>
           @for (b of budgets; track b) {
             <mat-option [value]="b">{{ b }}</mat-option>
@@ -16,7 +16,7 @@
       </mat-form-field>
       <mat-form-field appearance="outline" class="w-48" subscriptSizing="dynamic">
         <mat-label>Strategy</mat-label>
-        <mat-select [(value)]="filterStrategy" (selectionChange)="onFilterChange()">
+        <mat-select [value]="filterStrategy()" (selectionChange)="filterStrategy.set($event.value); onFilterChange()">
           <mat-option [value]="null">All</mat-option>
           @for (s of strategies; track s) {
             <mat-option [value]="s">{{ strategyLabel[s] }}</mat-option>
@@ -29,7 +29,7 @@
 
     <!-- Table -->
     <div class="mat-elevation-z8 m-4">
-      <table mat-table [dataSource]="trades" class="w-full">
+      <table mat-table [dataSource]="trades()" class="w-full">
         <ng-container matColumnDef="symbol">
           <th mat-header-cell *matHeaderCellDef>Symbol</th>
           <td mat-cell *matCellDef="let e">{{ e.symbol }}</td>
@@ -69,17 +69,17 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"
             (click)="onRowSelect(row)"
             class="cursor-pointer"
-            [class.!bg-blue-900]="selected?.id === row.id"></tr>
+            [class.!bg-blue-900]="selected()?.id === row.id"></tr>
       </table>
     </div>
   </div>
 
   <!-- Sidebar form -->
   <div sidebar class="flex flex-1">
-    @if (showSidebar) {
+    @if (showSidebar()) {
       <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
 
-        @if (!isCreating) {
+        @if (!isCreating()) {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>ID</mat-label>
             <input matInput formControlName="id" readonly>
@@ -194,11 +194,11 @@
         <div class="flex items-center justify-between">
           <label class="text-sm font-medium">Notes / Thesis</label>
           <button mat-icon-button type="button" class="w-8 h-8 p-0" (click)="toggleQuillToolbar()">
-            <mat-icon>{{ showToolbar ? 'visibility_off' : 'visibility' }}</mat-icon>
+            <mat-icon>{{ showToolbar() ? 'visibility_off' : 'visibility' }}</mat-icon>
           </button>
         </div>
         <div class="min-h-[120px]">
-          @if (showToolbar) {
+          @if (showToolbar()) {
             <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="notes" theme="snow"></quill-editor>
           } @else {
             <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notes" theme="snow"></quill-editor>
@@ -227,7 +227,7 @@
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
-          @if (!isCreating && selected) {
+          @if (!isCreating() && selected()) {
             <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
           }
           <span class="flex-1"></span>

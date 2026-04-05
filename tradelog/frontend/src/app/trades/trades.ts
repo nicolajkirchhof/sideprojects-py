@@ -1,5 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -25,7 +25,6 @@ import { NotificationService } from '../shared/notification.service';
   selector: 'app-trades',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     ContentArea,
     ReactiveFormsModule,
@@ -44,25 +43,25 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './trades.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class Trades implements OnInit {
+export class Trades {
   private service = inject(TradesService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  loading = false;
+  loading = signal(false);
 
-  trades: Trade[] = [];
+  trades = signal<Trade[]>([]);
   displayedColumns = ['symbol', 'date', 'typeOfTrade', 'directional', 'budget', 'strategy', 'managementRating'];
 
   // Sidebar state
-  showSidebar = false;
+  showSidebar = signal(false);
   form!: FormGroup;
-  isCreating = false;
-  selected: Trade | null = null;
+  isCreating = signal(false);
+  selected = signal<Trade | null>(null);
 
   // Filter state
-  filterBudget: Budget | null = null;
-  filterStrategy: Strategy | null = null;
+  filterBudget = signal<Budget | null>(null);
+  filterStrategy = signal<Strategy | null>(null);
 
   // Enum values for dropdowns
   budgets = Object.values(Budget);
@@ -79,7 +78,7 @@ export class Trades implements OnInit {
   managementRatingLabel: Record<string, string> = MANAGEMENT_RATING_LABELS;
 
   // Quill config
-  showToolbar = false;
+  showToolbar = signal(false);
   quillModules: any = {
     toolbar: [
       ['bold', 'italic', 'underline'],
@@ -91,7 +90,7 @@ export class Trades implements OnInit {
   };
   quillModulesOff: any = { toolbar: false };
 
-  ngOnInit(): void {
+  constructor() {
     this.load();
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
@@ -120,18 +119,18 @@ export class Trades implements OnInit {
   }
 
   load(): void {
-    this.loading = true;
+    this.loading.set(true);
     const filters: any = {};
-    if (this.filterBudget) filters.budget = this.filterBudget;
-    if (this.filterStrategy) filters.strategy = this.filterStrategy;
+    if (this.filterBudget()) filters.budget = this.filterBudget();
+    if (this.filterStrategy()) filters.strategy = this.filterStrategy();
     this.service.getAll(filters).subscribe({
       next: (data) => {
-        this.trades = data ?? [];
-        this.loading = false;
+        this.trades.set(data ?? []);
+        this.loading.set(false);
       },
       error: () => {
         this.notify.error('Failed to load trades');
-        this.loading = false;
+        this.loading.set(false);
       },
     });
   }
@@ -141,8 +140,8 @@ export class Trades implements OnInit {
   }
 
   onRowSelect(row: Trade): void {
-    this.isCreating = false;
-    this.selected = row;
+    this.isCreating.set(false);
+    this.selected.set(row);
     this.form.reset({
       id: row.id,
       symbol: row.symbol,
@@ -167,12 +166,12 @@ export class Trades implements OnInit {
       managementRating: row.managementRating ?? null,
       learnings: row.learnings ?? '',
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onNew(): void {
-    this.isCreating = true;
-    this.selected = null;
+    this.isCreating.set(true);
+    this.selected.set(null);
     this.form.reset({
       id: null,
       symbol: '',
@@ -197,17 +196,17 @@ export class Trades implements OnInit {
       managementRating: null,
       learnings: '',
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onCancel(): void {
-    this.showSidebar = false;
-    this.selected = null;
-    this.isCreating = false;
+    this.showSidebar.set(false);
+    this.selected.set(null);
+    this.isCreating.set(false);
   }
 
   toggleQuillToolbar(): void {
-    this.showToolbar = !this.showToolbar;
+    this.showToolbar.update(v => !v);
   }
 
   onSave(): void {
@@ -241,13 +240,13 @@ export class Trades implements OnInit {
       learnings: v.learnings || null,
     };
 
-    const obs = this.isCreating || !payload.id
+    const obs = this.isCreating() || !payload.id
       ? this.service.create(payload)
       : this.service.update(payload.id as number, payload);
 
     obs.subscribe({
       next: () => {
-        this.notify.success(this.isCreating ? 'Trade created' : 'Trade updated');
+        this.notify.success(this.isCreating() ? 'Trade created' : 'Trade updated');
         this.load();
         this.onCancel();
       },
@@ -256,9 +255,9 @@ export class Trades implements OnInit {
   }
 
   onDelete(): void {
-    if (!this.selected) return;
-    if (!confirm(`Delete trade for ${this.selected.symbol}?`)) return;
-    this.service.delete(this.selected.id).subscribe({
+    if (!this.selected()) return;
+    if (!confirm(`Delete trade for ${this.selected()!.symbol}?`)) return;
+    this.service.delete(this.selected()!.id).subscribe({
       next: () => {
         this.notify.success('Trade deleted');
         this.load();

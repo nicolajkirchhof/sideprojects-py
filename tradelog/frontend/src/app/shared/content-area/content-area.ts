@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, input } from '@angular/core';
 
 import { AngularSplitModule } from 'angular-split';
 
@@ -10,7 +10,7 @@ import { AngularSplitModule } from 'angular-split';
   host: {class: 'flex flex-col flex-1'},
 })
 export class ContentArea {
-  @Input() showRightSidebar = false;
-  @Input() sidebarWidth: string = '320px';
-  @Input() title?: string;
+  showRightSidebar = input(false);
+  sidebarWidth = input('320px');
+  title = input<string>();
 }

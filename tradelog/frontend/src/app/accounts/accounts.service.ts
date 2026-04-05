@@ -1,6 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { Observable } from 'rxjs';
 
 export interface Account {
   id: number;
@@ -34,19 +34,11 @@ const STORAGE_KEY = 'tradelog-selected-account-id';
 export class AccountsService {
   private http = inject(HttpClient);
 
-  private selectedAccountId$ = new BehaviorSubject<number>(this.loadSelectedId());
-
-  get selectedAccountId(): number {
-    return this.selectedAccountId$.value;
-  }
-
-  get selectedAccountId$Obs(): Observable<number> {
-    return this.selectedAccountId$.asObservable();
-  }
+  readonly selectedAccountId = signal(this.loadSelectedId());
 
   selectAccount(id: number): void {
     localStorage.setItem(STORAGE_KEY, id.toString());
-    this.selectedAccountId$.next(id);
+    this.selectedAccountId.set(id);
   }
 
   private loadSelectedId(): number {

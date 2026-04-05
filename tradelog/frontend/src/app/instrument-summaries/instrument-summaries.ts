@@ -1,5 +1,5 @@
-import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { Component, effect, inject, signal, viewChild } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { FormsModule } from '@angular/forms';
@@ -24,7 +24,6 @@ import {
   selector: 'app-instrument-summaries',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatTableModule,
     MatButtonModule,
@@ -38,15 +37,15 @@ import {
   templateUrl: './instrument-summaries.html',
   host: { class: 'flex flex-col flex-1 overflow-auto' },
 })
-export class InstrumentSummaries implements OnInit, AfterViewInit {
+export class InstrumentSummaries {
   private service = inject(InstrumentSummariesService);
   private router = inject(Router);
   private notify = inject(NotificationService);
 
-  @ViewChild('optionSort') optionSort!: MatSort;
-  @ViewChild('tradeSort') tradeSort!: MatSort;
+  optionSort = viewChild<MatSort>('optionSort');
+  tradeSort = viewChild<MatSort>('tradeSort');
 
-  loading = false;
+  loading = signal(false);
 
   optionDataSource = new MatTableDataSource<OptionInstrumentSummary>([]);
   tradeDataSource = new MatTableDataSource<TradeInstrumentSummary>([]);
@@ -59,41 +58,47 @@ export class InstrumentSummaries implements OnInit, AfterViewInit {
     'symbol', 'status', 'positionType', 'totalPos', 'pnl', 'unrealizedPnlPct', 'realizedPnl', 'commissions',
   ];
 
-  statusFilter = 'open';
-  filterSymbol = '';
+  statusFilter = signal('open');
+  filterSymbol = signal('');
   typeOfTradeLabel: Record<string, string> = TYPE_OF_TRADE_LABELS;
   pnlColor = pnlColor;
 
   // Portfolio totals
-  totals = {
+  totals = signal({
     pnl: 0, delta: 0, theta: 0, vega: 0, gamma: 0, margin: 0,
-  };
+  });
 
-  ngAfterViewInit(): void {
-    this.optionDataSource.sort = this.optionSort;
-    this.tradeDataSource.sort = this.tradeSort;
-    const symbolFilter = (row: { symbol: string }, filter: string) =>
-      !filter || row.symbol.toLowerCase().includes(filter);
-    this.optionDataSource.filterPredicate = symbolFilter;
-    this.tradeDataSource.filterPredicate = symbolFilter;
+  constructor() {
+    this.load();
+
+    effect(() => {
+      const optSort = this.optionSort();
+      const trSort = this.tradeSort();
+      const symbolFilter = (row: { symbol: string }, filter: string) =>
+        !filter || row.symbol.toLowerCase().includes(filter);
+      if (optSort) {
+        this.optionDataSource.sort = optSort;
+        this.optionDataSource.filterPredicate = symbolFilter;
+      }
+      if (trSort) {
+        this.tradeDataSource.sort = trSort;
+        this.tradeDataSource.filterPredicate = symbolFilter;
+      }
+    });
   }
 
   applyFilter(): void {
-    const f = this.filterSymbol.trim().toLowerCase();
+    const f = this.filterSymbol().trim().toLowerCase();
     this.optionDataSource.filter = f;
     this.tradeDataSource.filter = f;
   }
 
-  ngOnInit(): void {
-    this.load();
-  }
-
   load(): void {
-    this.loading = true;
+    this.loading.set(true);
     let remaining = 2;
-    const done = () => { if (--remaining === 0) this.loading = false; };
+    const done = () => { if (--remaining === 0) this.loading.set(false); };
 
-    const status = this.statusFilter === 'all' ? undefined : this.statusFilter;
+    const status = this.statusFilter() === 'all' ? undefined : this.statusFilter();
     this.service.getOptionSummaries(status).subscribe({
       next: (data) => {
         this.optionDataSource.data = data ?? [];
@@ -107,10 +112,10 @@ export class InstrumentSummaries implements OnInit, AfterViewInit {
     });
     this.service.getTradeSummaries().subscribe({
       next: (data) => {
-        this.tradeDataSource.data = this.statusFilter === 'all'
+        this.tradeDataSource.data = this.statusFilter() === 'all'
           ? (data ?? [])
           : (data ?? []).filter(t =>
-              this.statusFilter === 'open' ? t.totalPos !== 0 : t.totalPos === 0);
+              this.statusFilter() === 'open' ? t.totalPos !== 0 : t.totalPos === 0);
         done();
       },
       error: (err) => {
@@ -121,7 +126,7 @@ export class InstrumentSummaries implements OnInit, AfterViewInit {
   }
 
   onStatusFilterChange(value: string): void {
-    this.statusFilter = value;
+    this.statusFilter.set(value);
     this.load();
   }
 
@@ -135,13 +140,13 @@ export class InstrumentSummaries implements OnInit, AfterViewInit {
 
   private computeTotals(): void {
     const options = this.optionDataSource.data;
-    this.totals = {
+    this.totals.set({
       pnl: options.reduce((s, r) => s + r.pnl, 0),
       delta: options.reduce((s, r) => s + r.delta, 0),
       theta: options.reduce((s, r) => s + r.theta, 0),
       vega: options.reduce((s, r) => s + r.vega, 0),
       gamma: options.reduce((s, r) => s + r.gamma, 0),
       margin: options.reduce((s, r) => s + r.margin, 0),
-    };
+    });
   }
 }

@@ -1,27 +1,27 @@
-<app-content-area [showRightSidebar]="showSidebar">
+<app-content-area [showRightSidebar]="showSidebar()">
   <div main>
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
     <!-- Filters -->
     <div class="flex items-center gap-3 mx-4 mb-2 flex-wrap">
-      <mat-button-toggle-group [value]="statusFilter" (change)="onStatusFilterChange($event.value)">
+      <mat-button-toggle-group [value]="statusFilter()" (change)="onStatusFilterChange($event.value)">
         <mat-button-toggle value="open">Open</mat-button-toggle>
         <mat-button-toggle value="closed">Closed</mat-button-toggle>
         <mat-button-toggle value="all">All</mat-button-toggle>
       </mat-button-toggle-group>
       <mat-form-field appearance="outline" class="w-32" subscriptSizing="dynamic">
         <mat-label>Symbol</mat-label>
-        <input matInput [(ngModel)]="filterSymbol" (input)="applyFilter()" placeholder="e.g. SPY">
+        <input matInput [ngModel]="filterSymbol()" (ngModelChange)="filterSymbol.set($event)" (input)="applyFilter()" placeholder="e.g. SPY">
       </mat-form-field>
-      <mat-button-toggle-group [value]="filterRight" (change)="filterRight = $event.value; applyFilter()">
+      <mat-button-toggle-group [value]="filterRight()" (change)="filterRight.set($event.value); applyFilter()">
         <mat-button-toggle value="">All</mat-button-toggle>
         <mat-button-toggle value="Call">Call</mat-button-toggle>
         <mat-button-toggle value="Put">Put</mat-button-toggle>
       </mat-button-toggle-group>
       <mat-form-field appearance="outline" class="w-36" subscriptSizing="dynamic">
         <mat-label>Expiry (YYYY-MM)</mat-label>
-        <input matInput [(ngModel)]="filterExpiry" (input)="applyFilter()" placeholder="2026-04">
+        <input matInput [ngModel]="filterExpiry()" (ngModelChange)="filterExpiry.set($event)" (input)="applyFilter()" placeholder="2026-04">
       </mat-form-field>
       <span class="flex-1"></span>
       <button mat-raised-button color="primary" (click)="onNew()">New Position</button>
@@ -126,7 +126,7 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"
             (click)="onRowSelect(row)"
             class="cursor-pointer"
-            [class.!bg-blue-900]="selected?.id === row.id"></tr>
+            [class.!bg-blue-900]="selected()?.id === row.id"></tr>
       </table>
       <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
     </div>
@@ -134,10 +134,10 @@
 
   <!-- Sidebar form -->
   <div sidebar class="flex flex-1">
-    @if (showSidebar) {
+    @if (showSidebar()) {
       <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
 
-        @if (!isCreating) {
+        @if (!isCreating()) {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>ID</mat-label>
             <input matInput formControlName="id" readonly>
@@ -201,7 +201,7 @@
         </div>
 
         <!-- Close fields (edit mode) -->
-        @if (!isCreating) {
+        @if (!isCreating()) {
           <div class="flex gap-3">
             <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
               <mat-label>Close Price</mat-label>
@@ -236,35 +236,35 @@
         </div>
 
         <!-- Computed fields (read-only, edit mode only) -->
-        @if (!isCreating && selected) {
+        @if (!isCreating() && selected()) {
           <div class="border-t border-white/10 pt-3 mt-1">
             <div class="text-xs opacity-50 mb-2">Computed</div>
             <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               <span class="opacity-60">Unrealized P/L:</span>
-              <span [class]="pnlColor(selected.unrealizedPnl)">{{ selected.unrealizedPnl != null ? (selected.unrealizedPnl | number:'1.2-2') : '—' }}</span>
+              <span [class]="pnlColor(selected()!.unrealizedPnl)">{{ selected()!.unrealizedPnl != null ? (selected()!.unrealizedPnl | number:'1.2-2') : '—' }}</span>
               <span class="opacity-60">Unrealized %:</span>
-              <span [class]="pnlColor(selected.unrealizedPnlPct)">{{ selected.unrealizedPnlPct != null ? (selected.unrealizedPnlPct | number:'1.0-1') + '%' : '—' }}</span>
+              <span [class]="pnlColor(selected()!.unrealizedPnlPct)">{{ selected()!.unrealizedPnlPct != null ? (selected()!.unrealizedPnlPct | number:'1.0-1') + '%' : '—' }}</span>
               <span class="opacity-60">Realized P/L:</span>
-              <span [class]="pnlColor(selected.realizedPnl)">{{ selected.realizedPnl != null ? (selected.realizedPnl | number:'1.2-2') : '—' }}</span>
+              <span [class]="pnlColor(selected()!.realizedPnl)">{{ selected()!.realizedPnl != null ? (selected()!.realizedPnl | number:'1.2-2') : '—' }}</span>
               <span class="opacity-60">Duration %:</span>
-              <span>{{ selected.durationPct != null ? (selected.durationPct | number:'1.0-0') + '%' : '—' }}</span>
+              <span>{{ selected()!.durationPct != null ? (selected()!.durationPct | number:'1.0-0') + '%' : '—' }}</span>
               <span class="opacity-60">ROIC:</span>
-              <span [class]="pnlColor(selected.roic)">{{ selected.roic != null ? (selected.roic | number:'1.1-1') + '%' : '—' }}</span>
+              <span [class]="pnlColor(selected()!.roic)">{{ selected()!.roic != null ? (selected()!.roic | number:'1.1-1') + '%' : '—' }}</span>
               <span class="opacity-60">Delta:</span>
-              <span>{{ selected.delta != null ? (selected.delta | number:'1.2-4') : '—' }}</span>
+              <span>{{ selected()!.delta != null ? (selected()!.delta | number:'1.2-4') : '—' }}</span>
               <span class="opacity-60">Theta:</span>
-              <span>{{ selected.theta != null ? (selected.theta | number:'1.2-4') : '—' }}</span>
+              <span>{{ selected()!.theta != null ? (selected()!.theta | number:'1.2-4') : '—' }}</span>
               <span class="opacity-60">IV:</span>
-              <span>{{ selected.iv != null ? (selected.iv | number:'1.0-1') + '%' : '—' }}</span>
+              <span>{{ selected()!.iv != null ? (selected()!.iv | number:'1.0-1') + '%' : '—' }}</span>
               <span class="opacity-60">Margin:</span>
-              <span>{{ selected.margin != null ? (selected.margin | number:'1.2-2') : '—' }}</span>
+              <span>{{ selected()!.margin != null ? (selected()!.margin | number:'1.2-2') : '—' }}</span>
             </div>
           </div>
         }
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
-          @if (!isCreating && selected) {
+          @if (!isCreating() && selected()) {
             <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
           }
           <span class="flex-1"></span>

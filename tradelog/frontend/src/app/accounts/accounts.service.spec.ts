@@ -24,24 +24,20 @@ describe('AccountsService', () => {
   // --- Account selection ---
 
   it('should default selectedAccountId to 0 when localStorage is empty', () => {
-    expect(service.selectedAccountId).toBe(0);
+    expect(service.selectedAccountId()).toBe(0);
   });
 
   it('should persist to localStorage and reflect in selectedAccountId', () => {
     service.selectAccount(42);
     expect(localStorage.getItem('tradelog-selected-account-id')).toBe('42');
-    expect(service.selectedAccountId).toBe(42);
+    expect(service.selectedAccountId()).toBe(42);
   });
 
-  it('should persist and emit selected account id', () => {
-    const emitted: number[] = [];
-    service.selectedAccountId$Obs.subscribe((id) => emitted.push(id));
-
+  it('should persist and update selected account id signal', () => {
     service.selectAccount(7);
 
-    expect(service.selectedAccountId).toBe(7);
+    expect(service.selectedAccountId()).toBe(7);
     expect(localStorage.getItem('tradelog-selected-account-id')).toBe('7');
-    expect(emitted).toContain(7);
   });
 
   // --- CRUD ---

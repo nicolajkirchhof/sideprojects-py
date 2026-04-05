@@ -1,5 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -18,7 +18,6 @@ import { NotificationService } from '../shared/notification.service';
   selector: 'app-portfolio',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     MatButtonModule,
     MatIconModule,
@@ -33,27 +32,27 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './portfolio.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class PortfolioComponent implements OnInit {
+export class PortfolioComponent {
   private service = inject(PortfolioService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  loading = false;
+  loading = signal(false);
 
-  entries: PortfolioDto[] = [];
+  entries = signal<PortfolioDto[]>([]);
   displayedColumns = ['budget', 'strategy', 'minAllocation', 'maxAllocation', 'currentAllocation', 'pnl'];
 
-  showSidebar = false;
+  showSidebar = signal(false);
   form!: FormGroup;
-  isCreating = false;
-  selected: PortfolioDto | null = null;
+  isCreating = signal(false);
+  selected = signal<PortfolioDto | null>(null);
 
   budgets = Object.values(Budget);
   strategies = Object.values(Strategy);
   strategyLabel: Record<string, string> = STRATEGY_LABELS;
   pnlColor = pnlColor;
 
-  ngOnInit(): void {
+  constructor() {
     this.load();
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
@@ -65,22 +64,22 @@ export class PortfolioComponent implements OnInit {
   }
 
   load(): void {
-    this.loading = true;
+    this.loading.set(true);
     this.service.getAll().subscribe({
       next: (data) => {
-        this.entries = data ?? [];
-        this.loading = false;
+        this.entries.set(data ?? []);
+        this.loading.set(false);
       },
       error: () => {
         this.notify.error('Failed to load portfolio');
-        this.loading = false;
+        this.loading.set(false);
       },
     });
   }
 
   onRowSelect(row: PortfolioDto): void {
-    this.isCreating = false;
-    this.selected = row;
+    this.isCreating.set(false);
+    this.selected.set(row);
     this.form.reset({
       id: row.id,
       budget: row.budget,
@@ -88,20 +87,20 @@ export class PortfolioComponent implements OnInit {
       minAllocation: row.minAllocation,
       maxAllocation: row.maxAllocation,
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onNew(): void {
-    this.isCreating = true;
-    this.selected = null;
+    this.isCreating.set(true);
+    this.selected.set(null);
     this.form.reset({ id: null, budget: null, strategy: null, minAllocation: 0, maxAllocation: 0 });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onCancel(): void {
-    this.showSidebar = false;
-    this.selected = null;
-    this.isCreating = false;
+    this.showSidebar.set(false);
+    this.selected.set(null);
+    this.isCreating.set(false);
   }
 
   onSave(): void {
@@ -119,13 +118,13 @@ export class PortfolioComponent implements OnInit {
     };
 
     const done = () => {
-      this.notify.success(this.isCreating ? 'Allocation created' : 'Allocation updated');
+      this.notify.success(this.isCreating() ? 'Allocation created' : 'Allocation updated');
       this.load();
       this.onCancel();
     };
     const fail = () => this.notify.error('Failed to save allocation');
 
-    if (this.isCreating || !payload.id) {
+    if (this.isCreating() || !payload.id) {
       this.service.create(payload).subscribe({ next: done, error: fail });
     } else {
       this.service.update(payload.id as number, payload).subscribe({ next: done, error: fail });
@@ -133,9 +132,9 @@ export class PortfolioComponent implements OnInit {
   }
 
   onDelete(): void {
-    if (!this.selected) return;
+    if (!this.selected()) return;
     if (!confirm('Delete this portfolio allocation?')) return;
-    this.service.delete(this.selected.id).subscribe({
+    this.service.delete(this.selected()!.id).subscribe({
       next: () => {
         this.notify.success('Allocation deleted');
         this.load();

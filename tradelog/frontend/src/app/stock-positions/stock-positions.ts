@@ -1,6 +1,6 @@
-import { AfterViewInit, Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, effect, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -21,7 +21,6 @@ import { NotificationService } from '../shared/notification.service';
   selector: 'app-stock-positions',
   standalone: true,
   imports: [
-    CommonModule,
     MatTableModule,
     ContentArea,
     ReactiveFormsModule,
@@ -41,48 +40,38 @@ import { NotificationService } from '../shared/notification.service';
   templateUrl: './stock-positions.html',
   host: { class: 'flex flex-col flex-1' },
 })
-export class StockPositions implements OnInit, AfterViewInit {
+export class StockPositions {
   private service = inject(StockPositionsService);
   private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
-  @ViewChild(MatSort) sort!: MatSort;
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  sort = viewChild(MatSort);
+  paginator = viewChild(MatPaginator);
 
-  loading = false;
+  loading = signal(false);
 
   dataSource = new MatTableDataSource<StockPositionDto>([]);
-  displayedColumns = [
+  displayedColumns = signal([
     'symbol', 'date', 'posChange', 'price', 'multiplier',
     'totalPos', 'avgPrice', 'pnl', 'commission',
-  ];
+  ]);
 
   // Check if any trade has multiplier != 1 to show/hide the column
-  hasMultiplier = false;
+  hasMultiplier = signal(false);
 
   // Sidebar state
-  showSidebar = false;
+  showSidebar = signal(false);
   form!: FormGroup;
-  isCreating = false;
-  selected: StockPositionDto | null = null;
+  isCreating = signal(false);
+  selected = signal<StockPositionDto | null>(null);
 
   // Filter
-  filterSymbol = '';
+  filterSymbol = signal('');
 
-  ngAfterViewInit(): void {
-    this.dataSource.sort = this.sort;
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.filterPredicate = (row: StockPositionDto, filter: string) => {
-      if (!filter) return true;
-      return row.symbol.toLowerCase().includes(filter);
-    };
-  }
-
-  ngOnInit(): void {
+  constructor() {
     const qp = this.route.snapshot.queryParams;
-    if (qp['symbol']) this.filterSymbol = qp['symbol'];
-    this.load();
+    if (qp['symbol']) this.filterSymbol.set(qp['symbol']);
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
       symbol: ['', [Validators.required]],
@@ -94,34 +83,48 @@ export class StockPositions implements OnInit, AfterViewInit {
       bestExitPrice: [null],
       bestExitDate: [null],
     });
+    this.load();
+
+    effect(() => {
+      const sort = this.sort();
+      const paginator = this.paginator();
+      if (sort) {
+        this.dataSource.sort = sort;
+        this.dataSource.filterPredicate = (row: StockPositionDto, filter: string) => {
+          if (!filter) return true;
+          return row.symbol.toLowerCase().includes(filter);
+        };
+      }
+      if (paginator) this.dataSource.paginator = paginator;
+    });
   }
 
   applyFilter(): void {
-    this.dataSource.filter = this.filterSymbol.trim().toLowerCase();
+    this.dataSource.filter = this.filterSymbol().trim().toLowerCase();
   }
 
   load(): void {
-    this.loading = true;
+    this.loading.set(true);
     this.service.getAll().subscribe({
       next: (data) => {
         this.dataSource.data = data ?? [];
         this.applyFilter();
-        this.hasMultiplier = this.dataSource.data.some(t => t.multiplier !== 1);
-        this.displayedColumns = this.hasMultiplier
+        this.hasMultiplier.set(this.dataSource.data.some(t => t.multiplier !== 1));
+        this.displayedColumns.set(this.hasMultiplier()
           ? ['symbol', 'date', 'posChange', 'price', 'multiplier', 'totalPos', 'avgPrice', 'pnl', 'commission']
-          : ['symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission'];
-        this.loading = false;
+          : ['symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission']);
+        this.loading.set(false);
       },
       error: () => {
         this.notify.error('Failed to load trades');
-        this.loading = false;
+        this.loading.set(false);
       },
     });
   }
 
   onRowSelect(row: StockPositionDto): void {
-    this.isCreating = false;
-    this.selected = row;
+    this.isCreating.set(false);
+    this.selected.set(row);
     this.form.reset({
       id: row.id,
       symbol: row.symbol,
@@ -133,12 +136,12 @@ export class StockPositions implements OnInit, AfterViewInit {
       bestExitPrice: row.bestExitPrice ?? null,
       bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onNew(): void {
-    this.isCreating = true;
-    this.selected = null;
+    this.isCreating.set(true);
+    this.selected.set(null);
     this.form.reset({
       id: null,
       symbol: '',
@@ -150,13 +153,13 @@ export class StockPositions implements OnInit, AfterViewInit {
       bestExitPrice: null,
       bestExitDate: null,
     });
-    this.showSidebar = true;
+    this.showSidebar.set(true);
   }
 
   onCancel(): void {
-    this.showSidebar = false;
-    this.selected = null;
-    this.isCreating = false;
+    this.showSidebar.set(false);
+    this.selected.set(null);
+    this.isCreating.set(false);
   }
 
   onSave(): void {
@@ -177,13 +180,13 @@ export class StockPositions implements OnInit, AfterViewInit {
       bestExitDate: toIsoOrNull(v.bestExitDate),
     };
 
-    const obs = this.isCreating || !payload.id
+    const obs = this.isCreating() || !payload.id
       ? this.service.create(payload)
       : this.service.update(payload.id as number, payload);
 
     obs.subscribe({
       next: () => {
-        this.notify.success(this.isCreating ? 'Trade created' : 'Trade updated');
+        this.notify.success(this.isCreating() ? 'Trade created' : 'Trade updated');
         this.load();
         this.onCancel();
       },
@@ -192,9 +195,10 @@ export class StockPositions implements OnInit, AfterViewInit {
   }
 
   onDelete(): void {
-    if (!this.selected) return;
-    if (!confirm(`Delete ${this.selected.symbol} trade from ${new Date(this.selected.date).toLocaleDateString()}?`)) return;
-    this.service.delete(this.selected.id).subscribe({
+    const sel = this.selected();
+    if (!sel) return;
+    if (!confirm(`Delete ${sel.symbol} trade from ${new Date(sel.date).toLocaleDateString()}?`)) return;
+    this.service.delete(sel.id).subscribe({
       next: () => {
         this.notify.success('Trade deleted');
         this.load();
