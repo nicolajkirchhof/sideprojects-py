@@ -43,6 +43,20 @@ export interface EquityCurvePoint {
   cumulativePnl: number;
 }
 
+export interface ChainSummary {
+  rootTradeId: number;
+  symbol: string;
+  strategy: string;
+  budget: string;
+  chainLength: number;
+  status: string;
+  startDate: string;
+  totalPnl: number;
+  premiumCollected: number;
+  premiumLost: number;
+  eventCount: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private http = inject(HttpClient);
@@ -69,5 +83,9 @@ export class AnalyticsService {
 
   getOverallEquityCurve(): Observable<EquityCurvePoint[]> {
     return this.http.get<EquityCurvePoint[]>('/api/analytics/overall/equity-curve');
+  }
+
+  getChains(): Observable<ChainSummary[]> {
+    return this.http.get<ChainSummary[]>('/api/analytics/chains');
   }
 }

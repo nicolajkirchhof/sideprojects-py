@@ -203,4 +203,124 @@ public class AnalyticsController : ControllerBase
 
         return (pnls, trades);
     }
+
+    /// <summary>
+    /// Returns one row per trade chain (length >= 2) with aggregated P/L.
+    /// Walks from root trades down through all descendants via ParentTradeId.
+    /// </summary>
+    [HttpGet("chains")]
+    public async Task<ActionResult<IEnumerable<ChainSummaryDto>>> GetChains()
+    {
+        var allTrades = await _context.Trades.OrderBy(t => t.Date).ToListAsync();
+        var childrenByParent = allTrades
+            .Where(t => t.ParentTradeId.HasValue)
+            .GroupBy(t => t.ParentTradeId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // Root trades = no parent
+        var roots = allTrades.Where(t => t.ParentTradeId == null).ToList();
+
+        // Build chains via BFS from each root
+        var chains = new List<(Trade Root, List<Trade> All)>();
+        foreach (var root in roots)
+        {
+            var chain = new List<Trade> { root };
+            var queue = new Queue<int>();
+            queue.Enqueue(root.Id);
+            while (queue.Count > 0)
+            {
+                var parentId = queue.Dequeue();
+                if (childrenByParent.TryGetValue(parentId, out var children))
+                {
+                    chain.AddRange(children);
+                    foreach (var child in children) queue.Enqueue(child.Id);
+                }
+            }
+            if (chain.Count >= 2) chains.Add((root, chain));
+        }
+
+        if (chains.Count == 0) return new List<ChainSummaryDto>();
+
+        // Batch-load all linked positions and events for chain trades
+        var chainTradeIds = chains.SelectMany(c => c.All.Select(t => t.Id)).ToHashSet();
+
+        var optionPositions = await _context.OptionPositions
+            .Where(p => p.TradeId != null && chainTradeIds.Contains(p.TradeId.Value))
+            .ToListAsync();
+        var optionsByTrade = optionPositions
+            .GroupBy(p => p.TradeId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var stockPositions = await _context.StockPositions
+            .Where(p => p.TradeId != null && chainTradeIds.Contains(p.TradeId.Value))
+            .ToListAsync();
+        var stocksByTrade = stockPositions
+            .GroupBy(p => p.TradeId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var eventCounts = await _context.TradeEvents
+            .Where(e => chainTradeIds.Contains(e.TradeId))
+            .GroupBy(e => e.TradeId)
+            .Select(g => new { TradeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TradeId, x => x.Count);
+
+        var result = new List<ChainSummaryDto>();
+
+        foreach (var (root, chainTrades) in chains)
+        {
+            decimal totalPnl = 0, premiumCollected = 0, premiumLost = 0;
+            int totalEvents = 0;
+            var hasOpen = false;
+
+            foreach (var trade in chainTrades)
+            {
+                totalEvents += eventCounts.GetValueOrDefault(trade.Id);
+
+                // Option P/L
+                var opts = optionsByTrade.GetValueOrDefault(trade.Id) ?? [];
+                foreach (var p in opts)
+                {
+                    if (p.Closed == null) hasOpen = true;
+                    if (p.Closed != null && p.ClosePrice.HasValue)
+                    {
+                        var pnl = (p.ClosePrice.Value - p.Cost) * p.Multiplier * p.Pos - p.Commission;
+                        totalPnl += pnl;
+                        if (pnl >= 0) premiumCollected += pnl;
+                        else premiumLost += Math.Abs(pnl);
+                    }
+                }
+
+                // Stock P/L
+                var stks = stocksByTrade.GetValueOrDefault(trade.Id) ?? [];
+                if (stks.Count > 0)
+                {
+                    var stkDtos = StockPositionComputations.ComputeRunningFields(
+                        stks.OrderBy(s => s.Date).ThenBy(s => s.Id).ToList());
+                    var stkPnl = stkDtos.Sum(d => d.Pnl);
+                    totalPnl += stkPnl;
+                    if (stkPnl >= 0) premiumCollected += stkPnl;
+                    else premiumLost += Math.Abs(stkPnl);
+
+                    if (stkDtos.Last().TotalPos != 0) hasOpen = true;
+                }
+            }
+
+            result.Add(new ChainSummaryDto
+            {
+                RootTradeId = root.Id,
+                Symbol = root.Symbol,
+                Strategy = root.Strategy.ToString(),
+                Budget = root.Budget.ToString(),
+                ChainLength = chainTrades.Count,
+                Status = hasOpen ? "Open" : "Closed",
+                StartDate = root.Date,
+                TotalPnl = totalPnl,
+                PremiumCollected = premiumCollected,
+                PremiumLost = premiumLost,
+                EventCount = totalEvents,
+            });
+        }
+
+        return result.OrderByDescending(c => c.StartDate).ToList();
+    }
 }

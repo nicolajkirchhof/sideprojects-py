@@ -13,7 +13,9 @@ import {
   BudgetPerformance,
   OverallPerformance,
   EquityCurvePoint,
+  ChainSummary,
 } from './analytics.service';
+import { Router } from '@angular/router';
 import { pnlColor } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
 
@@ -33,6 +35,7 @@ import { NotificationService } from '../shared/notification.service';
 })
 export class AnalyticsComponent {
   private service = inject(AnalyticsService);
+  private router = inject(Router);
   private notify = inject(NotificationService);
 
   loading = signal(false);
@@ -42,6 +45,9 @@ export class AnalyticsComponent {
 
   strategyColumns = ['strategy', 'tradeCount', 'totalPnl', 'winRate', 'avgWin', 'avgLoss', 'expectancy', 'maxDrawdown'];
   budgetColumns = ['budget', 'tradeCount', 'totalPnl', 'winRate', 'avgWin', 'avgLoss', 'expectancy'];
+
+  chains = signal<ChainSummary[]>([]);
+  chainColumns = ['symbol', 'strategy', 'chainLength', 'totalPnl', 'premiumCollected', 'premiumLost', 'eventCount', 'status'];
 
   pnlColor = pnlColor;
 
@@ -65,7 +71,7 @@ export class AnalyticsComponent {
 
   constructor() {
     this.loading.set(true);
-    let remaining = 3;
+    let remaining = 4;
     const done = () => { if (--remaining === 0) this.loading.set(false); };
 
     this.service.getOverall().subscribe({
@@ -79,6 +85,10 @@ export class AnalyticsComponent {
     this.service.getBudgets().subscribe({
       next: (data) => { this.budgets.set(data); done(); },
       error: () => { this.notify.error('Failed to load budget data'); done(); },
+    });
+    this.service.getChains().subscribe({
+      next: (data) => { this.chains.set(data); done(); },
+      error: () => { this.notify.error('Failed to load chain data'); done(); },
     });
     this.loadEquityCurve();
   }
@@ -169,5 +179,9 @@ export class AnalyticsComponent {
         };
       }),
     });
+  }
+
+  onChainClick(chain: ChainSummary): void {
+    this.router.navigate(['/trades'], { queryParams: { id: chain.rootTradeId } });
   }
 }
