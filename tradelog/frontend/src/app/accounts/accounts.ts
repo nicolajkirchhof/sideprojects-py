@@ -44,6 +44,7 @@ export class AccountsComponent {
   showSidebar = signal(false);
   form!: FormGroup;
   isCreating = signal(false);
+  editMode = signal(false);
   selected = signal<Account | null>(null);
 
   syncStatus = signal<SyncStatus | null>(null);
@@ -72,6 +73,9 @@ export class AccountsComponent {
       next: (data) => {
         this.accounts.set(data ?? []);
         this.loading.set(false);
+        if (!this.selected() && (data?.length ?? 0) > 0) {
+          this.onRowSelect(data![0]);
+        }
       },
       error: () => {
         this.notify.error('Failed to load accounts');
@@ -83,6 +87,7 @@ export class AccountsComponent {
 
   onRowSelect(row: Account): void {
     this.isCreating.set(false);
+    this.editMode.set(false);
     this.selected.set(row);
     this.form.reset({
       id: row.id,
@@ -95,13 +100,30 @@ export class AccountsComponent {
       flexToken: row.flexToken ?? '',
       flexQueryId: row.flexQueryId ?? '',
     });
+    this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
     this.syncMessage.set(null);
     this.refreshSyncStatus();
   }
 
+  onEdit(): void {
+    this.editMode.set(true);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
+  }
+
+  onCancelEdit(): void {
+    if (this.isCreating()) {
+      this.onCancel();
+      return;
+    }
+    const row = this.selected();
+    if (row) this.onRowSelect(row);
+  }
+
   onNew(): void {
     this.isCreating.set(true);
+    this.editMode.set(true);
     this.selected.set(null);
     this.form.reset({
       id: null,
@@ -114,6 +136,8 @@ export class AccountsComponent {
       flexToken: '',
       flexQueryId: '',
     });
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
     this.showSidebar.set(true);
     this.syncMessage.set(null);
   }
@@ -122,6 +146,7 @@ export class AccountsComponent {
     this.showSidebar.set(false);
     this.selected.set(null);
     this.isCreating.set(false);
+    this.editMode.set(false);
   }
 
   onSave(): void {

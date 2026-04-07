@@ -64,6 +64,7 @@ export class StockPositions {
   showSidebar = signal(false);
   form!: FormGroup;
   isCreating = signal(false);
+  editMode = signal(false);
   selected = signal<StockPositionDto | null>(null);
 
   // Filter
@@ -114,6 +115,9 @@ export class StockPositions {
           ? ['symbol', 'date', 'posChange', 'price', 'multiplier', 'totalPos', 'avgPrice', 'pnl', 'commission']
           : ['symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission']);
         this.loading.set(false);
+        if (!this.selected() && (data?.length ?? 0) > 0) {
+          this.onRowSelect(data![0]);
+        }
       },
       error: () => {
         this.notify.error('Failed to load trades');
@@ -124,6 +128,7 @@ export class StockPositions {
 
   onRowSelect(row: StockPositionDto): void {
     this.isCreating.set(false);
+    this.editMode.set(false);
     this.selected.set(row);
     this.form.reset({
       id: row.id,
@@ -136,12 +141,31 @@ export class StockPositions {
       bestExitPrice: row.bestExitPrice ?? null,
       bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
     });
+    this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
+  }
+
+  onEdit(): void {
+    this.editMode.set(true);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
+  }
+
+  onCancelEdit(): void {
+    if (this.isCreating()) {
+      this.onCancel();
+      return;
+    }
+    const row = this.selected();
+    if (row) this.onRowSelect(row);
   }
 
   onNew(): void {
     this.isCreating.set(true);
+    this.editMode.set(true);
     this.selected.set(null);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
     this.form.reset({
       id: null,
       symbol: '',
@@ -160,6 +184,7 @@ export class StockPositions {
     this.showSidebar.set(false);
     this.selected.set(null);
     this.isCreating.set(false);
+    this.editMode.set(false);
   }
 
   onSave(): void {

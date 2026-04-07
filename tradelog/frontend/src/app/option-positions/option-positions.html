@@ -10,17 +10,17 @@
         <mat-button-toggle value="closed">Closed</mat-button-toggle>
         <mat-button-toggle value="all">All</mat-button-toggle>
       </mat-button-toggle-group>
-      <mat-form-field appearance="outline" class="w-32" subscriptSizing="dynamic">
+      <mat-form-field appearance="outline" class="w-24" subscriptSizing="dynamic">
         <mat-label>Symbol</mat-label>
-        <input matInput [ngModel]="filterSymbol()" (ngModelChange)="filterSymbol.set($event)" (input)="applyFilter()" placeholder="e.g. SPY">
+        <input matInput [ngModel]="filterSymbol()" (ngModelChange)="filterSymbol.set($event)" (input)="applyFilter()" placeholder="SPY">
       </mat-form-field>
       <mat-button-toggle-group [value]="filterRight()" (change)="filterRight.set($event.value); applyFilter()">
         <mat-button-toggle value="">All</mat-button-toggle>
         <mat-button-toggle value="Call">Call</mat-button-toggle>
         <mat-button-toggle value="Put">Put</mat-button-toggle>
       </mat-button-toggle-group>
-      <mat-form-field appearance="outline" class="w-36" subscriptSizing="dynamic">
-        <mat-label>Expiry (YYYY-MM)</mat-label>
+      <mat-form-field appearance="outline" class="w-28" subscriptSizing="dynamic">
+        <mat-label>Expiry</mat-label>
         <input matInput [ngModel]="filterExpiry()" (ngModelChange)="filterExpiry.set($event)" (input)="applyFilter()" placeholder="2026-04">
       </mat-form-field>
       <span class="flex-1"></span>
@@ -126,7 +126,7 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"
             (click)="onRowSelect(row)"
             class="cursor-pointer"
-            [class.!bg-blue-900]="selected()?.id === row.id"></tr>
+            [class.row-selected]="selected()?.id === row.id"></tr>
       </table>
       <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
     </div>
@@ -135,7 +135,7 @@
   <!-- Sidebar form -->
   <div sidebar class="flex flex-1">
     @if (showSidebar()) {
-      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full max-w-[420px] pr-4 gap-2 h-full min-h-0 overflow-auto">
 
         @if (!isCreating()) {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -264,12 +264,20 @@
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
-          @if (!isCreating() && selected()) {
-            <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+          @if (editMode()) {
+            @if (!isCreating() && selected()) {
+              <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+            }
+            <span class="flex-1"></span>
+            <button mat-stroked-button type="button" (click)="onCancelEdit()">Cancel</button>
+            <button mat-flat-button color="primary" type="submit">Save</button>
+          } @else {
+            <span class="flex-1"></span>
+            <button mat-stroked-button type="button" (click)="onCancel()">Close</button>
+            <button mat-flat-button color="primary" type="button" (click)="onEdit()">
+              <mat-icon class="mr-1">edit</mat-icon>Edit
+            </button>
           }
-          <span class="flex-1"></span>
-          <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
-          <button mat-flat-button color="primary" type="submit">Save</button>
         </div>
       </form>
     }

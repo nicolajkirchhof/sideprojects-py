@@ -59,6 +59,7 @@ export class Trades {
   showSidebar = signal(false);
   form!: FormGroup;
   isCreating = signal(false);
+  editMode = signal(false);
   selected = signal<Trade | null>(null);
 
   // Filter state
@@ -156,6 +157,9 @@ export class Trades {
       next: (data) => {
         this.trades.set(data ?? []);
         this.loading.set(false);
+        if (!this.selected() && (data?.length ?? 0) > 0) {
+          this.onRowSelect(data![0]);
+        }
       },
       error: () => {
         this.notify.error('Failed to load trades');
@@ -170,6 +174,7 @@ export class Trades {
 
   onRowSelect(row: Trade): void {
     this.isCreating.set(false);
+    this.editMode.set(false);
     this.selected.set(row);
     this.form.reset({
       id: row.id,
@@ -196,14 +201,33 @@ export class Trades {
       learnings: row.learnings ?? '',
       parentTradeId: row.parentTradeId ?? null,
     });
+    this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
     this.showLegPicker.set(false);
     this.loadLegs(row.id);
   }
 
+  onEdit(): void {
+    this.editMode.set(true);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
+  }
+
+  onCancelEdit(): void {
+    if (this.isCreating()) {
+      this.onCancel();
+      return;
+    }
+    const row = this.selected();
+    if (row) this.onRowSelect(row);
+  }
+
   onNew(): void {
     this.isCreating.set(true);
+    this.editMode.set(true);
     this.selected.set(null);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
     this.form.reset({
       id: null,
       symbol: '',
@@ -241,6 +265,7 @@ export class Trades {
     this.showSidebar.set(false);
     this.selected.set(null);
     this.isCreating.set(false);
+    this.editMode.set(false);
   }
 
   toggleQuillToolbar(): void {

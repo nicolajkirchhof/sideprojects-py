@@ -72,6 +72,7 @@ export class OptionPositions {
   showSidebar = signal(false);
   form!: FormGroup;
   isCreating = signal(false);
+  editMode = signal(false);
   selected = signal<OptionPositionDto | null>(null);
 
   // Filters
@@ -130,6 +131,10 @@ export class OptionPositions {
       next: (data) => {
         this.dataSource.data = data ?? [];
         this.loading.set(false);
+        // Auto-select first row if nothing currently selected
+        if (!this.selected() && (data?.length ?? 0) > 0) {
+          this.onRowSelect(data![0]);
+        }
       },
       error: () => {
         this.notify.error('Failed to load option positions');
@@ -153,6 +158,7 @@ export class OptionPositions {
 
   onRowSelect(row: OptionPositionDto): void {
     this.isCreating.set(false);
+    this.editMode.set(false);
     this.selected.set(row);
     this.form.reset({
       id: row.id,
@@ -172,12 +178,34 @@ export class OptionPositions {
       bestExitPrice: row.bestExitPrice ?? null,
       bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
     });
+    this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
+  }
+
+  onEdit(): void {
+    this.editMode.set(true);
+    this.form.enable({ emitEvent: false });
+    // ID always read-only
+    this.form.get('id')?.disable({ emitEvent: false });
+  }
+
+  onCancelEdit(): void {
+    const row = this.selected();
+    if (this.isCreating()) {
+      this.onCancel();
+      return;
+    }
+    if (row) {
+      this.onRowSelect(row);
+    }
   }
 
   onNew(): void {
     this.isCreating.set(true);
+    this.editMode.set(true);
     this.selected.set(null);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
     this.form.reset({
       id: null,
       symbol: '',
@@ -203,6 +231,7 @@ export class OptionPositions {
     this.showSidebar.set(false);
     this.selected.set(null);
     this.isCreating.set(false);
+    this.editMode.set(false);
   }
 
   openGreeksHistory(contractId: string, event: Event): void {
@@ -240,10 +269,19 @@ export class OptionPositions {
       : this.service.update(payload.id as number, payload);
 
     obs.subscribe({
-      next: () => {
+      next: (saved: any) => {
         this.notify.success(this.isCreating() ? 'Position created' : 'Position updated');
+        const wasCreating = this.isCreating();
+        this.isCreating.set(false);
+        this.editMode.set(false);
         this.load();
-        this.onCancel();
+        // Re-select the saved row to refresh view-mode display
+        if (!wasCreating && saved) {
+          setTimeout(() => {
+            const row = this.dataSource.data.find(r => r.id === saved.id);
+            if (row) this.onRowSelect(row);
+          });
+        }
       },
       error: () => this.notify.error('Failed to save position'),
     });

@@ -33,12 +33,20 @@
       <span class="flex-1"></span>
       <app-account-switcher class="mr-3"></app-account-switcher>
       @let sync = lastSyncInfo();
-      <span class="text-xs flex items-center gap-1"
-            [class]="sync.stale ? 'text-amber-400' : 'opacity-70'"
+      <span class="sync-chip"
+            [class.is-stale]="sync.stale"
             [matTooltip]="sync.stale ? 'Greeks data may be stale' : 'IBKR Greeks sync status'">
         <mat-icon class="!text-base !w-4 !h-4">{{ sync.stale ? 'warning' : 'sync' }}</mat-icon>
         {{ sync.label }}
       </span>
+      <button mat-icon-button
+              type="button"
+              class="ml-2"
+              (click)="theme.toggle()"
+              [matTooltip]="theme.isDark() ? 'Switch to light theme' : 'Switch to dark theme'"
+              aria-label="Toggle theme">
+        <mat-icon>{{ theme.isDark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
     </mat-toolbar>
     <div class="flex flex-1 flex-col">
       <router-outlet></router-outlet>

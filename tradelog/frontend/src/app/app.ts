@@ -12,6 +12,7 @@ import { map, filter, startWith, switchMap, catchError } from 'rxjs/operators';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { OptionPositionsLogService } from './option-positions/option-positions.service';
 import { AccountSwitcherComponent } from './shared/account-switcher/account-switcher';
+import { ThemeService } from './shared/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -33,6 +34,7 @@ export class App {
   private breakpointObserver = inject(BreakpointObserver);
   private router = inject(Router);
   private logService = inject(OptionPositionsLogService);
+  protected theme = inject(ThemeService);
 
   isHandset = toSignal(
     this.breakpointObserver.observe(Breakpoints.Handset).pipe(

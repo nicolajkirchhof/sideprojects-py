@@ -8,6 +8,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angula
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { BaseChartDirective } from 'ng2-charts';
@@ -27,6 +28,7 @@ import { NotificationService } from '../shared/notification.service';
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
+    MatIconModule,
     MatDatepickerModule,
     MatNativeDateModule,
     BaseChartDirective,
@@ -58,6 +60,7 @@ export class CapitalComponent {
   showSidebar = signal(false);
   form!: FormGroup;
   isCreating = signal(false);
+  editMode = signal(false);
   selected = signal<Capital | null>(null);
 
   pnlColor = pnlColor;
@@ -108,6 +111,9 @@ export class CapitalComponent {
         this.dataSource.data = data ?? [];
         this.updateChart();
         this.loading.set(false);
+        if (!this.selected() && (data?.length ?? 0) > 0) {
+          this.onRowSelect(data![0]);
+        }
       },
       error: () => {
         this.notify.error('Failed to load capital snapshots');
@@ -118,6 +124,7 @@ export class CapitalComponent {
 
   onRowSelect(row: Capital): void {
     this.isCreating.set(false);
+    this.editMode.set(false);
     this.selected.set(row);
     this.form.reset({
       id: row.id,
@@ -127,11 +134,28 @@ export class CapitalComponent {
       excessLiquidity: row.excessLiquidity,
       bpr: row.bpr,
     });
+    this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
+  }
+
+  onEdit(): void {
+    this.editMode.set(true);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
+  }
+
+  onCancelEdit(): void {
+    if (this.isCreating()) {
+      this.onCancel();
+      return;
+    }
+    const row = this.selected();
+    if (row) this.onRowSelect(row);
   }
 
   onNew(): void {
     this.isCreating.set(true);
+    this.editMode.set(true);
     this.selected.set(null);
     this.form.reset({
       id: null,
@@ -141,6 +165,8 @@ export class CapitalComponent {
       excessLiquidity: null,
       bpr: null,
     });
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
     this.showSidebar.set(true);
   }
 
@@ -148,6 +174,7 @@ export class CapitalComponent {
     this.showSidebar.set(false);
     this.selected.set(null);
     this.isCreating.set(false);
+    this.editMode.set(false);
   }
 
   onSave(): void {

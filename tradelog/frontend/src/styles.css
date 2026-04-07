@@ -1,10 +1,84 @@
 @import "tailwindcss";
 
-/* You can add global styles to this file, and also import other style files */
-@import '@angular/material/prebuilt-themes/indigo-pink.css';
+/* Angular Material 3 azure-blue base — defines all --mat-sys-* tokens (light scheme) */
+@import '@angular/material/prebuilt-themes/azure-blue.css';
 @import 'quill/dist/quill.snow.css';
 
-/* Fix: Remove Tailwind preflight borders/background from Angular Material inputs to avoid extra line inside fields */
+/* ============================================================
+   THEME — dark by default, .light-theme class on <html> reverts
+   to the azure-blue light tokens already loaded.
+   ============================================================ */
+
+html {
+  color-scheme: dark;
+  background-color: var(--mat-sys-background);
+  color: var(--mat-sys-on-background);
+  font-family: Roboto, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+html.light-theme {
+  color-scheme: light;
+}
+
+/* Dark M3 token overrides for azure-blue (default) */
+html:not(.light-theme) {
+  --mat-sys-background: #131316;
+  --mat-sys-on-background: #e3e2e6;
+  --mat-sys-surface: #131316;
+  --mat-sys-surface-dim: #131316;
+  --mat-sys-surface-bright: #39393d;
+  --mat-sys-surface-container-lowest: #0e0e11;
+  --mat-sys-surface-container-low: #1a1b1f;
+  --mat-sys-surface-container: #1f2024;
+  --mat-sys-surface-container-high: #292a2e;
+  --mat-sys-surface-container-highest: #343539;
+  --mat-sys-on-surface: #e3e2e6;
+  --mat-sys-on-surface-variant: #c4c6d0;
+  --mat-sys-surface-variant: #44474e;
+  --mat-sys-inverse-surface: #e3e2e6;
+  --mat-sys-inverse-on-surface: #2f3033;
+  --mat-sys-inverse-primary: #005cbb;
+
+  --mat-sys-primary: #abc7ff;
+  --mat-sys-on-primary: #002f66;
+  --mat-sys-primary-container: #00458f;
+  --mat-sys-on-primary-container: #d7e3ff;
+
+  --mat-sys-secondary: #bec6dc;
+  --mat-sys-on-secondary: #283041;
+  --mat-sys-secondary-container: #3e4759;
+  --mat-sys-on-secondary-container: #dae2f9;
+
+  --mat-sys-tertiary: #bec2ff;
+  --mat-sys-on-tertiary: #00006e;
+  --mat-sys-tertiary-container: #0000ef;
+  --mat-sys-on-tertiary-container: #e0e0ff;
+
+  --mat-sys-error: #ffb4ab;
+  --mat-sys-on-error: #690005;
+  --mat-sys-error-container: #93000a;
+  --mat-sys-on-error-container: #ffdad6;
+
+  --mat-sys-outline: #8e9099;
+  --mat-sys-outline-variant: #44474e;
+}
+
+/* Domain accents — P&L colours, work in both themes */
+:root {
+  --color-pnl-positive: #16a34a;
+  --color-pnl-negative: #dc2626;
+}
+html:not(.light-theme) {
+  --color-pnl-positive: #4ade80;
+  --color-pnl-negative: #f87171;
+}
+
+/* ============================================================
+   GLOBAL TWEAKS
+   ============================================================ */
+
+/* Tailwind preflight cleanup for Material inputs */
 .mat-mdc-form-field .mdc-text-field__input,
 .mat-mdc-form-field input[matInput],
 .mat-mdc-form-field textarea[matInput] {
@@ -14,27 +88,172 @@
   box-shadow: none !important;
 }
 
-.mdc-notched-outline__notch
-{
+.mdc-notched-outline__notch {
   border-right: none;
 }
 
-/* Quill internals: let the content container fill remaining space when host is flex */
+/* Quill */
 quill-editor .ql-container {
   flex: 1 1 auto;
   height: auto !important;
   min-height: 0;
 }
-
-/* Ensure editor can shrink inside flex container */
 quill-editor .ql-editor {
   min-height: 0;
 }
 
-/* Snackbar variants */
+/* Snackbar */
 .snackbar-success .mdc-snackbar__surface {
   background-color: #2e7d32 !important;
 }
 .snackbar-error .mdc-snackbar__surface {
   background-color: #c62828 !important;
+}
+
+/* ============================================================
+   TOOLBAR — explicit surface container so text/chips read well
+   in both themes (don't rely on M3 color="primary")
+   ============================================================ */
+
+.mat-toolbar {
+  background-color: var(--mat-sys-surface-container) !important;
+  color: var(--mat-sys-on-surface) !important;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.mat-toolbar .mat-mdc-icon-button {
+  color: var(--mat-sys-on-surface) !important;
+}
+
+/* ============================================================
+   SIDENAV — narrower (was double-width) + flat menu items
+   ============================================================ */
+
+.sidenav {
+  width: 11.25rem !important; /* 180px */
+  background-color: var(--mat-sys-surface-container-low) !important;
+  border-right: 1px solid var(--mat-sys-outline-variant) !important;
+}
+.sidenav .mat-toolbar {
+  background-color: var(--mat-sys-surface-container-low) !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  border-bottom: none;
+}
+
+/* Flat, rectangular nav list items */
+.mat-mdc-nav-list .mat-mdc-list-item {
+  border-radius: 0.125rem !important; /* 2px */
+  margin: 0.0625rem 0.25rem !important; /* 1px 4px */
+  height: 2.25rem !important; /* 36px */
+  --mdc-list-list-item-container-shape: 0.125rem;
+}
+.mat-mdc-nav-list .mat-mdc-list-item .mdc-list-item__primary-text {
+  font-size: 0.8125rem !important;
+}
+.mat-mdc-nav-list .mat-mdc-list-item.active,
+.mat-mdc-nav-list .mat-mdc-list-item:hover {
+  background-color: color-mix(in srgb, var(--mat-sys-on-surface) 8%, transparent) !important;
+}
+
+/* ============================================================
+   BUTTON TOGGLE GROUP — flat & matched to input field height
+   M3 puts border-radius on the group via CSS vars + the first
+   and last toggles inherit it. Override aggressively.
+   ============================================================ */
+
+/* Set vars on :root so they cascade everywhere */
+:root {
+  --mat-button-toggle-shape: 0.25rem;
+  --mat-button-toggle-height: 2.5rem;
+  --mat-button-toggle-divider-color: var(--mat-sys-outline-variant);
+}
+/* Direct border-radius override matching the exact Material selector */
+.mat-button-toggle-standalone.mat-button-toggle-appearance-standard,
+.mat-button-toggle-group-appearance-standard {
+  border-radius: 0.25rem !important;
+  height: 2.5rem;
+  overflow: hidden;
+}
+/* Kill rounded corners on first/last toggles inside the group */
+.mat-button-toggle-group .mat-button-toggle:first-child,
+.mat-button-toggle-group .mat-button-toggle:first-child .mat-button-toggle-button,
+.mat-button-toggle-group .mat-button-toggle:last-child,
+.mat-button-toggle-group .mat-button-toggle:last-child .mat-button-toggle-button {
+  border-radius: 0 !important;
+}
+.mat-button-toggle-group .mat-button-toggle:first-child {
+  border-top-left-radius: 0.25rem !important;
+  border-bottom-left-radius: 0.25rem !important;
+}
+.mat-button-toggle-group .mat-button-toggle:last-child {
+  border-top-right-radius: 0.25rem !important;
+  border-bottom-right-radius: 0.25rem !important;
+}
+.mat-button-toggle-group .mat-button-toggle {
+  height: 2.5rem;
+}
+.mat-button-toggle-group .mat-button-toggle .mat-button-toggle-button {
+  height: 2.5rem !important;
+}
+.mat-button-toggle-group .mat-button-toggle-label-content {
+  line-height: 2.5rem !important;
+  padding: 0 0.875rem !important;
+  font-size: 0.8125rem !important;
+}
+
+/* Match form field outlined corner radius to chips/buttons */
+.mat-mdc-form-field .mdc-text-field--outlined {
+  --mdc-outlined-text-field-container-shape: 0.25rem;
+}
+
+/* ============================================================
+   SYNC CHIP — toolbar status indicator (surface-aware)
+   ============================================================ */
+
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.625rem; /* 26px */
+  padding: 0 0.625rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background-color: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
+  border: 1px solid var(--mat-sys-outline-variant);
+}
+.sync-chip.is-stale {
+  background-color: color-mix(in srgb, #f59e0b 22%, transparent);
+  color: var(--mat-sys-on-surface);
+  border-color: color-mix(in srgb, #f59e0b 55%, transparent);
+}
+.sync-chip mat-icon {
+  font-size: 0.875rem !important;
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  line-height: 0.875rem !important;
+}
+
+/* ============================================================
+   DATA TABLE — selected row uses primary-container (high contrast both themes)
+   ============================================================ */
+
+.mat-mdc-row.row-selected,
+.mat-mdc-row.row-selected:hover {
+  background-color: var(--mat-sys-primary-container) !important;
+}
+.mat-mdc-row.row-selected .mat-mdc-cell {
+  color: var(--mat-sys-on-primary-container) !important;
+  border-bottom-color: var(--mat-sys-outline-variant);
+}
+.mat-mdc-row.row-selected .mat-mdc-cell .opacity-70 {
+  opacity: 0.85;
+}
+.mat-mdc-row:hover {
+  background-color: color-mix(in srgb, var(--mat-sys-on-surface) 6%, transparent);
 }

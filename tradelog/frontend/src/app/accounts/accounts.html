@@ -43,14 +43,14 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"
             (click)="onRowSelect(row)"
             class="cursor-pointer"
-            [class.!bg-blue-900]="selected()?.id === row.id"></tr>
+            [class.row-selected]="selected()?.id === row.id"></tr>
       </table>
     </div>
   </div>
 
   <div sidebar class="flex flex-1">
     @if (showSidebar()) {
-      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full pr-4 gap-3 h-full min-h-0 overflow-auto">
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col w-full max-w-[420px] pr-4 gap-2 h-full min-h-0 overflow-auto">
 
         @if (!isCreating()) {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -145,12 +145,20 @@
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
-          @if (!isCreating() && selected()) {
-            <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+          @if (editMode()) {
+            @if (!isCreating() && selected()) {
+              <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+            }
+            <span class="flex-1"></span>
+            <button mat-stroked-button type="button" (click)="onCancelEdit()">Cancel</button>
+            <button mat-flat-button color="primary" type="submit">Save</button>
+          } @else {
+            <span class="flex-1"></span>
+            <button mat-stroked-button type="button" (click)="onCancel()">Close</button>
+            <button mat-flat-button color="primary" type="button" (click)="onEdit()">
+              <mat-icon class="mr-1">edit</mat-icon>Edit
+            </button>
           }
-          <span class="flex-1"></span>
-          <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
-          <button mat-flat-button color="primary" type="submit">Save</button>
         </div>
       </form>
     }

@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 
 import { AngularSplitModule } from 'angular-split';
 
@@ -11,6 +11,8 @@ import { AngularSplitModule } from 'angular-split';
 })
 export class ContentArea {
   showRightSidebar = input(false);
-  sidebarWidth = input('320px');
+  /** Initial sidebar width in pixels — matches the form max-width (420px) + padding. */
+  sidebarWidth = input(460);
+  sidebarWidthPx = computed(() => this.sidebarWidth());
   title = input<string>();
 }

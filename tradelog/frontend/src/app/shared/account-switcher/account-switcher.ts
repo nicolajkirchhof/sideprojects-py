@@ -2,33 +2,63 @@ import { Component, inject, signal } from '@angular/core';
 
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { AccountsService, Account } from '../../accounts/accounts.service';
 import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-account-switcher',
   standalone: true,
-  imports: [MatSelectModule, MatFormFieldModule],
+  imports: [MatSelectModule, MatFormFieldModule, MatIconModule, MatTooltipModule],
   template: `
-    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="account-switcher">
-      <mat-select [value]="service.selectedAccountId()" (selectionChange)="onChange($event.value)" placeholder="Select account">
+    <div class="account-switcher" [matTooltip]="'Active account'">
+      <mat-icon class="account-switcher__icon">account_circle</mat-icon>
+      <mat-select
+        [value]="service.selectedAccountId()"
+        (selectionChange)="onChange($event.value)"
+        panelClass="account-switcher-panel"
+        placeholder="Select account">
         @for (a of accounts(); track a.id) {
           <mat-option [value]="a.id">{{ a.name }}</mat-option>
         }
       </mat-select>
-    </mat-form-field>
+    </div>
   `,
   styles: [`
     .account-switcher {
-      width: 140px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      height: 1.875rem; /* 30px */
+      padding: 0 0.625rem;
+      min-width: 10rem; /* 160px */
+      border-radius: 0.25rem;
+      background-color: var(--mat-sys-surface-container-high);
+      border: 1px solid var(--mat-sys-outline-variant);
+      transition: background-color 120ms ease, border-color 120ms ease;
     }
-    :host ::ng-deep .mat-mdc-form-field-subscript-wrapper { display: none; }
-    :host ::ng-deep .mdc-text-field { height: 32px; }
-    :host ::ng-deep .mat-mdc-select-value { font-size: 13px; }
-    :host ::ng-deep .mdc-notched-outline__leading,
-    :host ::ng-deep .mdc-notched-outline__trailing,
-    :host ::ng-deep .mdc-notched-outline__notch {
-      border-color: rgba(255,255,255,0.3) !important;
+    .account-switcher:hover {
+      background-color: var(--mat-sys-surface-container-highest);
+      border-color: var(--mat-sys-outline);
+    }
+    .account-switcher__icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    :host ::ng-deep .account-switcher .mat-mdc-select {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--mat-sys-on-surface);
+      letter-spacing: 0.01em;
+    }
+    :host ::ng-deep .account-switcher .mat-mdc-select-arrow {
+      color: var(--mat-sys-on-surface-variant);
+    }
+    :host ::ng-deep .account-switcher .mat-mdc-select-placeholder {
+      color: var(--mat-sys-on-surface-variant);
     }
   `],
 })
