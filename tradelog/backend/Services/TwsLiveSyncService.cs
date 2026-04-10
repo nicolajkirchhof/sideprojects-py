@@ -13,12 +13,18 @@ namespace tradelog.Services;
 public class TwsLiveSyncService
 {
     private readonly DataContext _context;
+    private readonly OptionPositionLogCountService _logCountService;
     private readonly ILogger<TwsLiveSyncService> _logger;
     private readonly ILoggerFactory _loggerFactory;
 
-    public TwsLiveSyncService(DataContext context, ILogger<TwsLiveSyncService> logger, ILoggerFactory loggerFactory)
+    public TwsLiveSyncService(
+        DataContext context,
+        OptionPositionLogCountService logCountService,
+        ILogger<TwsLiveSyncService> logger,
+        ILoggerFactory loggerFactory)
     {
         _context = context;
+        _logCountService = logCountService;
         _logger = logger;
         _loggerFactory = loggerFactory;
     }
@@ -79,6 +85,15 @@ public class TwsLiveSyncService
 
         int logged = 0;
         var now = DateTime.UtcNow;
+        var upsertCutoff = now - TimeSpan.FromHours(1);
+
+        // Pre-fetch the latest log per contract so we can decide insert vs update
+        var contractIds = openPositions.Select(p => p.ContractId).ToList();
+        var recentLogs = await _context.OptionPositionsLogs
+            .Where(l => contractIds.Contains(l.ContractId) && l.DateTime >= upsertCutoff)
+            .GroupBy(l => l.ContractId)
+            .Select(g => g.OrderByDescending(l => l.DateTime).First())
+            .ToDictionaryAsync(l => l.ContractId);
 
         foreach (var pos in openPositions)
         {
@@ -132,24 +147,45 @@ public class TwsLiveSyncService
                         pos.Symbol, pos.ConId, ex.Message);
                 }
 
-                _context.OptionPositionsLogs.Add(new OptionPositionsLog
+                if (recentLogs.TryGetValue(pos.ContractId, out var existing))
                 {
-                    DateTime = now,
-                    ContractId = pos.ContractId,
-                    Underlying = underlyingPrice,
-                    Iv = (decimal)iv,
-                    Price = price,
-                    TimeValue = timeValue,
-                    Delta = (decimal)delta,
-                    Theta = (decimal)theta,
-                    Gamma = (decimal)gamma,
-                    Vega = (decimal)vega,
-                    Margin = margin,
-                });
-                logged++;
+                    // Recent log exists — update it in place
+                    existing.DateTime = now;
+                    existing.Underlying = underlyingPrice;
+                    existing.Iv = (decimal)iv;
+                    existing.Price = price;
+                    existing.TimeValue = timeValue;
+                    existing.Delta = (decimal)delta;
+                    existing.Theta = (decimal)theta;
+                    existing.Gamma = (decimal)gamma;
+                    existing.Vega = (decimal)vega;
+                    existing.Margin = margin;
 
-                _logger.LogInformation("Logged {Symbol} conId={ConId}: price={Price} delta={Delta} theta={Theta} iv={Iv} margin={Margin}",
-                    pos.Symbol, pos.ConId, price, delta, theta, iv, margin);
+                    _logger.LogInformation("Updated {Symbol} conId={ConId}: price={Price} delta={Delta} theta={Theta} iv={Iv} margin={Margin}",
+                        pos.Symbol, pos.ConId, price, delta, theta, iv, margin);
+                }
+                else
+                {
+                    // No recent log — insert new row
+                    _context.OptionPositionsLogs.Add(new OptionPositionsLog
+                    {
+                        DateTime = now,
+                        ContractId = pos.ContractId,
+                        Underlying = underlyingPrice,
+                        Iv = (decimal)iv,
+                        Price = price,
+                        TimeValue = timeValue,
+                        Delta = (decimal)delta,
+                        Theta = (decimal)theta,
+                        Gamma = (decimal)gamma,
+                        Vega = (decimal)vega,
+                        Margin = margin,
+                    });
+
+                    _logger.LogInformation("Logged {Symbol} conId={ConId}: price={Price} delta={Delta} theta={Theta} iv={Iv} margin={Margin}",
+                        pos.Symbol, pos.ConId, price, delta, theta, iv, margin);
+                }
+                logged++;
 
                 await Task.Delay(200);
             }
@@ -160,7 +196,10 @@ public class TwsLiveSyncService
         }
 
         if (logged > 0)
+        {
+            await _logCountService.RecomputeForAsync(openPositions);
             await _context.SaveChangesAsync();
+        }
 
         return logged;
     }

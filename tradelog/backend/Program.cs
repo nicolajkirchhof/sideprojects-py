@@ -31,7 +31,11 @@ builder.Services.AddScoped<IAccountContext, AccountContext>();
 builder.Services.AddScoped<TwsLiveSyncService>();
 builder.Services.AddScoped<FlexQueryClient>();
 builder.Services.AddSingleton<FlexReportParser>();
-builder.Services.AddScoped<FlexSyncService>();
+builder.Services.AddScoped<FlexSyncService>(sp => new FlexSyncService(
+    sp.GetRequiredService<DataContext>(),
+    sp.GetRequiredService<ILogger<FlexSyncService>>(),
+    cutoffDate: builder.Configuration.GetValue<DateTime?>("FlexSyncCutoffDate")));
+builder.Services.AddScoped<OptionPositionLogCountService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -53,6 +57,16 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<DataContext>();
     context.Database.Migrate();
+
+    // One-off backfill: populate LogCount for any open positions that have never
+    // been computed. Runs synchronously after migrate so the column is coherent
+    // before the first request is served.
+    var logCountService = services.GetRequiredService<OptionPositionLogCountService>();
+    var backfilled = await logCountService.RecomputeForPendingOpenAsync();
+    if (backfilled > 0)
+    {
+        app.Logger.LogInformation("Backfilled LogCount for {Count} open position(s).", backfilled);
+    }
 }
 
 if (app.Environment.IsDevelopment())

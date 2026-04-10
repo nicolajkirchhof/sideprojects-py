@@ -12,7 +12,7 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 import pyqtgraph as pg
 
@@ -279,12 +279,13 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.evt_earnings = QtWidgets.QCheckBox("Earnings")
     self.evt_atrp = QtWidgets.QCheckBox("ATRP")
     self.evt_green = QtWidgets.QCheckBox("GreenLine")
+    self.evt_bb = QtWidgets.QCheckBox("BB Lower")
 
     # Default: ATRP checked (requested)
     self.evt_atrp.setChecked(True)
 
     # Default: none checked = no event-type filtering (show all)
-    for w in (self.evt_earnings, self.evt_atrp, self.evt_green):
+    for w in (self.evt_earnings, self.evt_atrp, self.evt_green, self.evt_bb):
       evt_layout.addWidget(w)
     evt_layout.addStretch(1)
     c_layout.addWidget(evt_box)
@@ -441,6 +442,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     self.evt_earnings.toggled.connect(lambda _v: self._schedule_apply())
     self.evt_atrp.toggled.connect(lambda _v: self._schedule_apply())
     self.evt_green.toggled.connect(lambda _v: self._schedule_apply())
+    self.evt_bb.toggled.connect(lambda _v: self._schedule_apply())
 
     self.spy_all.toggled.connect(lambda _v: self._schedule_apply())
     self.spy_support.toggled.connect(lambda _v: self._schedule_apply())
@@ -494,7 +496,7 @@ class DashboardQt(QtWidgets.QMainWindow):
 
   def _load_spy_swing_initial(self) -> None:
     try:
-      spy = utils.swing_trading_data.SwingTradingData("SPY", offline=True, metainfo=False)
+      spy = utils.swing_trading_data.SwingTradingData("SPY", datasource='offline')
     except Exception as e:
       self._spy_swing = None
       self._spy_df_day = None
@@ -565,7 +567,7 @@ class DashboardQt(QtWidgets.QMainWindow):
     QtWidgets.QApplication.processEvents()
 
     try:
-      und = utils.swing_trading_data.SwingTradingData(sym, offline=True)
+      und = utils.swing_trading_data.SwingTradingData(sym, datasource='offline')
     except Exception as e:
       QtWidgets.QMessageBox.critical(self, "Prefill Error", f"Failed to load swing data for {sym}: {e}")
       self.lbl_prefill_status.setText("")
@@ -1064,6 +1066,8 @@ class DashboardQt(QtWidgets.QMainWindow):
       selected_cols.append("evt_atrp_breakout")
     if self.evt_green.isChecked():
       selected_cols.append("evt_green_line_breakout")
+    if self.evt_bb.isChecked():
+      selected_cols.append("evt_bb_lower_touch")
 
     if selected_cols:
       evt_mask = pd.Series(False, index=df.index)

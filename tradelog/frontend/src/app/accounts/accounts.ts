@@ -7,11 +7,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatCardModule } from '@angular/material/card';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ContentArea } from '../shared/content-area/content-area';
 import { NotificationService } from '../shared/notification.service';
-import { AccountsService, Account, SyncStatus } from './accounts.service';
+import { AccountsService, Account } from './accounts.service';
 
 @Component({
   selector: 'app-accounts',
@@ -24,7 +23,6 @@ import { AccountsService, Account, SyncStatus } from './accounts.service';
     MatButtonModule,
     MatIconModule,
     MatCheckboxModule,
-    MatCardModule,
     MatProgressBarModule,
     ContentArea
 ],
@@ -46,11 +44,6 @@ export class AccountsComponent {
   isCreating = signal(false);
   editMode = signal(false);
   selected = signal<Account | null>(null);
-
-  syncStatus = signal<SyncStatus | null>(null);
-  syncing = signal(false);
-  Math = Math;
-  syncMessage = signal<string | null>(null);
 
   constructor() {
     this.load();
@@ -82,7 +75,6 @@ export class AccountsComponent {
         this.loading.set(false);
       },
     });
-    this.refreshSyncStatus();
   }
 
   onRowSelect(row: Account): void {
@@ -102,8 +94,6 @@ export class AccountsComponent {
     });
     this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
-    this.syncMessage.set(null);
-    this.refreshSyncStatus();
   }
 
   onEdit(): void {
@@ -139,7 +129,6 @@ export class AccountsComponent {
     this.form.enable({ emitEvent: false });
     this.form.get('id')?.disable({ emitEvent: false });
     this.showSidebar.set(true);
-    this.syncMessage.set(null);
   }
 
   onCancel(): void {
@@ -202,50 +191,6 @@ export class AccountsComponent {
         this.onCancel();
       },
       error: () => this.notify.error('Failed to delete account'),
-    });
-  }
-
-  onFlexSync(): void {
-    if (!this.selected()) return;
-    this.service.selectAccount(this.selected()!.id);
-    this.syncing.set(true);
-    this.syncMessage.set(null);
-    this.service.triggerFlexSync().subscribe({
-      next: (res) => {
-        this.syncMessage.set(res?.message ?? 'Flex sync completed.');
-        this.syncing.set(false);
-        this.load();
-      },
-      error: (err) => {
-        this.syncMessage.set(err.error?.message ?? 'Flex sync failed.');
-        this.syncing.set(false);
-        this.load();
-      },
-    });
-  }
-
-  onLiveSync(): void {
-    if (!this.selected()) return;
-    this.service.selectAccount(this.selected()!.id);
-    this.syncing.set(true);
-    this.syncMessage.set(null);
-    this.service.triggerLiveSync().subscribe({
-      next: (res) => {
-        this.syncMessage.set(res?.message ?? 'Live sync completed.');
-        this.syncing.set(false);
-        this.load();
-      },
-      error: (err) => {
-        this.syncMessage.set(err.error?.message ?? 'Live sync failed.');
-        this.syncing.set(false);
-        this.load();
-      },
-    });
-  }
-
-  private refreshSyncStatus(): void {
-    this.service.getSyncStatus().subscribe({
-      next: (status) => this.syncStatus.set(status),
     });
   }
 

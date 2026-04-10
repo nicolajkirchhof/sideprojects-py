@@ -50,16 +50,16 @@ def qt_pen_cfg(cfg: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 MA_CONFIGS = {
-    'ma5':   {'color': '#9b7f6c', 'width': 1.0, 'dash': 'dash'},
-    'ma10':  {'color': '#9b7f6c', 'width': 1.0, 'dash': 'solid'},
-    'ma20':  {'color': '#b26529', 'width': 1.5, 'dash': 'solid'},
-    'ma50':  {'color': '#7b4326', 'width': 1.0, 'dash': 'solid'},
-    'ma100': {'color': '#703b24', 'width': 1.0, 'dash': 'solid'},
-    'ma200': {'color': '#5a2c27', 'width': 1.0, 'dash': 'solid'},
+    'ma5':   {'color': '#89c9f5', 'width': 1.0, 'dash': 'dash'},
+    'ma10':  {'color': '#58b0f6', 'width': 1.0, 'dash': 'dash'},
+    'ma20':  {'color': '#0181ec', 'width': 1.5, 'dash': 'solid'},
+    'ma50':  {'color': '#004b9a', 'width': 1.0, 'dash': 'dash'},
+    'ma100': {'color': '#004b9a', 'width': 1.0, 'dash': 'dash'},
+    'ma200': {'color': '#00285a', 'width': 1.0, 'dash': 'dash'},
 }
 
 ATR_CONFIGS = {
-    'atrp1':  {'color': '#f5a1df', 'width': 1.0, 'dash': 'dot'},
+    'atrp9':  {'color': '#f5a1df', 'width': 1.0, 'dash': 'dot'},
     'atrp20': {'color': '#b72494', 'width': 1.5, 'dash': 'solid'},
 }
 
@@ -73,7 +73,7 @@ SLOPE_CONFIGS = {
 
 VOL_CONFIGS = {
     'v':   {'color': '#49bdd9', 'width': 1.0, 'dash': 'dash'},
-    'v20': {'color': '#f3cb21', 'width': 1.5, 'dash': 'solid'},
+    'v20': {'color': '#0e64ab', 'width': 1.5, 'dash': 'solid'},
 }
 
 # ma100_dist / ma200_dist removed — not decision-relevant for 20-60 day swings
@@ -85,17 +85,17 @@ DIST_CONFIGS = {
 
 HV_CONFIGS = {
     'hv9':  {'color': '#b7a3db', 'width': 1.0, 'dash': 'dash'},
-    'hv20': {'color': '#6539b4', 'width': 1.5, 'dash': 'solid'},
-    'iv':   {'color': '#49bcd8', 'width': 1.5, 'dash': 'solid'},
+    'hv20': {'color': '#673ab7', 'width': 1.5, 'dash': 'solid'},
+    'iv':   {'color': '#4ec9e7', 'width': 1.5, 'dash': 'solid'},
 }
 
 IVPCT_CONFIGS = {
-    'iv_pct': {'color': '#b72494', 'width': 1.0, 'dash': 'solid'},
+    'iv_pct': {'color': '#b92c9f', 'width': 1.5, 'dash': 'solid'},
 }
 
 BB_CONFIGS = {
-    'bb_upper': {'color': '#9075d6', 'width': 1.0, 'dash': 'dot'},
-    'bb_lower': {'color': '#00aaab', 'width': 1.0, 'dash': 'dot'},
+    'bb_upper': {'color': '#ffffff', 'width': 1.0, 'dash': 'dot'},
+    'bb_lower': {'color': '#ffffff', 'width': 1.0, 'dash': 'dot'},
 }
 
 TTM_COLORS = {

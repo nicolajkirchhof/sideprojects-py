@@ -21,6 +21,7 @@ dependencies = [
     "pandas-stubs==2.3.3.260113",
     "plotly==6.5.1",
     "pyarrow>=23.0.1",
+    "psycopg[binary]>=3.2.0",
     "pymysql>=1.1.2",
     "pyqt6==6.10.2",
     "pyqtgraph==0.14.0",

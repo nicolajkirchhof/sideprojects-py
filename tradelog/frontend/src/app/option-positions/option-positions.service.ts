@@ -48,6 +48,9 @@ export interface OptionPositionDto {
   realizedPnlPct?: number | null;
   durationPct?: number | null;
   roic?: number | null;
+
+  /** Cached count of greek log samples recorded since the position was opened. Null = never computed. */
+  logCount: number | null;
 }
 
 export interface OptionPositionUpsert {

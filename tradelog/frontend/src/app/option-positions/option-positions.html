@@ -101,6 +101,18 @@
           <td mat-cell *matCellDef="let p">{{ p.theta != null ? (p.theta | number:'1.2-4') : '—' }}</td>
         </ng-container>
 
+        <ng-container matColumnDef="logCount">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="text-right">n</th>
+          <td mat-cell *matCellDef="let p"
+              class="text-right"
+              [class.opacity-40]="p.logCount == null || p.logCount === 0"
+              [class.cursor-pointer]="p.logCount > 0"
+              (click)="p.logCount > 0 && openGreeksHistory(p.contractId, $event)"
+              [matTooltip]="p.logCount == null ? 'Never computed' : (p.logCount === 0 ? 'No samples recorded' : 'Open greeks history')">
+            {{ p.logCount == null ? '—' : p.logCount }}
+          </td>
+        </ng-container>
+
         <ng-container matColumnDef="durationPct">
           <th mat-header-cell *matHeaderCellDef>Dur%</th>
           <td mat-cell *matCellDef="let p">{{ p.durationPct != null ? (p.durationPct | number:'1.0-0') + '%' : '—' }}</td>

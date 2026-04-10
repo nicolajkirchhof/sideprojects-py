@@ -56,8 +56,8 @@ class OHLCItem(pg.GraphicsObject):
 
     def paint(self, p, *args):
         w_pen = pg.mkPen('#ffffff', width=2)
-        g_pen = pg.mkPen('#00ff00', width=2)
-        r_pen = pg.mkPen('#ff0000', width=2)
+        g_pen = pg.mkPen('#1b9e44', width=2)
+        r_pen = pg.mkPen('#cf3030', width=2)
         b_pen = pg.mkPen('#0000ff', width=2)
         p.setPen(w_pen)
         for t, op, high, low, close in self.data:

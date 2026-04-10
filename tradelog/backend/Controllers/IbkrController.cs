@@ -159,16 +159,7 @@ public class IbkrController : ControllerBase
         if (account == null)
             return BadRequest("No account selected.");
 
-        if (account.LastSyncAt != null)
-        {
-            var elapsed = DateTime.UtcNow - account.LastSyncAt.Value;
-            if (elapsed < LiveSyncCooldown)
-            {
-                var remaining = (int)(LiveSyncCooldown - elapsed).TotalSeconds;
-                return Conflict(new { message = $"Next live sync in {remaining / 60} minutes.", cooldownRemainingSeconds = remaining });
-            }
-        }
-
+        // Greeks log upserts within 1h, so cooldown is no longer enforced here.
         var result = await _liveSync.SyncAll(account);
 
         if (result.Success)

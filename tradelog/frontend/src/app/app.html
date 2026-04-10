@@ -32,13 +32,7 @@
       <span class="ml-4 opacity-90 text-sm">{{ breadcrumb() }}</span>
       <span class="flex-1"></span>
       <app-account-switcher class="mr-3"></app-account-switcher>
-      @let sync = lastSyncInfo();
-      <span class="sync-chip"
-            [class.is-stale]="sync.stale"
-            [matTooltip]="sync.stale ? 'Greeks data may be stale' : 'IBKR Greeks sync status'">
-        <mat-icon class="!text-base !w-4 !h-4">{{ sync.stale ? 'warning' : 'sync' }}</mat-icon>
-        {{ sync.label }}
-      </span>
+      <app-sync-control class="mr-2"></app-sync-control>
       <button mat-icon-button
               type="button"
               class="ml-2"

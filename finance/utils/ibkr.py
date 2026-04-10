@@ -38,6 +38,40 @@ JP_INDEX = ib.Index('N225', 'OSE.JPN', 'JPY')
 HK_INDEX = ib.Index('HSI', 'HKFE', 'HKD')
 INDICES = [*EU_INDICES, *US_INDICES, JP_INDEX, FR_INDEX, HK_INDEX]
 
+def cache_path(symbol: str) -> str:
+  """Return the on-disk pickle path used by `daily_w_volatility` for this symbol."""
+  if '.' in symbol:
+    symbol = symbol.replace('.', ' ')
+  return f'finance/_data/ibkr/{symbol.replace(" ", "_")}_contract.pkl'
+
+
+def get_cached_last_bar_date(symbol: str):
+  """Return the last cached bar date for `symbol`, or None if no cache exists."""
+  path = cache_path(symbol)
+  if not os.path.exists(path):
+    return None
+  try:
+    df = pd.read_pickle(path)
+    if df is None or df.empty:
+      return None
+    return df.index.max().date()
+  except Exception:
+    return None
+
+
+def is_cache_fresh(symbol: str, max_age_days: int = 1) -> bool:
+  """True if cache exists and its last bar is within `max_age_days` of today."""
+  last = get_cached_last_bar_date(symbol)
+  if last is None:
+    return False
+  return (datetime.now().date() - last).days <= max_age_days
+
+
+def has_cache(symbol: str) -> bool:
+  """True if a cache pickle exists for `symbol` (may be stale)."""
+  return os.path.exists(cache_path(symbol))
+
+
 def connect(instance, id, data_type):
   ib.util.startLoop()
   ib_con = ib.IB()
@@ -107,8 +141,8 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
      if cursor is None or cursor is not datetime:
        cursor = dateutil.parser.parse("2000-01-01").date()
 
-    # If already up-to-date, just return cache
-    if cursor >= target_end:
+    # If already up-to-date (cache past today), return cache
+    if cursor > target_end:
       return df_existing
 
     def get_request_string(days: int) -> str:
@@ -125,7 +159,8 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
 
     dfs = [df_existing.copy() if df_existing is not None else pd.DataFrame()]
 
-    while cursor <= target_end:
+    while cursor <= target_end:  # inclusive — always try to include `today`
+
       request_end = min(cursor + timedelta(days=max_chunk_days), target_end)
       days_to_request = (request_end - cursor).days + 1  # include end day
 

@@ -7,11 +7,10 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { of, timer } from 'rxjs';
-import { map, filter, startWith, switchMap, catchError } from 'rxjs/operators';
+import { map, filter, startWith } from 'rxjs/operators';
 import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
-import { OptionPositionsLogService } from './option-positions/option-positions.service';
 import { AccountSwitcherComponent } from './shared/account-switcher/account-switcher';
+import { SyncControlComponent } from './shared/sync-control/sync-control';
 import { ThemeService } from './shared/theme.service';
 
 @Component({
@@ -26,14 +25,14 @@ import { ThemeService } from './shared/theme.service';
     MatListModule,
     MatIconModule,
     MatTooltipModule,
-    AccountSwitcherComponent
+    AccountSwitcherComponent,
+    SyncControlComponent
   ],
   templateUrl: './app.html'
 })
 export class App {
   private breakpointObserver = inject(BreakpointObserver);
   private router = inject(Router);
-  private logService = inject(OptionPositionsLogService);
   protected theme = inject(ThemeService);
 
   isHandset = toSignal(
@@ -67,24 +66,4 @@ export class App {
   );
 
   breadcrumb = computed(() => `${this.sectionLabel()} > List`);
-
-  lastSyncInfo = toSignal(
-    timer(0, 60_000).pipe(
-      switchMap(() => this.logService.getLastSync().pipe(
-        catchError(() => of({ lastSync: null }))
-      )),
-      map(({ lastSync }) => {
-        if (!lastSync) return { label: 'Never synced', stale: true };
-        const diffMs = Date.now() - new Date(lastSync).getTime();
-        const diffMin = Math.floor(diffMs / 60_000);
-        if (diffMin < 1) return { label: 'Synced just now', stale: false };
-        if (diffMin < 60) return { label: `Synced ${diffMin}m ago`, stale: false };
-        const diffH = Math.floor(diffMin / 60);
-        if (diffH < 24) return { label: `Synced ${diffH}h ago`, stale: false };
-        const diffD = Math.floor(diffH / 24);
-        return { label: `Synced ${diffD}d ago`, stale: true };
-      })
-    ),
-    { initialValue: { label: 'Never synced', stale: true } }
-  );
 }

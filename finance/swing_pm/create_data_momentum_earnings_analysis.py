@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 import finance.utils as utils
-from finance.utils._dormant import underlyings
+from finance.utils import underlyings
 
 # %load_ext autoreload
 # %autoreload 2
@@ -37,7 +37,7 @@ liquid_symbols = liquid_stocks + liquid_etfs
 # The dataset has the following columns 'symbol', 'date', 'is_earnings', 'event_types', 'eps', 'eps_est',
 #   'earnings_when', 'gappct', 'market_cap', 'market_cap_date', 'market_cap_class', 'original_price',
 #   '1M_chg', '3M_chg', '6M_chg', '12M_chg'
-#   'evt_atrp_breakout', 'evt_green_line_breakout'
+#   'evt_atrp_breakout', 'evt_green_line_breakout', 'evt_bb_lower_touch'
 # In addition, the following columns track changes before and after the event they are tracked
 # as {name}XX and w_{name}XX for daily and weekly values before and after the event.
 #   Daily columns are from -25 to 25 whereas 0 is the event day (Total: 51 days)
@@ -231,6 +231,46 @@ for i, ticker in enumerate(symbols_to_process):
                 ath_high = max(ath_high, float(current_h))
                 last_ath_idx = idx
 
+    # --- 4. Identify BB Lower Touch Events (Mean Reversion to Trend, PM-09) ---
+    # Condition: low touches/crosses lower Bollinger band while broader trend is intact.
+    # Fires on every qualifying touch (no cooldown) to measure raw success rate.
+    if (
+        'bb_lower' in df_day.columns
+        and 'l' in df_day.columns
+        and 'ma50_slope' in df_day.columns
+        and 'ma200_dist' in df_day.columns
+    ):
+        bb_condition = (
+            (df_day['l'] <= df_day['bb_lower'])
+            & (df_day['ma50_slope'] > 0)
+            & (df_day['ma200_dist'] > 0)
+        )
+
+        for reaction_date in df_day.index[bb_condition]:
+            reaction_idx = df_day.index.get_loc(reaction_date)
+
+            # Boundary Check
+            if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
+                continue
+
+            reaction_volume = df_day.iloc[reaction_idx].v
+            if reaction_volume < MIN_VOLUME:
+                disregarded_count += 1
+                continue
+
+            meta = events_map.get(reaction_date, {
+                'reaction_idx': reaction_idx,
+                'eps': np.nan,
+                'eps_est': np.nan,
+                'earnings_when': np.nan,
+                'event_types': set(),
+            })
+
+            meta['reaction_idx'] = reaction_idx
+            meta['event_types'].add('bb_lower_touch')
+
+            events_map[reaction_date] = meta
+
     if not events_map:
         if disregarded_count > 0:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | NO EVENTS ({disregarded_count} disregarded due to volume)")
@@ -329,6 +369,7 @@ for i, ticker in enumerate(symbols_to_process):
             # NEW: flat flags for fast filtering
             'evt_atrp_breakout': ('atrp_breakout' in event_types),
             'evt_green_line_breakout': ('green_line_breakout' in event_types),
+            'evt_bb_lower_touch': ('bb_lower_touch' in event_types),
 
             # ... existing fields ...
             'is_etf': is_etf,

@@ -13,10 +13,12 @@ namespace tradelog.Controllers;
 public class OptionPositionsController : ControllerBase
 {
     private readonly DataContext _context;
+    private readonly OptionPositionLogCountService _logCountService;
 
-    public OptionPositionsController(DataContext context)
+    public OptionPositionsController(DataContext context, OptionPositionLogCountService logCountService)
     {
         _context = context;
+        _logCountService = logCountService;
     }
 
     [HttpGet]
@@ -47,7 +49,9 @@ public class OptionPositionsController : ControllerBase
             .Select(g => g.OrderByDescending(l => l.DateTime).First())
             .ToDictionaryAsync(l => l.ContractId);
 
-        return positions.Select(p => OptionPositionDtoMapper.ToDto(p, latestLogs.GetValueOrDefault(p.ContractId))).ToList();
+        return positions
+            .Select(p => OptionPositionDtoMapper.ToDto(p, latestLogs.GetValueOrDefault(p.ContractId)))
+            .ToList();
     }
 
     [HttpGet("{id:int}")]
@@ -80,7 +84,21 @@ public class OptionPositionsController : ControllerBase
         var existing = await _context.OptionPositions.FindAsync(id);
         if (existing == null) return NotFound();
 
+        var openedChanged = existing.Opened != position.Opened;
+        var cachedLogCount = existing.LogCount;
+
         _context.Entry(existing).CurrentValues.SetValues(position);
+
+        // LogCount is a server-maintained cache field — never trust the payload.
+        // Preserve the pre-update value across SetValues, then recompute only if
+        // the Opened date actually changed on a still-open position.
+        existing.LogCount = cachedLogCount;
+
+        if (openedChanged && existing.Closed == null)
+        {
+            await _logCountService.RecomputeForAsync(new[] { existing });
+        }
+
         await _context.SaveChangesAsync();
         return NoContent();
     }

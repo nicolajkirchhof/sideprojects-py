@@ -210,7 +210,14 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
   label_color = 'white' if is_dark else 'black'
   start_node_color = 'skyblue' if is_dark else 'lightblue'
 
-  ax.set_title(f"Transition Probabilities - {title}", fontsize=15, pad=20, color=label_color)
+  ax.set_title(f"Transition Probabilities — {title}", fontsize=11, pad=4, color=label_color)
+  # Hide frame/ticks but KEEP facecolor (set_axis_off() wipes it)
+  for spine in ax.spines.values():
+      spine.set_visible(False)
+  ax.set_xticks([])
+  ax.set_yticks([])
+  ax.set_facecolor(face_color_hex)
+  ax.margins(0.02, 0.04)
 
   # Determine edge colors and widths based on limits
   edge_colors = []
@@ -237,16 +244,12 @@ def plot_probability_tree(series, depth=4, title='', lower_limit=None, upper_lim
     else:
       node_colors.append(start_node_color)
 
-  nx.draw(G, pos, with_labels=False, node_size=50, node_color=node_colors, arrows=True, edge_color=edge_colors,
+  nx.draw(G, pos, with_labels=False, node_size=40, node_color=node_colors, arrows=True, edge_color=edge_colors,
           width=edge_widths, ax=ax)
 
-  # Draw node labels (Up/Down)
-  node_labels = nx.get_node_attributes(G, 'label')
-  nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10, ax=ax, font_color=label_color)
-
-  # Draw edge labels (Probabilities)
+  # Edge labels (Probabilities) — no U/D node labels; nodes are colour-coded instead.
   edge_labels = nx.get_edge_attributes(G, 'label')
-  nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6, ax=ax, font_color=label_color,
-                               bbox=dict(facecolor=ax.get_facecolor(), edgecolor='none', alpha=0.6))
+  nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=7, ax=ax, font_color=label_color,
+                               bbox=dict(facecolor=face_color_hex, edgecolor='none', alpha=1.0, pad=1.0))
 
   return fig, ax

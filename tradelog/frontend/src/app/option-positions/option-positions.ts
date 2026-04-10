@@ -65,7 +65,7 @@ export class OptionPositions {
   displayedColumns = [
     'symbol', 'contractId', 'right', 'strike', 'expiry', 'pos', 'cost',
     'lastPrice', 'unrealizedPnl', 'unrealizedPnlPct', 'realizedPnl',
-    'delta', 'theta', 'durationPct', 'roic', 'actions',
+    'delta', 'theta', 'logCount', 'durationPct', 'roic', 'actions',
   ];
 
   // Sidebar state

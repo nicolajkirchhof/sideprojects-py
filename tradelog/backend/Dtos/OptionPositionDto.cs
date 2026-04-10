@@ -38,4 +38,7 @@ public class OptionPositionDto
     public decimal? RealizedPnlPct { get; set; }
     public decimal? DurationPct { get; set; }
     public decimal? Roic { get; set; }
+
+    /// <summary>Number of greek log samples recorded since the position was opened. Null = never computed.</summary>
+    public int? LogCount { get; set; }
 }

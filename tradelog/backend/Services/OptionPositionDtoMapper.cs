@@ -74,6 +74,7 @@ public static class OptionPositionDtoMapper
             RealizedPnlPct = realizedPnlPct,
             DurationPct = durationPct,
             Roic = roic,
+            LogCount = p.LogCount,
         };
     }
 }

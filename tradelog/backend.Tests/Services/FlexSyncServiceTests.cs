@@ -25,6 +25,48 @@ public class FlexSyncServiceTests : IDisposable
 
     public void Dispose() => _fixture.Dispose();
 
+    // ── Cutoff date filter ──────────────────────────────
+
+    [Fact]
+    public async Task SyncTradesAsync_WithCutoff_DropsPreCutoffTrades()
+    {
+        var cutoff = new DateTime(2025, 7, 1);
+        var service = new FlexSyncService(
+            _fixture.CreateContext(),
+            NullLogger<FlexSyncService>.Instance,
+            cutoffDate: cutoff);
+
+        var trades = new List<FlexTradeDto>
+        {
+            new() // before cutoff → dropped
+            {
+                TradeId = "T-OLD", AssetCategory = "STK", Symbol = "AAPL",
+                DateTime = new DateTime(2025, 6, 30), BuySell = "BUY", Quantity = 10,
+                TradePrice = 100m, Commission = 1m, Multiplier = 1, ConId = 11,
+            },
+            new() // on cutoff → kept
+            {
+                TradeId = "T-ON", AssetCategory = "STK", Symbol = "MSFT",
+                DateTime = new DateTime(2025, 7, 1), BuySell = "BUY", Quantity = 5,
+                TradePrice = 200m, Commission = 1m, Multiplier = 1, ConId = 12,
+            },
+            new() // after cutoff → kept
+            {
+                TradeId = "T-NEW", AssetCategory = "STK", Symbol = "NVDA",
+                DateTime = new DateTime(2025, 8, 15), BuySell = "BUY", Quantity = 3,
+                TradePrice = 500m, Commission = 1m, Multiplier = 1, ConId = 13,
+            },
+        };
+
+        var (created, _, _, _) = await service.SyncTradesAsync(trades);
+
+        Assert.Equal(2, created);
+        using var verify = _fixture.CreateContext();
+        Assert.DoesNotContain(verify.StockPositions, p => p.ExecutionId == "T-OLD");
+        Assert.Contains(verify.StockPositions, p => p.ExecutionId == "T-ON");
+        Assert.Contains(verify.StockPositions, p => p.ExecutionId == "T-NEW");
+    }
+
     // ── SyncOptionEventsAsync ────────────────────────────
 
     [Fact]

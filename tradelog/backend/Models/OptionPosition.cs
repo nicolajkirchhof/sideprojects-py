@@ -59,4 +59,11 @@ public class OptionPosition : tradelog.Data.IAccountScoped
 
     /// <summary>Date of the best exit opportunity.</summary>
     public DateTime? BestExitDate { get; set; }
+
+    /// <summary>
+    /// Cached count of greek log samples recorded since <see cref="Opened"/>.
+    /// Populated lazily by the startup initializer (for legacy open rows) and by
+    /// the live sync service whenever greeks are refreshed. Null means "never computed".
+    /// </summary>
+    public int? LogCount { get; set; }
 }

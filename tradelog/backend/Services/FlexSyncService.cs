@@ -14,20 +14,36 @@ public class FlexSyncService
 {
     private readonly DataContext _context;
     private readonly ILogger<FlexSyncService> _logger;
+    private readonly DateTime? _cutoffDate;
 
-    public FlexSyncService(DataContext context, ILogger<FlexSyncService> logger)
+    public FlexSyncService(
+        DataContext context,
+        ILogger<FlexSyncService> logger,
+        DateTime? cutoffDate = null)
     {
         _context = context;
         _logger = logger;
+        _cutoffDate = cutoffDate;
     }
 
     /// <summary>
     /// Imports STK/FUT trades and manages OPT/FOP position lifecycle from Flex trade data.
+    /// Rows with <c>DateTime</c> before the configured cutoff are dropped.
     /// Returns (tradesCreated, tradesUpdated, optionsCreated, optionsClosed).
     /// </summary>
     public async Task<(int tradesCreated, int tradesUpdated, int optionsCreated, int optionsClosed)> SyncTradesAsync(
         List<FlexTradeDto> flexTrades)
     {
+        if (_cutoffDate.HasValue)
+        {
+            var before = flexTrades.Count;
+            flexTrades = flexTrades.Where(t => t.DateTime >= _cutoffDate.Value).ToList();
+            var dropped = before - flexTrades.Count;
+            if (dropped > 0)
+                _logger.LogInformation("FlexSync: dropped {Dropped} trades before cutoff {Cutoff:yyyy-MM-dd}",
+                    dropped, _cutoffDate.Value);
+        }
+
         var stockFutTrades = flexTrades.Where(t => t.AssetCategory is "STK" or "FUT").ToList();
         var optionTrades = flexTrades.Where(t => t.AssetCategory is "OPT" or "FOP").ToList();
 
@@ -261,6 +277,9 @@ public class FlexSyncService
     /// </summary>
     public async Task<int> SyncCapitalAsync(List<FlexEquitySummaryDto> summaries)
     {
+        if (_cutoffDate.HasValue)
+            summaries = summaries.Where(s => s.ReportDate >= _cutoffDate.Value).ToList();
+
         if (summaries.Count == 0) return 0;
 
         var dates = summaries.Select(s => s.ReportDate).ToList();
@@ -302,6 +321,7 @@ public class FlexSyncService
         var optionEvents = events
             .Where(e => e.AssetCategory is "OPT" or "FOP")
             .Where(e => e.TransactionType is "Assignment" or "Exercise" or "Expiration")
+            .Where(e => _cutoffDate == null || e.Date >= _cutoffDate.Value)
             .ToList();
 
         if (optionEvents.Count == 0) return 0;

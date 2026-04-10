@@ -12,6 +12,41 @@ import pandas as pd
 import pyarrow.parquet as pq  # type: ignore
 
 
+def load_ticker_earnings_events(symbol: str) -> pd.DataFrame:
+    """
+    Load per-ticker earnings events from the momentum_earnings dataset.
+
+    Returns a DataFrame with one row per earnings event and the cpct[-25..25]
+    forward/backward return columns. Adds an `eps_surprise` column
+    (eps - eps_est) and a `surprise_dir` column ('beat' / 'miss' / 'unknown').
+    Returns an empty DataFrame if the ticker parquet is missing.
+    """
+    path = f"finance/_data/momentum_earnings/ticker/{symbol.upper()}.parquet"
+    if not os.path.exists(path):
+        return pd.DataFrame()
+
+    df = pd.read_parquet(path)
+    if df.empty or 'is_earnings' not in df.columns:
+        return pd.DataFrame()
+
+    df = df[df['is_earnings'].fillna(False).astype(bool)].copy()
+    if df.empty:
+        return df
+
+    if 'date' in df.columns:
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    num_cols = df.select_dtypes(include=[np.number]).columns
+    df[num_cols] = df[num_cols].replace([np.inf, -np.inf], np.nan)
+
+    df['eps_surprise'] = df['eps'] - df['eps_est'] if {'eps', 'eps_est'} <= set(df.columns) else np.nan
+    df['surprise_dir'] = np.where(
+        df['eps_surprise'].isna(), 'unknown',
+        np.where(df['eps_surprise'] > 0, 'beat',
+                 np.where(df['eps_surprise'] < 0, 'miss', 'inline'))
+    )
+    return df.sort_values('date').reset_index(drop=True)
+
+
 def load_and_prep_data(years: range) -> pd.DataFrame:
     """
     Loads and standardizes the momentum/earnings dataset for the dashboard.
@@ -23,7 +58,7 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
             "date", "original_price", "c0", "cpct0", "atrp200", "is_earnings", "is_etf",
             "spy0", "spy5", "market_cap_class",
             # event types (new tracking)
-            "evt_atrp_breakout", "evt_green_line_breakout",
+            "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch",
             # filters
             "1M_chg", "3M_chg", "6M_chg", "12M_chg",
             "ma10_dist0", "ma20_dist0", "ma50_dist0", "ma100_dist0", "ma200_dist0",
@@ -97,7 +132,7 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
 
     df["direction"] = np.sign(df["event_move"]).replace(0, 1)
 
-    for c in ("is_earnings", "is_etf", "evt_atrp_breakout", "evt_green_line_breakout"):
+    for c in ("is_earnings", "is_etf", "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch"):
         df[c] = df[c].fillna(False).astype(bool) if c in df.columns else False
 
     # SPY Context
