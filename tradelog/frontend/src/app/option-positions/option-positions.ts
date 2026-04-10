@@ -63,9 +63,9 @@ export class OptionPositions {
 
   dataSource = new MatTableDataSource<OptionPositionDto>([]);
   displayedColumns = [
-    'symbol', 'contractId', 'right', 'strike', 'expiry', 'pos', 'cost',
-    'lastPrice', 'unrealizedPnl', 'unrealizedPnlPct', 'realizedPnl',
-    'delta', 'theta', 'logCount', 'durationPct', 'roic', 'actions',
+    'symbol', 'contractId', 'right', 'strike', 'opened', 'expiry', 'closed',
+    'pos', 'cost', 'lastPrice', 'unrealizedPnl', 'unrealizedPnlPct',
+    'realizedPnl', 'delta', 'theta', 'logCount', 'durationPct', 'roic', 'actions',
   ];
 
   // Sidebar state

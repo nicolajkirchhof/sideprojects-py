@@ -1,637 +1,191 @@
 # Tradelog — Product Backlog
 
-Based on `SPEC.md`. Last updated: 2026-03-19.
+## E1: Date Format Settings
 
----
+Global application setting controlling how dates display and how date inputs behave. Persisted as app-wide config (not per-user). Default: `yyyy-MM-dd` (ISO).
 
-## Epic Overview
-
-| Epic | Stories | Description | Core dependency |
-|---|---|---|---|
-| **E1** | 6 | Data Model Overhaul | Foundation — everything depends on this |
-| **E2** | 3 | Trade Entry (TradeLog) | E1 |
-| **E3** | 4 | Option Positions & Greeks | E1 |
-| **E4** | 2 | Stock & Future Trades | E1 |
-| **E5** | 3 | Instrument Summaries | E2, E3, E4 |
-| **E6** | 3 | Capital Monitoring | E5 |
-| **E7** | 3 | IBKR Greeks Sync | E3 |
-| **E8** | 2 | Journaling (WeeklyPrep) | E1 |
-| **E9** | 4 | Performance Analytics | E5, E6 |
-| **E10** | 2 | Utilities | Various |
-
-**Total: 10 epics, 25 stories**
-
----
-
-## Open Architectural Decisions
-
-1. **E6-1**: Should Capital aggregations be snapshotted (stored at capture time) or computed live from current positions?
-2. **E6-3 / E9-4 / E10-3**: Which charting library for Angular? (Chart.js / ng2-charts is the lightest option)
-3. **E7-2**: Standalone sync script or integrated sync job?
-
----
-
-## E1: Data Model Overhaul
-
-### E1-1: Redesign TradeEntry model
+### E1-S1: Date format configuration service
 
 **As a** trader,
-**I want to** record my full trade thesis at entry time,
-**So that** I can review my reasoning and track which strategies I'm using.
+**I want to** choose my preferred date format (ISO / US / German),
+**So that** dates across the application match my locale preference.
 
 **Acceptance criteria:**
-- [ ] TradeEntry entity replaces the existing `Log` model
-- [ ] All fields from SPEC 3.1 are present: symbol, date, typeOfTrade, notes, directional, timeframe, budget, strategy, newsCatalyst, recentEarnings, sectorPerformanceSupport, ath, rvol, institutionalSupport, gapPct, xAtrMove, taFaNotes, intendedManagement, actualManagement, managementRating, learnings
-- [ ] Enums defined for: Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating
-- [ ] Migration drops/renames old `Log` table and creates new `TradeEntry` table
-- [ ] Existing Log data is not silently lost — migration should be reviewed before applying
+- [ ] Three supported formats: `yyyy-MM-dd` (ISO, default), `MM/dd/yyyy` (US), `dd.MM.yyyy` (German)
+- [ ] Setting persisted in `localStorage` and exposed via an injectable `DateFormatService` signal
+- [ ] Changing the format applies immediately without page reload
 
-**Affected layers:** Data model
-**Dependencies:** none
-**Notes:** The existing `Log` model has `Notes`, `ProfitMechanism`, `Sentiment`. The new TradeEntry expands this significantly. The old `ProfitMechanism` bitmask is replaced by `strategy` enum. Decision for `/architect`: keep `ProfitMechanism` as a separate field or drop it?
+**Affected layers:** Frontend (service)
+**Dependencies:** None
+**Notes:** This is a frontend-only setting for now. If multi-user support is added later, migrate to DB-backed per-user preference.
 
 ---
 
-### E1-2: Redesign OptionPosition model
+### E1-S2: Apply date format to all table columns
 
 **As a** trader,
-**I want to** track individual option contracts with all fields needed for P/L and Greeks computation,
-**So that** the system can compute unrealized/realized P/L and aggregate by symbol.
+**I want** all date columns in every table to respect my chosen format,
+**So that** I see consistent dates across the application.
 
 **Acceptance criteria:**
-- [ ] OptionPosition entity replaces the existing `Position` model
-- [ ] Stored fields per SPEC 3.2: symbol, contractId, opened, expiry, closed, pos, right, strike, cost, closePrice, commission, multiplier
-- [ ] `right` uses enum (Call/Put), not the old `Type` enum which mixed Call/Put/Underlying
-- [ ] `pos` is signed integer (positive = long, negative = short)
-- [ ] Old `Position` data migration reviewed before applying
+- [ ] All `| date:` pipes across option-positions, stock-positions, trades, capital, weekly-prep, accounts use the format from `DateFormatService`
+- [ ] Existing `shortDate` pipes replaced with a custom pipe or directive that reads the service
+- [ ] Sorting by date columns still works correctly (sorts by underlying Date, not display string)
 
-**Affected layers:** Data model
-**Dependencies:** none
-**Notes:** The existing `Position` model has `Type` (Call/Put/Underlying), `Size`, `Strike`, `Cost`, `Close`, `Comission`, `CloseReasons`. Stock positions are moving to Trade (E1-3), so `Underlying` type is removed. `CloseReasons` bitmask can remain as an optional field.
+**Affected layers:** Frontend (pipe + all table templates)
+**Dependencies:** E1-S1
+**Notes:** Consider a shared `AppDatePipe` that injects `DateFormatService` to avoid passing the format everywhere.
 
 ---
 
-### E1-3: Add Trade model
+### E1-S3: Apply date format to all date inputs
 
 **As a** trader,
-**I want to** record individual buy/sell executions for stocks and futures in a single table,
-**So that** all non-option position tracking uses the same lifecycle logic.
+**I want** date pickers and text inputs for dates to match my chosen format,
+**So that** I enter dates in a consistent format.
 
 **Acceptance criteria:**
-- [ ] `Trade` entity created with fields: symbol, date, posChange, price, commission, multiplier
-- [ ] `multiplier` defaults to 1 (stocks) but is editable (e.g., 12500 for M6E, 5 for MES)
-- [ ] Table created via migration
-- [ ] No computed fields stored — those are calculated at query time (E5)
+- [ ] All `mat-datepicker` inputs display the selected date in the configured format
+- [ ] Manual text entry in date fields parses the configured format
+- [ ] Invalid date input shows a validation error, does not silently accept the wrong format
 
-**Affected layers:** Data model
-**Dependencies:** none
+**Affected layers:** Frontend (MatDatepicker custom adapter + all form templates)
+**Dependencies:** E1-S1
+**Notes:** Angular Material supports custom `DateAdapter` — implement a format-aware adapter that reads from `DateFormatService`.
 
 ---
 
-### E1-5: Add OptionPositionsLog model
+### E1-S4: Settings page with date format selector
 
 **As a** trader,
-**I want to** store periodic Greeks snapshots for each option contract,
-**So that** open positions show live Greeks and I can visualize their evolution over time.
+**I want** a Settings page accessible from the sidebar,
+**So that** I can change the date format and any future app-wide settings.
 
 **Acceptance criteria:**
-- [ ] OptionPositionsLog entity created per SPEC 3.7: dateTime, contractId, underlying, iv, price, timeValue, delta, theta, gamma, vega, margin
-- [ ] Replaces existing `Tracking` model (which exists in DB but has no API endpoint)
-- [ ] Index on (contractId, dateTime DESC) for efficient "latest snapshot" queries
+- [ ] New `/settings` route with a standalone component in the sidebar navigation
+- [ ] Radio group or dropdown for date format selection with live preview of a sample date
+- [ ] Persists on selection (auto-save, no submit button needed)
+- [ ] Page is extensible for future settings (layout should use sections/cards)
 
-**Affected layers:** Data model
-**Dependencies:** none
-**Notes:** The existing `Tracking` model in the backend has similar fields but is not exposed via API. This replaces it with proper indexing.
+**Affected layers:** Frontend (new route, component, sidebar nav)
+**Dependencies:** E1-S1
 
 ---
 
-### E1-6: Add WeeklyPrep model
+## E2: Option Position Table — Opened & Closed Columns
+
+Currently the option-positions table only shows Expiry. Add Opened and Closed as visible, sortable columns.
+
+### E2-S1: Add Opened and Closed columns to option-positions table
 
 **As a** trader,
-**I want to** record my weekly market prep notes in a structured format,
-**So that** I maintain a consistent pre-week review process.
+**I want to** see when each option position was opened and closed directly in the table,
+**So that** I can sort and scan positions by entry/exit timing without opening the detail sidebar.
 
 **Acceptance criteria:**
-- [ ] WeeklyPrep entity created per SPEC 3.10: all 14 fields (date, indexBias, breadth, notableSectors, volatilityNotes, openPositionsRequiringManagement, currentPortfolioRisk, portfolioNotes, scanningFor, indexSectorPreference, watchlist, learnings, focusForImprovement, externalComments)
-- [ ] Table created via migration
+- [ ] `Opened` column added before the existing `Expiry` column, with `mat-sort-header`
+- [ ] `Closed` column added after `Expiry`, with `mat-sort-header`
+- [ ] Closed shows `—` (muted) for open positions (null value)
+- [ ] Both columns use the date format from `DateFormatService` (or the existing pipe if E1 is not yet implemented)
+- [ ] Column order in table: Symbol, Contract, R, Strike, Opened, Expiry, Closed, Pos, Cost, ...
 
-**Affected layers:** Data model
-**Dependencies:** none
+**Affected layers:** Frontend (option-positions.html, option-positions.ts — displayedColumns array)
+**Dependencies:** None (E1-S2 will update the date pipe later if implemented first)
 
 ---
 
-### E1-7: Refresh enum definitions across all models
+## E3: Configurable Enums (DB-backed Lookups)
+
+Replace hardcoded C# enums with database-backed lookup tables so users can add, rename, and remove values through the UI. Renaming updates all historical references.
+
+> **Architectural decision required.** This epic changes the data model fundamentally (int enums → FK references or string-based lookups). Switch to `/architect` before implementation to decide: generic lookup table vs per-enum table, migration strategy for existing int-valued rows, and cascading rename semantics.
+
+### E3-S1: Data model for configurable lookups
 
 **As a** developer,
-**I want to** have a single consistent set of enums shared between backend and frontend,
-**So that** dropdowns, filters, and validations use the same values everywhere.
+**I want** enum values stored in the database as lookup rows,
+**So that** users can manage them without code changes or redeployment.
 
 **Acceptance criteria:**
-- [ ] All enums defined per SPEC Section 2: Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating, PositionRight, CloseReasons, SecType, Sentiment, ProfitMechanism
-- [ ] Backend enums serialize as camelCase strings (existing pattern via `JsonStringEnumConverter`)
-- [ ] Frontend TypeScript enums/types mirror backend exactly
+- [ ] Each configurable enum has a corresponding lookup table (or rows in a generic table) with at minimum: `Id`, `AccountId`, `Name`, `SortOrder`, `IsActive`
+- [ ] Existing integer enum values are migrated to FK references in a data migration
+- [ ] Historical trades/positions referencing a renamed value automatically reflect the new name
+- [ ] Deleting a lookup value is soft-delete (`IsActive = false`) — prevents orphaned FK references
+- [ ] Enums to convert: `Strategy`, `TypeOfTrade`, `Budget`, `Timeframe`, `DirectionalBias`, `ManagementRating`
 
-**Affected layers:** Data model | Frontend (types only)
-**Dependencies:** E1-1 through E1-6
+**Affected layers:** Data model, EF migration, all backend services that read/write these fields
+**Dependencies:** Architectural decision (see note above)
+**Notes:** Start with `Strategy` and `TypeOfTrade` as the highest-priority pair. The remaining four can follow in a second pass once the pattern is proven.
 
 ---
 
-## E2: Trade Entry (TradeLog)
-
-### E2-1: TradeEntry CRUD API
+### E3-S2: CRUD API for lookup values
 
 **As a** trader,
-**I want to** create, read, update, and delete trade entries via the API,
-**So that** the frontend can manage trade rationale records.
+**I want** API endpoints to list, create, rename, reorder, and deactivate lookup values,
+**So that** the settings UI can manage them.
 
 **Acceptance criteria:**
-- [ ] `GET /api/trade-entries` — returns all entries, ordered by date descending
-- [ ] `GET /api/trade-entries/{id}` — single entry
-- [ ] `POST /api/trade-entries` — create with all SPEC 3.1 fields
-- [ ] `PUT /api/trade-entries/{id}` — update (used to add actualManagement, learnings post-trade)
-- [ ] `DELETE /api/trade-entries/{id}` — delete
-- [ ] Optional query params: `?symbol=`, `?budget=`, `?strategy=` for filtering
+- [ ] `GET /api/lookups/{enumType}` — returns ordered list of active values for an enum type
+- [ ] `POST /api/lookups/{enumType}` — creates a new value (name + sort order)
+- [ ] `PUT /api/lookups/{enumType}/{id}` — renames a value; cascades rename to all referencing rows
+- [ ] `PATCH /api/lookups/{enumType}/{id}/deactivate` — soft-deletes; value no longer appears in dropdowns but historical data is preserved
+- [ ] `PATCH /api/lookups/{enumType}/{id}/reorder` — updates sort order
+- [ ] Validation: duplicate names within the same enum type are rejected
 
-**Affected layers:** API
-**Dependencies:** E1-1, E1-7
+**Affected layers:** API (new controller), backend services
+**Dependencies:** E3-S1
 
 ---
 
-### E2-2: TradeEntry list page
+### E3-S3: Settings UI for managing lookup values
 
 **As a** trader,
-**I want to** see a table of all my trade entries with key columns,
-**So that** I can quickly find and review past trade rationale.
+**I want** a section in the Settings page where I can add, rename, reorder, and deactivate enum values,
+**So that** I can evolve my trading vocabulary without developer intervention.
 
 **Acceptance criteria:**
-- [ ] Table shows: symbol, date, typeOfTrade, directional, budget, strategy, managementRating
-- [ ] Rows sorted by date descending (most recent first)
-- [ ] Clicking a row opens the detail/edit form in the right sidebar (existing split-pane pattern)
-- [ ] Filter controls for budget and strategy dropdowns
+- [ ] Tab or section per enum type (Strategy, TypeOfTrade, etc.) on the `/settings` page
+- [ ] Each section shows a reorderable list (drag-to-reorder or up/down buttons)
+- [ ] Inline edit for renaming (click name → text input → save on blur/enter)
+- [ ] "Add" button appends a new value at the end
+- [ ] "Deactivate" action with confirmation; deactivated values shown in a collapsed "Inactive" section with a "Reactivate" option
+- [ ] Changes save immediately (no form-level submit)
 
-**Affected layers:** Frontend
-**Dependencies:** E2-1
+**Affected layers:** Frontend (settings component, new API service)
+**Dependencies:** E3-S2, E1-S4 (shares the Settings page shell)
 
 ---
 
-### E2-3: TradeEntry create/edit form
+### E3-S4: Replace hardcoded enum dropdowns with dynamic lookups
 
 **As a** trader,
-**I want to** fill in my trade thesis using a structured form,
-**So that** I capture all relevant entry criteria consistently.
+**I want** all form dropdowns (Strategy, TypeOfTrade, etc.) to pull their options from the database,
+**So that** newly added values appear immediately in trade entry forms.
 
 **Acceptance criteria:**
-- [ ] Form fields match SPEC 3.1 with appropriate controls:
-  - symbol: text input
-  - date: date picker
-  - typeOfTrade, directional, timeframe, budget, strategy, managementRating: dropdowns (from enums)
-  - newsCatalyst, recentEarnings, sectorPerformanceSupport, ath: checkboxes
-  - rvol, gapPct, xAtrMove: numeric inputs (optional)
-  - notes, taFaNotes, intendedManagement, actualManagement, learnings: Quill rich-text editor (reuse existing pattern)
-  - institutionalSupport: text input
-- [ ] Create saves via POST, edit saves via PUT
-- [ ] Form validates: symbol and date are required
+- [ ] All `mat-select` dropdowns for configurable enums fetch values from the lookup API
+- [ ] Deactivated values do NOT appear in dropdowns for new entries
+- [ ] Deactivated values DO still display correctly on historical trades (read-only rendering)
+- [ ] Forms affected: Trades, Option Positions (if applicable), Portfolio, Analytics filters
+- [ ] Enum labels used in table cells also resolve from the lookup cache (not hardcoded label maps)
 
-**Affected layers:** Frontend
-**Dependencies:** E2-1, E2-2
+**Affected layers:** Frontend (all form components, shared lookup service with caching)
+**Dependencies:** E3-S2
 
 ---
 
-## E3: Option Positions & Greeks
-
-### E3-1: OptionPosition CRUD API
-
-**As a** trader,
-**I want to** manage individual option contract positions via the API,
-**So that** I can track every leg of my trades.
-
-**Acceptance criteria:**
-- [ ] `GET /api/option-positions` — all positions; supports `?symbol=` and `?status=open|closed` filters
-- [ ] `GET /api/option-positions/{id}` — single position with computed fields included in response
-- [ ] `POST /api/option-positions` — create with stored fields from SPEC 3.2
-- [ ] `PUT /api/option-positions/{id}` — update (primarily to set closePrice and closed date)
-- [ ] `DELETE /api/option-positions/{id}` — delete
-- [ ] Response DTO includes computed fields: unrealizedPnL, unrealizedPnLPct, realizedPnL, realizedPnLPct, durationPct, ROIC
-- [ ] Computed fields sourced from latest OptionPositionsLog entry for this contractId (lastPrice, delta, theta, gamma, vega, iv, timeValue, margin)
-- [ ] If no OptionPositionsLog entry exists, Greeks fields return null/0
-
-**Affected layers:** API
-**Dependencies:** E1-2, E1-5, E1-7
-
----
-
-### E3-2: OptionPositionsLog API (bulk insert)
-
-**As a** trader (or automated sync job),
-**I want to** submit Greeks snapshots for multiple contracts at once,
-**So that** position data stays current without manual entry per contract.
-
-**Acceptance criteria:**
-- [ ] `POST /api/option-positions-log/bulk` — accepts an array of snapshot records (SPEC 3.7 fields)
-- [ ] `GET /api/option-positions-log?contractId={id}` — returns time-series for a specific contract, ordered by dateTime ascending
-- [ ] `GET /api/option-positions-log/latest` — returns the most recent snapshot per open contractId (for dashboard use)
-- [ ] Inserting snapshots does not require positions to exist yet (contractId is a loose reference)
-
-**Affected layers:** API
-**Dependencies:** E1-5
-
----
-
-### E3-3: Option positions list page
-
-**As a** trader,
-**I want to** see all my option positions in a table with live Greeks and P/L,
-**So that** I can monitor my book at a glance.
-
-**Acceptance criteria:**
-- [ ] Table columns: symbol, contractId, right, strike, expiry, pos, cost, lastPrice, unrealizedPnL, unrealizedPnLPct, realizedPnL, delta, theta, durationPct, ROIC
-- [ ] Toggle filter: Open / Closed / All
-- [ ] Rows sorted by symbol then expiry
-- [ ] Closed positions show realized P/L; open positions show unrealized P/L + Greeks
-- [ ] Color coding: green for positive P/L, red for negative
-
-**Affected layers:** Frontend
-**Dependencies:** E3-1
-
----
-
-### E3-4: Option position create/edit form
-
-**As a** trader,
-**I want to** add or close option positions through a form,
-**So that** I can record new legs and mark positions as closed with exit prices.
-
-**Acceptance criteria:**
-- [ ] Create mode: fields for symbol, contractId, opened, expiry, pos, right (C/P), strike, cost, commission, multiplier
-- [ ] Edit mode: additionally shows closePrice and closed date fields (to close a position)
-- [ ] Multiplier defaults to 100 but is editable (for futures options: CL=1000, NG=10000)
-- [ ] Validation: symbol, contractId, opened, expiry, pos, right, strike, cost are required
-
-**Affected layers:** Frontend
-**Dependencies:** E3-1, E3-3
-
----
-
-## E4: Stock & Future Trades
-
-### E4-1: Trade CRUD API with computed fields
-
-**As a** trader,
-**I want to** record buy/sell executions for stocks and futures and see running position, avg price, and P/L,
-**So that** I can track my equity and futures portfolio lifecycle.
-
-**Acceptance criteria:**
-- [ ] `GET /api/trades?symbol=` — returns trades for a symbol, ordered by date ascending
-- [ ] `GET /api/trades` — returns all trades
-- [ ] `POST /api/trades` — create with: symbol, date, posChange, price, commission, multiplier (default 1)
-- [ ] `PUT /api/trades/{id}` — update
-- [ ] `DELETE /api/trades/{id}` — delete (recomputes running fields for subsequent trades)
-- [ ] Response includes computed fields: lastPos, totalPos, avgPrice, PnL
-- [ ] avgPrice computation: new position = price; adding (same sign) = weighted average; reducing (opposite sign) = keep previous avg
-- [ ] PnL computation: `posChange * (avgPrice - price) * multiplier` only when reducing; 0 otherwise
-- [ ] Multiplier defaults to 1 for stocks; user sets it for futures (M6E=12500, MES=5, etc.)
-
-**Affected layers:** API
-**Dependencies:** E1-3
-
----
-
-### E4-3: Trades list page and form
-
-**As a** trader,
-**I want to** see my stock and futures executions in a table with running position and P/L,
-**So that** I can track my non-options book.
-
-**Acceptance criteria:**
-- [ ] Table columns: symbol, date, posChange, price, multiplier, totalPos, avgPrice, PnL, commission
-- [ ] `multiplier` column hidden by default (most rows are 1), shown if any row has multiplier != 1
-- [ ] Filter by symbol
-- [ ] Create form: symbol, date, posChange (signed), price, commission, multiplier (defaults to 1)
-- [ ] Running fields (totalPos, avgPrice, PnL) are read-only / computed by API
-
-**Affected layers:** Frontend
-**Dependencies:** E4-1
-
----
-
-## E5: Instrument Summaries
-
-### E5-1: OptionInstrumentSummary API endpoint
-
-**As a** trader,
-**I want to** see aggregated P/L, Greeks, and risk per underlying symbol,
-**So that** I can assess my exposure per name without mentally summing individual legs.
-
-**Acceptance criteria:**
-- [ ] `GET /api/instrument-summaries/options` — returns one row per symbol with all fields from SPEC 3.3
-- [ ] `GET /api/instrument-summaries/options?status=open` — only symbols with at least one open position
-- [ ] Aggregation logic per SPEC: SUM for pnl/Greeks/margin/commissions, AVG for percentages/iv/duration
-- [ ] `budget`, `currentSetup`, `intendedManagement` resolved from latest TradeEntry for the symbol
-- [ ] `strikes` is comma-joined strikes of open positions, ordered ascending
-- [ ] `opened`/`closed`/`DIT`/`DTE`/`status` derived per SPEC 3.3 rules
-- [ ] This is a computed view — no dedicated table, computed at query time
-
-**Affected layers:** API
-**Dependencies:** E3-1, E3-2, E2-1
-
----
-
-### E5-2: TradeInstrumentSummary API endpoint
-
-**As a** trader,
-**I want to** see per-symbol position summaries for stocks and futures,
-**So that** I have a consolidated view of each non-option name.
-
-**Acceptance criteria:**
-- [ ] `GET /api/instrument-summaries/trades` — returns one row per symbol
-- [ ] `status` derived: Open if current totalPos != 0
-- [ ] `realizedPnL` = SUM of Trade.PnL for the symbol (includes multiplier)
-- [ ] `unrealizedPnL = totalPos * (lastPrice - avgPrice) * multiplier` (lastPrice initially null)
-- [ ] `budget`, `positionType`, `intendedManagement` from latest TradeEntry
-- [ ] Multiplier sourced from the instrument's most recent trade
-
-**Affected layers:** API
-**Dependencies:** E4-1, E2-1
-
----
-
-### E5-3: Instrument summaries dashboard page
-
-**As a** trader,
-**I want to** see all my open positions summarized by underlying on a single page,
-**So that** I can monitor my full book from one screen.
-
-**Acceptance criteria:**
-- [ ] Two tables: Option Instruments (top) and Trade Instruments (bottom)
-- [ ] Option table columns: symbol, status, currentSetup, strikes, DIT, DTE, pnl, unrealizedPnLPct, delta, theta, vega, margin, ROIC
-- [ ] Trade table columns: symbol, status, positionType, pnl, unrealizedPnLPct, realizedPnL
-- [ ] Default filter: Open only, with toggle to show Closed
-- [ ] Row click navigates to the underlying's positions (filtered option positions or trades)
-- [ ] Portfolio totals row at the bottom: sum of delta, theta, vega, gamma, margin, total P/L
-
-**Affected layers:** Frontend
-**Dependencies:** E5-1, E5-2
-
----
-
-## E6: Capital Monitoring
-
-### E6-1: Capital CRUD API with computed fields
-
-**As a** trader,
-**I want to** record account snapshots and see portfolio-level aggregations alongside them,
-**So that** I can track my account health and risk utilization over time.
-
-**Acceptance criteria:**
-- [ ] `GET /api/capital` — returns all snapshots ordered by date descending
-- [ ] `GET /api/capital/{id}` — single snapshot
-- [ ] `POST /api/capital` — create with stored fields: date, netLiquidity, maintenance, excessLiquidity, BPR
-- [ ] `PUT /api/capital/{id}` — update
-- [ ] `DELETE /api/capital/{id}` — delete
-- [ ] Response includes computed `maintenancePct = maintenance * 100 / netLiquidity`
-- [ ] Response includes live portfolio aggregations (computed from current instrument summaries at query time): netDelta, netTheta, netVega, netGamma, totalMargin, avgIV, totalPnL, unrealizedPnL, realizedPnL, totalCommissions
-
-**Affected layers:** API
-**Dependencies:** E5-1, E5-2
-**Notes:** Decision for `/architect`: should the aggregated values be snapshotted (stored at capture time) or always computed live?
-
----
-
-### E6-2: Capital list page
-
-**As a** trader,
-**I want to** see my account snapshots in a table with key risk metrics,
-**So that** I can monitor margin utilization and account growth.
-
-**Acceptance criteria:**
-- [ ] Table columns: date, netLiquidity, maintenance, maintenancePct, excessLiquidity, BPR, totalPnL, netDelta, netTheta, totalMargin
-- [ ] Sorted by date descending
-- [ ] Create/edit form in sidebar with stored fields only (date, netLiquidity, maintenance, excessLiquidity, BPR)
-- [ ] Computed fields are read-only in the form
-
-**Affected layers:** Frontend
-**Dependencies:** E6-1
-
----
-
-### E6-3: Capital timeline chart
-
-**As a** trader,
-**I want to** see my net liquidity, margin utilization, and P/L plotted over time,
-**So that** I can spot trends in account health and risk exposure.
-
-**Acceptance criteria:**
-- [ ] Line chart: netLiquidity over time (primary axis)
-- [ ] Line chart: maintenancePct over time (secondary axis, with warning threshold at 50%)
-- [ ] Bar chart overlay: totalPnL per snapshot
-- [ ] Displayed above or as a tab alongside the capital table
-
-**Affected layers:** Frontend
-**Dependencies:** E6-2
-**Notes:** Decision for `/architect`: charting library choice.
-
----
-
-## E7: IBKR Greeks Sync
-
-### E7-1: IBKR sync endpoint (receive snapshots)
-
-**As a** trader running the sync script,
-**I want to** push Greeks snapshots from the IBKR Python script to the backend,
-**So that** I no longer need to copy/paste data into spreadsheets.
-
-**Acceptance criteria:**
-- [ ] `POST /api/option-positions-log/sync` — accepts the same payload format as the bulk insert (E3-2) but is explicitly the "sync" entrypoint
-- [ ] Accepts an array of snapshots with fields: dateTime, contractId, underlying, iv, price, timeValue, delta, theta, gamma, vega, margin
-- [ ] Returns count of records inserted
-- [ ] Idempotent: if a snapshot with the same (contractId, dateTime) already exists, skip it (don't duplicate)
-
-**Affected layers:** API
-**Dependencies:** E3-2
-
----
-
-### E7-2: Adapt Python sync script to POST to backend
-
-**As a** trader,
-**I want** `options_portfolio_tracking.py` to push data to the Tradelog API instead of printing to console,
-**So that** Greeks flow into the webapp automatically.
-
-**Acceptance criteria:**
-- [ ] After fetching Greeks from IBKR, script POSTs to `POST /api/option-positions-log/sync`
-- [ ] Script reads the backend URL from config or environment variable (default: `http://localhost:5186`)
-- [ ] On HTTP error, prints the error and continues (don't crash the IBKR connection)
-- [ ] Existing console output preserved (print AND post)
-- [ ] Script can be run as a cron/scheduled task
-
-**Affected layers:** Python script (`finance/ibkr/portfolio/options_portfolio_tracking.py`)
-**Dependencies:** E7-1
-**Notes:** Decision for `/architect`: standalone script or integrated sync job?
-
----
-
-### E7-3: Sync status indicator in frontend
-
-**As a** trader,
-**I want to** see when the last Greeks sync happened,
-**So that** I know if my position data is stale.
-
-**Acceptance criteria:**
-- [ ] `GET /api/option-positions-log/last-sync` — returns the most recent dateTime across all snapshots
-- [ ] Frontend toolbar shows "Last sync: X minutes/hours ago" or "Never synced"
-- [ ] Visual warning (amber) if last sync > 24 hours ago
-
-**Affected layers:** API | Frontend
-**Dependencies:** E7-1
-
----
-
-## E8: Journaling
-
-### E8-1: WeeklyPrep CRUD API
-
-**As a** trader,
-**I want to** manage my weekly market preparation notes via the API,
-**So that** the frontend can provide a structured weekly review workflow.
-
-**Acceptance criteria:**
-- [ ] Standard CRUD at `/api/weekly-prep`
-- [ ] All 14 fields from SPEC 3.10
-- [ ] `GET` returns entries ordered by date descending
-- [ ] Optional filter: `?year=` to limit to a specific year
-
-**Affected layers:** API
-**Dependencies:** E1-6
-
----
-
-### E8-2: WeeklyPrep page
-
-**As a** trader,
-**I want to** fill in my weekly preparation using a structured form,
-**So that** I maintain a consistent pre-week routine.
-
-**Acceptance criteria:**
-- [ ] List view: table with date, indexBias, breadth, currentPortfolioRisk, scanningFor
-- [ ] Detail/edit form with all 14 fields:
-  - indexBias, breadth, currentPortfolioRisk, scanningFor: dropdowns or short text
-  - notableSectors, volatilityNotes, openPositionsRequiringManagement, portfolioNotes, watchlist, learnings, focusForImprovement, externalComments: multiline text / Quill editor
-  - indexSectorPreference: text
-- [ ] "New Week" button pre-fills date to the upcoming Monday
-- [ ] Split-pane layout consistent with other pages
-
-**Affected layers:** Frontend
-**Dependencies:** E8-1
-
----
-
-## E9: Performance Analytics
-
-### E9-1: Per-strategy performance API
-
-**As a** trader,
-**I want to** see win rate, avg win/loss, expectancy, and equity curve per strategy,
-**So that** I can evaluate which strategies are working and which need adjustment.
-
-**Acceptance criteria:**
-- [ ] `GET /api/analytics/strategies` — returns per-strategy metrics for closed trades
-- [ ] For each strategy: tradeCount, totalPnL, avgWin, avgLoss, winRate, expectancy (per SPEC 4.1 formulas)
-- [ ] `GET /api/analytics/strategies/{strategy}/equity-curve` — returns chronological running P/L series (date, cumulativePnL)
-- [ ] Trades are linked to strategies via TradeEntry; positions linked to TradeEntry by symbol
-- [ ] A trade's P/L = sum of its linked OptionPosition realizedPnL + Trade (stock/futures) realizedPnL
-
-**Affected layers:** API
-**Dependencies:** E5-1, E5-2, E2-1
-
----
-
-### E9-2: Per-budget performance API
-
-**As a** trader,
-**I want to** compare Core vs. Speculative bucket performance,
-**So that** I can assess whether my budget allocation is balanced.
-
-**Acceptance criteria:**
-- [ ] `GET /api/analytics/budgets` — returns same metrics as E9-1 but grouped by budget (Core/Speculative)
-- [ ] `GET /api/analytics/budgets/{budget}/equity-curve` — running P/L series per budget
-
-**Affected layers:** API
-**Dependencies:** E9-1
-
----
-
-### E9-3: Overall performance API
-
-**As a** trader,
-**I want to** see aggregate portfolio performance metrics,
-**So that** I can track my overall trading edge.
-
-**Acceptance criteria:**
-- [ ] `GET /api/analytics/overall` — returns:
-  - totalPnL, netPnL (after commissions), totalCommissions
-  - dailyPnL (`totalPnL / tradingDays`)
-  - annualizedROI (`365 * dailyPnL * 100 / accountSize`)
-  - accountSize sourced from most recent Capital snapshot's netLiquidity
-  - tradingDays = distinct dates with at least one closed trade
-- [ ] `GET /api/analytics/overall/equity-curve` — full portfolio running P/L series
-
-**Affected layers:** API
-**Dependencies:** E9-1, E6-1
-
----
-
-### E9-4: Analytics dashboard page
-
-**As a** trader,
-**I want to** see all performance metrics and equity curves on a single dashboard page,
-**So that** I can review my trading performance in one place.
-
-**Acceptance criteria:**
-- [ ] Top section: overall metrics cards (totalPnL, netPnL, annualizedROI, winRate, avgWin, avgLoss)
-- [ ] Middle section: equity curve chart (overall, with toggle to overlay per-strategy or per-budget curves)
-- [ ] Bottom section: strategy breakdown table (one row per strategy with tradeCount, totalPnL, winRate, expectancy, avgWin, avgLoss)
-- [ ] Budget comparison: side-by-side Core vs. Speculative summary
-- [ ] Date range filter (default: all time)
-
-**Affected layers:** Frontend
-**Dependencies:** E9-1, E9-2, E9-3
-**Notes:** Same charting library as E6-3.
-
----
-
-## E10: Utilities
-
-### E10-2: Portfolio allocation tracking
-
-**As a** trader,
-**I want to** define budget allocation limits and see current utilization,
-**So that** I stay within my Core/Speculative risk budget.
-
-**Acceptance criteria:**
-- [ ] `GET /api/portfolio` — returns budget rows with min/max allocation and current allocation
-- [ ] `PUT /api/portfolio/{budget}` — update min/max allocation limits
-- [ ] `currentAllocation` computed from total margin of open positions in each budget, divided by latest netLiquidity from Capital
-- [ ] Frontend: simple table showing budget, strategy, minAllocation, maxAllocation, currentAllocation, P/L
-- [ ] Visual indicator when currentAllocation exceeds maxAllocation (red) or is below minAllocation (amber)
-
-**Affected layers:** Data model | API | Frontend
-**Dependencies:** E5-1, E5-2, E6-1
-
----
-
-### E10-3: Greeks time-series charts
-
-**As a** trader,
-**I want to** see how delta, theta, IV, and P/L evolved over time for a specific position or symbol,
-**So that** I can evaluate how my positions behaved and learn from the Greeks dynamics.
-
-**Acceptance criteria:**
-- [ ] Accessible from the option positions page: "Greeks History" button per contractId
-- [ ] Charts: delta, theta, gamma, vega, IV, price, timeValue over time for that contract
-- [ ] Also accessible from instrument summary page: aggregated Greeks over time for all contracts of a symbol
-- [ ] Aggregated view sums delta/theta/gamma/vega and averages IV across all contracts of the symbol at each snapshot timestamp
-- [ ] Date range defaults to the position's opened-to-closed (or opened-to-now)
-
-**Affected layers:** Frontend
-**Dependencies:** E3-2, E5-3
-**Notes:** Same charting library as E6-3 and E9-4.
+## Suggested Implementation Order
+
+```
+E2-S1  (quick win, no dependencies, ~30 min)
+  ↓
+E1-S1 → E1-S2 → E1-S3 → E1-S4  (date format, incremental)
+  ↓
+E3-S1 → E3-S2 → E3-S3 → E3-S4  (configurable enums, needs /architect first)
+```
+
+**Rationale:**
+- E2-S1 is a single-file frontend change — ship it immediately.
+- E1 is self-contained and builds incrementally (service → pipes → inputs → settings page).
+- E3 is the largest and requires an architectural decision before any code. Start it after E1 ships so the Settings page (E1-S4) already exists as a shell for E3-S3.
