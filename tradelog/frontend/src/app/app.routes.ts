@@ -10,6 +10,7 @@ import { PortfolioComponent } from './portfolio/portfolio';
 import { GreeksHistoryComponent } from './greeks-history/greeks-history';
 import { AccountsComponent } from './accounts/accounts';
 import { About } from './about/about';
+import { SettingsComponent } from './settings/settings';
 
 export const routes: Routes = [
     { path: 'dashboard', component: InstrumentSummaries },
@@ -22,6 +23,7 @@ export const routes: Routes = [
     { path: 'portfolio', component: PortfolioComponent },
     { path: 'greeks-history', component: GreeksHistoryComponent },
     { path: 'accounts', component: AccountsComponent },
+    { path: 'settings', component: SettingsComponent },
     { path: 'about', component: About },
     { path: '', redirectTo: '/dashboard', pathMatch: 'full' }
 ];

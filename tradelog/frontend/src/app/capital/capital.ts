@@ -1,5 +1,6 @@
 import { Component, signal, viewChild, effect, inject } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
+import { AppDatePipe } from '../shared/app-date.pipe';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -35,7 +36,7 @@ import { NotificationService } from '../shared/notification.service';
     MatProgressBarModule,
     MatSortModule,
     MatPaginatorModule,
-    DatePipe,
+    AppDatePipe,
     DecimalPipe,
   ],
   templateUrl: './capital.html',

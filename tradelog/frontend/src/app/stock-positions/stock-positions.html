@@ -23,7 +23,7 @@
 
         <ng-container matColumnDef="date">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
-          <td mat-cell *matCellDef="let t">{{ t.date | date:'shortDate' }}</td>
+          <td mat-cell *matCellDef="let t">{{ t.date | appDate }}</td>
         </ng-container>
 
         <ng-container matColumnDef="posChange">

@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
+import { AppDatePipe } from '../shared/app-date.pipe';
 import { MatTableModule } from '@angular/material/table';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -39,7 +40,7 @@ import { NotificationService } from '../shared/notification.service';
     MatNativeDateModule,
     MatProgressBarModule,
     QuillModule,
-    DatePipe,
+    AppDatePipe,
     DecimalPipe,
   ],
   templateUrl: './trades.html',

@@ -22,7 +22,7 @@
       <table mat-table [dataSource]="dataSource" matSort class="w-full whitespace-nowrap">
         <ng-container matColumnDef="date">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
-          <td mat-cell *matCellDef="let c">{{ c.date | date:'shortDate' }}</td>
+          <td mat-cell *matCellDef="let c">{{ c.date | appDate }}</td>
         </ng-container>
 
         <ng-container matColumnDef="netLiquidity">

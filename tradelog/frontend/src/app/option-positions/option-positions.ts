@@ -1,6 +1,7 @@
 import { Component, signal, viewChild, effect, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
+import { AppDatePipe } from '../shared/app-date.pipe';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatSortModule, MatSort } from '@angular/material/sort';
 import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
@@ -43,7 +44,7 @@ import { NotificationService } from '../shared/notification.service';
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressBarModule,
-    DatePipe,
+    AppDatePipe,
     DecimalPipe,
   ],
   templateUrl: './option-positions.html',

@@ -52,18 +52,18 @@
 
         <ng-container matColumnDef="opened">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Opened</th>
-          <td mat-cell *matCellDef="let p">{{ p.opened | date:'shortDate' }}</td>
+          <td mat-cell *matCellDef="let p">{{ p.opened | appDate }}</td>
         </ng-container>
 
         <ng-container matColumnDef="expiry">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Expiry</th>
-          <td mat-cell *matCellDef="let p">{{ p.expiry | date:'shortDate' }}</td>
+          <td mat-cell *matCellDef="let p">{{ p.expiry | appDate }}</td>
         </ng-container>
 
         <ng-container matColumnDef="closed">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Closed</th>
           <td mat-cell *matCellDef="let p" [class.opacity-40]="!p.closed">
-            {{ p.closed ? (p.closed | date:'shortDate') : '—' }}
+            {{ p.closed ? (p.closed | appDate) : '—' }}
           </td>
         </ng-container>
 

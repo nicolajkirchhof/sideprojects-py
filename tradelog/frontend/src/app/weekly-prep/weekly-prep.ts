@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { AppDatePipe } from '../shared/app-date.pipe';
 import { MatTableModule } from '@angular/material/table';
 import { ContentArea } from '../shared/content-area/content-area';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -32,7 +32,7 @@ import { NotificationService } from '../shared/notification.service';
     MatNativeDateModule,
     MatProgressBarModule,
     QuillModule,
-    DatePipe,
+    AppDatePipe,
   ],
   templateUrl: './weekly-prep.html',
   host: { class: 'flex flex-col flex-1' },
