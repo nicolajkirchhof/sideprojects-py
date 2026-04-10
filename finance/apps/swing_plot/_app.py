@@ -135,6 +135,16 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
         self._status_timer.start()
         self._update_ib_status()
 
+    def closeEvent(self, event):
+        """Disconnect IBKR on window close to free the client ID."""
+        if self._ib_con is not None:
+            try:
+                self._ib_con.disconnect()
+            except Exception:
+                pass
+            self._ib_con = None
+        super().closeEvent(event)
+
     # ------------------------------------------------------------------
     # IBKR helpers
     # ------------------------------------------------------------------
@@ -152,9 +162,11 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
             return None
         if self._is_ib_connected():
             return self._ib_con
+        import random
         from finance.utils import ibkr as ib_utils
         try:
-            self._ib_con = ib_utils.connect(instance, 17, 1)
+            client_id = random.randint(100, 999)
+            self._ib_con = ib_utils.connect(instance, client_id, 1)
             self._update_ib_status()
             return self._ib_con
         except Exception as e:
@@ -740,13 +752,14 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
         toolbar.addWidget(ibkr_label)
         toolbar.addWidget(self._ibkr_combo)
 
-        self._load_btn = QtWidgets.QPushButton('Load')
+        _btn_style = ('QPushButton { color: white; font-size: 13pt; padding: 3px 8px;'
+                      ' border: 1px solid #555; border-radius: 3px; background: #222; }'
+                      'QPushButton:hover { background: #444; border-color: #888; }'
+                      'QPushButton:pressed { background: #555; }')
+        self._load_btn = QtWidgets.QPushButton('▶')
+        self._load_btn.setToolTip('Load symbol')
+        self._load_btn.setStyleSheet(_btn_style)
         toolbar.addWidget(self._load_btn)
-
-        self._refresh_btn = QtWidgets.QPushButton('Refresh')
-        self._refresh_btn.setToolTip('Sync current symbol from IBKR up to now')
-        self._refresh_btn.clicked.connect(self._on_refresh_clicked)
-        toolbar.addWidget(self._refresh_btn)
         toolbar.addSpacing(20)
 
         toolbar.addWidget(QtWidgets.QLabel('Start Year:'))
@@ -763,6 +776,14 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
         self._tree_tf_combo.addItems(['Daily', 'Weekly', 'Monthly'])
         toolbar.addWidget(self._tree_tf_combo)
         toolbar.addStretch()
+
+        # Right side — Refresh button with icon
+        self._refresh_btn = QtWidgets.QPushButton('⟳')
+        self._refresh_btn.setToolTip('Sync current symbol from IBKR up to now')
+        self._refresh_btn.setStyleSheet(_btn_style)
+        self._refresh_btn.clicked.connect(self._on_refresh_clicked)
+        toolbar.addWidget(self._refresh_btn)
+        toolbar.addSpacing(10)
 
         # Right side — data freshness for currently loaded symbol
         self._freshness_label = QtWidgets.QLabel('')

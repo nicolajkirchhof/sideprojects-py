@@ -104,8 +104,14 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
   else:
     cursor = None
 
-  if offline or (cursor is not None and cursor > datetime.now().date() - timedelta(days=refresh_offset_days)):
+  # Skip API call if cache is fresh enough. With refresh_offset_days=0,
+  # threshold = tomorrow — never skips, always re-fetches today's bar.
+  skip_threshold = datetime.now().date() + timedelta(days=1) - timedelta(days=refresh_offset_days)
+  print(f"[IBKR] {symbol}: cursor={cursor}, skip_threshold={skip_threshold}, offset={refresh_offset_days}")
+  if offline or (cursor is not None and cursor > skip_threshold):
+    print(f"[IBKR] {symbol}: skipping (cache fresh enough)")
     return df_existing
+  print(f"[IBKR] {symbol}: proceeding to fetch")
 
   disconnect = False
   try:
@@ -135,6 +141,12 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
 
     # Always try to catch up to "today"
     target_end = datetime.now().date()
+
+    # Force re-fetch of today's bar even if already cached (intraday override)
+    if cursor is not None and cursor > target_end:
+      print(f"[IBKR] {symbol}: clamping cursor {cursor} → {target_end}")
+      cursor = target_end
+    print(f"[IBKR] {symbol}: target_end={target_end}, cursor={cursor}, rth={rth}")
 
     if cursor is None:
      cursor = ib_con.reqHeadTimeStamp(contract, whatToShow="TRADES", useRTH=rth, formatDate=True)
@@ -170,7 +182,13 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
             or typ == 'HISTORICAL_VOLATILITY' and contract.symbol in NO_HV_INDICES:
           continue
 
-        end_date_time_str = request_end.strftime('%Y%m%d %H:%M:%S')
+        # Use empty string for endDateTime when requesting up to today —
+        # IBKR interprets a midnight timestamp as "before this time" so today's
+        # bar would be excluded. Empty string means "up to now".
+        if request_end >= target_end:
+          end_date_time_str = ''
+        else:
+          end_date_time_str = (request_end + timedelta(days=1)).strftime('%Y%m%d %H:%M:%S')
         duration = get_request_string(days_to_request)
 
         data = ib_con.reqHistoricalData(
