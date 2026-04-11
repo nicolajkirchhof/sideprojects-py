@@ -34,8 +34,10 @@ builder.Services.AddSingleton<FlexReportParser>();
 builder.Services.AddScoped<FlexSyncService>(sp => new FlexSyncService(
     sp.GetRequiredService<DataContext>(),
     sp.GetRequiredService<ILogger<FlexSyncService>>(),
-    cutoffDate: builder.Configuration.GetValue<DateTime?>("FlexSyncCutoffDate")));
+    cutoffDate: builder.Configuration.GetValue<DateTime?>("FlexSyncCutoffDate"),
+    statusService: sp.GetRequiredService<TradeStatusService>()));
 builder.Services.AddScoped<OptionPositionLogCountService>();
+builder.Services.AddScoped<TradeStatusService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -66,6 +68,13 @@ using (var scope = app.Services.CreateScope())
     if (backfilled > 0)
     {
         app.Logger.LogInformation("Backfilled LogCount for {Count} open position(s).", backfilled);
+    }
+
+    var statusService = services.GetRequiredService<TradeStatusService>();
+    var statusBackfilled = await statusService.RecomputeForPendingAsync();
+    if (statusBackfilled > 0)
+    {
+        app.Logger.LogInformation("Backfilled Status for {Count} trade(s).", statusBackfilled);
     }
 }
 

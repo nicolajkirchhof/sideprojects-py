@@ -1,3 +1,4 @@
+using tradelog.Services;
 using Microsoft.AspNetCore.Mvc;
 using tradelog.Controllers;
 using tradelog.Dtos;
@@ -153,7 +154,7 @@ public class TradeEventsControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var tradesController = new TradesController(queryCtx);
+        var tradesController = new TradesController(queryCtx, new TradeStatusService(queryCtx));
 
         var result = await tradesController.GetById(_tradeId);
 

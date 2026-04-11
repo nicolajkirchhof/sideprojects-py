@@ -56,7 +56,7 @@ public class OptionPositionsControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new OptionPositionsController(queryCtx, new OptionPositionLogCountService(queryCtx));
+        var controller = new OptionPositionsController(queryCtx, new OptionPositionLogCountService(queryCtx), new TradeStatusService(queryCtx));
 
         var result = await controller.GetAll(null, null, true);
 
@@ -87,7 +87,7 @@ public class OptionPositionsControllerTests : IDisposable
         }
 
         using var cmdCtx = _fixture.CreateContext();
-        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx));
+        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx), new TradeStatusService(cmdCtx));
 
         var result = await controller.Assign(posId, new AssignTradeDto { TradeId = tradeId });
 
@@ -120,7 +120,7 @@ public class OptionPositionsControllerTests : IDisposable
         }
 
         using var cmdCtx = _fixture.CreateContext();
-        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx));
+        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx), new TradeStatusService(cmdCtx));
 
         var result = await controller.Assign(posId, new AssignTradeDto { TradeId = null });
 
@@ -135,7 +135,7 @@ public class OptionPositionsControllerTests : IDisposable
     public async Task Assign_NotFound_Returns404()
     {
         using var ctx = _fixture.CreateContext();
-        var controller = new OptionPositionsController(ctx, new OptionPositionLogCountService(ctx));
+        var controller = new OptionPositionsController(ctx, new OptionPositionLogCountService(ctx), new TradeStatusService(ctx));
 
         var result = await controller.Assign(999, new AssignTradeDto { TradeId = 1 });
 
@@ -168,7 +168,7 @@ public class OptionPositionsControllerTests : IDisposable
         }
 
         using var cmdCtx = _fixture.CreateContext();
-        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx));
+        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx), new TradeStatusService(cmdCtx));
 
         var updated = new OptionPosition
         {
@@ -208,7 +208,7 @@ public class OptionPositionsControllerTests : IDisposable
         }
 
         using var cmdCtx = _fixture.CreateContext();
-        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx));
+        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx), new TradeStatusService(cmdCtx));
 
         var updated = new OptionPosition
         {
@@ -249,7 +249,7 @@ public class OptionPositionsControllerTests : IDisposable
         }
 
         using var cmdCtx = _fixture.CreateContext();
-        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx));
+        var controller = new OptionPositionsController(cmdCtx, new OptionPositionLogCountService(cmdCtx), new TradeStatusService(cmdCtx));
 
         var updated = new OptionPosition
         {

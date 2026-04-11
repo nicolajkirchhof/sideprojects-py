@@ -29,6 +29,7 @@ export interface Trade {
   managementRating?: number | null;
   learnings?: string | null;
   parentTradeId?: number | null;
+  status?: string | null;
 }
 
 export interface TradeDetail extends Trade {

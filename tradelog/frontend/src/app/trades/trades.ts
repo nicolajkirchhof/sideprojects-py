@@ -1,9 +1,12 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, viewChild, effect, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { AppDatePipe } from '../shared/app-date.pipe';
-import { MatTableModule } from '@angular/material/table';
+import { MatTableModule, MatTableDataSource } from '@angular/material/table';
+import { MatSortModule, MatSort } from '@angular/material/sort';
+import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { ContentArea } from '../shared/content-area/content-area';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -28,8 +31,12 @@ import { LookupService } from '../shared/lookup.service';
   standalone: true,
   imports: [
     MatTableModule,
+    MatSortModule,
+    MatPaginatorModule,
+    MatAutocompleteModule,
     ContentArea,
     ReactiveFormsModule,
+    FormsModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -52,10 +59,21 @@ export class Trades {
   private notify = inject(NotificationService);
   protected lookup = inject(LookupService);
 
+  sort = viewChild(MatSort);
+  paginator = viewChild(MatPaginator);
+
   loading = signal(false);
 
-  trades = signal<Trade[]>([]);
-  displayedColumns = ['symbol', 'date', 'typeOfTrade', 'directional', 'budget', 'strategy', 'managementRating'];
+  dataSource = new MatTableDataSource<Trade>([]);
+  displayedColumns = ['symbol', 'date', 'typeOfTrade', 'directional', 'budget', 'strategy', 'managementRating', 'status'];
+
+  // Symbol autocomplete filter (client-side, on top of server-side budget/strategy)
+  filterSymbol = signal('');
+  symbolSuggestions = computed(() => {
+    const all = [...new Set(this.dataSource.data.map(t => t.symbol))].sort();
+    const q = this.filterSymbol().toUpperCase();
+    return q ? all.filter(s => s.includes(q)) : all;
+  });
 
   // Sidebar state
   showSidebar = signal(false);
@@ -103,6 +121,20 @@ export class Trades {
 
   constructor() {
     this.load();
+
+    effect(() => {
+      const s = this.sort();
+      const p = this.paginator();
+      if (s) this.dataSource.sort = s;
+      if (p) this.dataSource.paginator = p;
+    });
+
+    // Client-side symbol filter (server-side budget/strategy stays via API params)
+    this.dataSource.filterPredicate = (row: Trade, filter: string) => {
+      if (!filter) return true;
+      return row.symbol.toLowerCase().includes(filter);
+    };
+
     this.form = this.fb.group({
       id: [{ value: null, disabled: true }],
       symbol: ['', [Validators.required]],
@@ -143,7 +175,7 @@ export class Trades {
     if (this.filterStrategy()) filters.strategy = this.filterStrategy();
     this.service.getAll(filters).subscribe({
       next: (data) => {
-        this.trades.set(data ?? []);
+        this.dataSource.data = data ?? [];
         this.loading.set(false);
         if (!this.selected() && (data?.length ?? 0) > 0) {
           this.onRowSelect(data![0]);
@@ -158,6 +190,10 @@ export class Trades {
 
   onFilterChange(): void {
     this.load();
+  }
+
+  applySymbolFilter(): void {
+    this.dataSource.filter = this.filterSymbol().trim().toLowerCase();
   }
 
   onRowSelect(row: Trade): void {

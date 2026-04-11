@@ -1,3 +1,4 @@
+using tradelog.Services;
 using Microsoft.AspNetCore.Mvc;
 using tradelog.Controllers;
 using tradelog.Dtos;
@@ -55,7 +56,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new TradesController(queryCtx, new TradeStatusService(queryCtx));
 
         var result = await controller.GetById(tradeId);
 
@@ -85,7 +86,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new TradesController(queryCtx, new TradeStatusService(queryCtx));
 
         var result = await controller.GetById(tradeId);
 
@@ -125,7 +126,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new TradesController(queryCtx, new TradeStatusService(queryCtx));
 
         var result = await controller.GetById(tradeId);
 
@@ -159,7 +160,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new TradesController(queryCtx, new TradeStatusService(queryCtx));
 
         var result = await controller.GetById(parentId);
 
@@ -190,7 +191,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new TradesController(queryCtx, new TradeStatusService(queryCtx));
 
         var result = await controller.GetChain(childId);
 
@@ -219,7 +220,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var queryCtx = _fixture.CreateContext();
-        var controller = new TradesController(queryCtx);
+        var controller = new TradesController(queryCtx, new TradeStatusService(queryCtx));
 
         var result = await controller.GetChain(rootId);
 
@@ -233,7 +234,7 @@ public class TradesControllerTests : IDisposable
     public async Task GetChain_ReturnsNotFoundForMissingTrade()
     {
         using var ctx = _fixture.CreateContext();
-        var controller = new TradesController(ctx);
+        var controller = new TradesController(ctx, new TradeStatusService(ctx));
 
         var result = await controller.GetChain(999);
 
@@ -256,7 +257,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var cmdCtx = _fixture.CreateContext();
-        var controller = new TradesController(cmdCtx);
+        var controller = new TradesController(cmdCtx, new TradeStatusService(cmdCtx));
 
         var result = await controller.Delete(parentId);
 
@@ -276,7 +277,7 @@ public class TradesControllerTests : IDisposable
         }
 
         using var cmdCtx = _fixture.CreateContext();
-        var controller = new TradesController(cmdCtx);
+        var controller = new TradesController(cmdCtx, new TradeStatusService(cmdCtx));
 
         var result = await controller.Delete(tradeId);
 

@@ -15,15 +15,18 @@ public class FlexSyncService
     private readonly DataContext _context;
     private readonly ILogger<FlexSyncService> _logger;
     private readonly DateTime? _cutoffDate;
+    private readonly TradeStatusService? _statusService;
 
     public FlexSyncService(
         DataContext context,
         ILogger<FlexSyncService> logger,
-        DateTime? cutoffDate = null)
+        DateTime? cutoffDate = null,
+        TradeStatusService? statusService = null)
     {
         _context = context;
         _logger = logger;
         _cutoffDate = cutoffDate;
+        _statusService = statusService;
     }
 
     /// <summary>
@@ -164,6 +167,16 @@ public class FlexSyncService
 
         await _context.SaveChangesAsync();
         _logger.LogInformation("FlexSync OPT/FOP: {Created} created, {Closed} closed", created, closed);
+        // Recompute trade status for any positions that changed
+        if (_statusService != null)
+        {
+            var affectedTradeIds = existingPositions.Values
+                .Where(p => p.TradeId.HasValue)
+                .Select(p => p.TradeId!.Value)
+                .Distinct();
+            await _statusService.RecomputeForAsync(affectedTradeIds);
+            await _context.SaveChangesAsync();
+        }
         return (created, closed);
     }
 
@@ -356,6 +369,16 @@ public class FlexSyncService
 
         if (processed > 0)
             await _context.SaveChangesAsync();
+        // Recompute trade status for closed positions
+        if (_statusService != null && processed > 0)
+        {
+            var affectedTradeIds = positions.Values
+                .Where(p => p.TradeId.HasValue)
+                .Select(p => p.TradeId!.Value)
+                .Distinct();
+            await _statusService.RecomputeForAsync(affectedTradeIds);
+            await _context.SaveChangesAsync();
+        }
 
         _logger.LogInformation("FlexSync OptionEAE: {Processed} events processed", processed);
         return processed;

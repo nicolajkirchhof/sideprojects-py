@@ -14,11 +14,16 @@ public class OptionPositionsController : ControllerBase
 {
     private readonly DataContext _context;
     private readonly OptionPositionLogCountService _logCountService;
+    private readonly TradeStatusService _statusService;
 
-    public OptionPositionsController(DataContext context, OptionPositionLogCountService logCountService)
+    public OptionPositionsController(
+        DataContext context,
+        OptionPositionLogCountService logCountService,
+        TradeStatusService statusService)
     {
         _context = context;
         _logCountService = logCountService;
+        _statusService = statusService;
     }
 
     [HttpGet]
@@ -112,7 +117,13 @@ public class OptionPositionsController : ControllerBase
         if (dto.TradeId.HasValue && !await _context.Trades.AnyAsync(t => t.Id == dto.TradeId.Value))
             return BadRequest("Trade not found");
 
+        var oldTradeId = position.TradeId;
         position.TradeId = dto.TradeId;
+        await _context.SaveChangesAsync();
+
+        // Recompute status for both old and new trade
+        var affectedIds = new[] { oldTradeId, dto.TradeId }.Where(id => id.HasValue).Select(id => id!.Value);
+        await _statusService.RecomputeForAsync(affectedIds);
         await _context.SaveChangesAsync();
         return NoContent();
     }

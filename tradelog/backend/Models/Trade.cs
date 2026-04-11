@@ -48,6 +48,13 @@ public class Trade : tradelog.Data.IAccountScoped
     public int? ManagementRating { get; set; }
     public string? Learnings { get; set; }
 
+    /// <summary>
+    /// Cached status: "Open" if any linked position is open, "Closed" if all are closed, null if no positions linked.
+    /// Recomputed by TradeStatusService on position changes.
+    /// </summary>
+    [StringLength(10)]
+    public string? Status { get; set; }
+
     public int? ParentTradeId { get; set; }
     public ICollection<OptionPosition> OptionPositions { get; set; } = new List<OptionPosition>();
     public ICollection<StockPosition> StockPositions { get; set; } = new List<StockPosition>();

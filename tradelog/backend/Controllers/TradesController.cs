@@ -13,10 +13,12 @@ namespace tradelog.Controllers;
 public class TradesController : ControllerBase
 {
     private readonly DataContext _context;
+    private readonly TradeStatusService _statusService;
 
-    public TradesController(DataContext context)
+    public TradesController(DataContext context, TradeStatusService statusService)
     {
         _context = context;
+        _statusService = statusService;
     }
 
     [HttpGet]
@@ -133,10 +135,62 @@ public class TradesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<Trade>> Create(Trade trade)
+    public async Task<ActionResult<Trade>> Create(TradeCreateDto dto)
     {
+        var trade = new Trade
+        {
+            Symbol = dto.Symbol,
+            Date = dto.Date,
+            TypeOfTrade = dto.TypeOfTrade,
+            Notes = dto.Notes,
+            Directional = dto.Directional,
+            Timeframe = dto.Timeframe,
+            Budget = dto.Budget,
+            Strategy = dto.Strategy,
+            NewsCatalyst = dto.NewsCatalyst,
+            RecentEarnings = dto.RecentEarnings,
+            SectorSupport = dto.SectorSupport,
+            Ath = dto.Ath,
+            Rvol = dto.Rvol,
+            InstitutionalSupport = dto.InstitutionalSupport,
+            GapPct = dto.GapPct,
+            XAtrMove = dto.XAtrMove,
+            TaFaNotes = dto.TaFaNotes,
+            IntendedManagement = dto.IntendedManagement,
+            ActualManagement = dto.ActualManagement,
+            ManagementRating = dto.ManagementRating,
+            Learnings = dto.Learnings,
+            ParentTradeId = dto.ParentTradeId,
+        };
+
         _context.Trades.Add(trade);
         await _context.SaveChangesAsync();
+
+        // Link option positions if provided
+        if (dto.OptionPositionIds is { Count: > 0 })
+        {
+            var positions = await _context.OptionPositions
+                .Where(p => dto.OptionPositionIds.Contains(p.Id) && p.TradeId == null)
+                .ToListAsync();
+            foreach (var p in positions) p.TradeId = trade.Id;
+        }
+
+        // Link stock positions if provided
+        if (dto.StockPositionIds is { Count: > 0 })
+        {
+            var positions = await _context.StockPositions
+                .Where(p => dto.StockPositionIds.Contains(p.Id) && p.TradeId == null)
+                .ToListAsync();
+            foreach (var p in positions) p.TradeId = trade.Id;
+        }
+
+        if (dto.OptionPositionIds is { Count: > 0 } || dto.StockPositionIds is { Count: > 0 })
+        {
+            await _context.SaveChangesAsync();
+            await _statusService.RecomputeForAsync([trade.Id]);
+            await _context.SaveChangesAsync();
+        }
+
         return CreatedAtAction(nameof(GetById), new { id = trade.Id }, trade);
     }
 
