@@ -13,18 +13,22 @@ public class Trade : tradelog.Data.IAccountScoped
     [Required]
     public DateTime Date { get; set; }
 
-    [Required]
-    public TypeOfTrade TypeOfTrade { get; set; }
+    /// <summary>FK → LookupValues (Category = "TypeOfTrade")</summary>
+    public int TypeOfTrade { get; set; }
 
     public string? Notes { get; set; }
-    public DirectionalBias? Directional { get; set; }
-    public Timeframe? Timeframe { get; set; }
 
-    [Required]
-    public Budget Budget { get; set; }
+    /// <summary>FK → LookupValues (Category = "Directional"), nullable</summary>
+    public int? Directional { get; set; }
 
-    [Required]
-    public Strategy Strategy { get; set; }
+    /// <summary>FK → LookupValues (Category = "Timeframe"), nullable</summary>
+    public int? Timeframe { get; set; }
+
+    /// <summary>FK → LookupValues (Category = "Budget")</summary>
+    public int Budget { get; set; }
+
+    /// <summary>FK → LookupValues (Category = "Strategy")</summary>
+    public int Strategy { get; set; }
 
     public bool NewsCatalyst { get; set; }
     public bool RecentEarnings { get; set; }
@@ -40,7 +44,8 @@ public class Trade : tradelog.Data.IAccountScoped
     public string? TaFaNotes { get; set; }
     public string? IntendedManagement { get; set; }
     public string? ActualManagement { get; set; }
-    public ManagementRating? ManagementRating { get; set; }
+    /// <summary>FK → LookupValues (Category = "ManagementRating"), nullable</summary>
+    public int? ManagementRating { get; set; }
     public string? Learnings { get; set; }
 
     public int? ParentTradeId { get; set; }

@@ -21,6 +21,7 @@ public class StockPositionsControllerTests : IDisposable
         using var ctx = _fixture.CreateContext();
         ctx.Accounts.Add(new Account { Id = _fixture.TestAccountId, IbkrAccountId = "U1234", Name = "Test" });
         ctx.SaveChanges();
+        LookupSeeder.Seed(ctx, _fixture.TestAccountId);
     }
 
     [Fact]
@@ -107,7 +108,7 @@ public class StockPositionsControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "AAPL", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.LongStock, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                TypeOfTrade = LookupSeeder.TypeLongStock, Budget = LookupSeeder.BudgetSwing, Strategy = LookupSeeder.StrategyBreakoutMomentum,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -139,7 +140,7 @@ public class StockPositionsControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "AAPL", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.LongStock, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                TypeOfTrade = LookupSeeder.TypeLongStock, Budget = LookupSeeder.BudgetSwing, Strategy = LookupSeeder.StrategyBreakoutMomentum,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -171,7 +172,7 @@ public class StockPositionsControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "AAPL", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.LongStock, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                TypeOfTrade = LookupSeeder.TypeLongStock, Budget = LookupSeeder.BudgetSwing, Strategy = LookupSeeder.StrategyBreakoutMomentum,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);

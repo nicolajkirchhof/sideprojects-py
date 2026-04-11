@@ -22,8 +22,8 @@ public class TradesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Trade>>> GetAll(
         [FromQuery] string? symbol,
-        [FromQuery] Budget? budget,
-        [FromQuery] Strategy? strategy)
+        [FromQuery] int? budget,
+        [FromQuery] int? strategy)
     {
         var query = _context.Trades.AsQueryable();
 
@@ -37,11 +37,26 @@ public class TradesController : ControllerBase
         return await query.OrderByDescending(e => e.Date).ToListAsync();
     }
 
+    /// <summary>Resolves lookup value names for a set of IDs. Returns empty string for unknown IDs.</summary>
+    private async Task<Dictionary<int, string>> ResolveLookupNames(params int?[] ids)
+    {
+        var nonNull = ids.Where(i => i.HasValue).Select(i => i!.Value).Distinct().ToList();
+        if (nonNull.Count == 0) return new();
+        return await _context.LookupValues
+            .IgnoreQueryFilters()
+            .Where(lv => nonNull.Contains(lv.Id))
+            .ToDictionaryAsync(lv => lv.Id, lv => lv.Name);
+    }
+
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TradeDetailDto>> GetById(int id)
     {
         var trade = await _context.Trades.FindAsync(id);
         if (trade == null) return NotFound();
+
+        var names = await ResolveLookupNames(
+            trade.TypeOfTrade, trade.Directional, trade.Timeframe,
+            trade.Budget, trade.Strategy, trade.ManagementRating);
 
         var optionPositions = await _context.OptionPositions
             .Where(p => p.TradeId == id)
@@ -80,11 +95,16 @@ public class TradesController : ControllerBase
             Symbol = trade.Symbol,
             Date = trade.Date,
             TypeOfTrade = trade.TypeOfTrade,
+            TypeOfTradeName = names.GetValueOrDefault(trade.TypeOfTrade, ""),
             Notes = trade.Notes,
             Directional = trade.Directional,
+            DirectionalName = trade.Directional.HasValue ? names.GetValueOrDefault(trade.Directional.Value) : null,
             Timeframe = trade.Timeframe,
+            TimeframeName = trade.Timeframe.HasValue ? names.GetValueOrDefault(trade.Timeframe.Value) : null,
             Budget = trade.Budget,
+            BudgetName = names.GetValueOrDefault(trade.Budget, ""),
             Strategy = trade.Strategy,
+            StrategyName = names.GetValueOrDefault(trade.Strategy, ""),
             NewsCatalyst = trade.NewsCatalyst,
             RecentEarnings = trade.RecentEarnings,
             SectorSupport = trade.SectorSupport,
@@ -97,6 +117,7 @@ public class TradesController : ControllerBase
             IntendedManagement = trade.IntendedManagement,
             ActualManagement = trade.ActualManagement,
             ManagementRating = trade.ManagementRating,
+            ManagementRatingName = trade.ManagementRating.HasValue ? names.GetValueOrDefault(trade.ManagementRating.Value) : null,
             Learnings = trade.Learnings,
             ParentTradeId = trade.ParentTradeId,
             ChildTradeIds = await _context.Trades

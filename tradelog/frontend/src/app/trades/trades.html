@@ -9,8 +9,8 @@
         <mat-label>Budget</mat-label>
         <mat-select [value]="filterBudget()" (selectionChange)="filterBudget.set($event.value); onFilterChange()">
           <mat-option [value]="null">All</mat-option>
-          @for (b of budgets; track b) {
-            <mat-option [value]="b">{{ b }}</mat-option>
+          @for (b of lookup.byCategory('Budget'); track b.id) {
+            <mat-option [value]="b.id">{{ b.name }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
@@ -18,8 +18,8 @@
         <mat-label>Strategy</mat-label>
         <mat-select [value]="filterStrategy()" (selectionChange)="filterStrategy.set($event.value); onFilterChange()">
           <mat-option [value]="null">All</mat-option>
-          @for (s of strategies; track s) {
-            <mat-option [value]="s">{{ strategyLabel[s] }}</mat-option>
+          @for (s of lookup.byCategory('Strategy'); track s.id) {
+            <mat-option [value]="s.id">{{ s.name }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
@@ -47,27 +47,27 @@
 
         <ng-container matColumnDef="typeOfTrade">
           <th mat-header-cell *matHeaderCellDef>Type</th>
-          <td mat-cell *matCellDef="let e">{{ typeOfTradeLabel[e.typeOfTrade] || e.typeOfTrade }}</td>
+          <td mat-cell *matCellDef="let e">{{ lookup.name(e.typeOfTrade) }}</td>
         </ng-container>
 
         <ng-container matColumnDef="directional">
           <th mat-header-cell *matHeaderCellDef>Direction</th>
-          <td mat-cell *matCellDef="let e">{{ e.directional || '—' }}</td>
+          <td mat-cell *matCellDef="let e">{{ lookup.name(e.directional) || '—' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="budget">
           <th mat-header-cell *matHeaderCellDef>Budget</th>
-          <td mat-cell *matCellDef="let e">{{ e.budget }}</td>
+          <td mat-cell *matCellDef="let e">{{ lookup.name(e.budget) }}</td>
         </ng-container>
 
         <ng-container matColumnDef="strategy">
           <th mat-header-cell *matHeaderCellDef>Strategy</th>
-          <td mat-cell *matCellDef="let e">{{ strategyLabel[e.strategy] || e.strategy }}</td>
+          <td mat-cell *matCellDef="let e">{{ lookup.name(e.strategy) }}</td>
         </ng-container>
 
         <ng-container matColumnDef="managementRating">
           <th mat-header-cell *matHeaderCellDef>Rating</th>
-          <td mat-cell *matCellDef="let e">{{ managementRatingLabel[e.managementRating] || '—' }}</td>
+          <td mat-cell *matCellDef="let e">{{ lookup.name(e.managementRating) || '—' }}</td>
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
@@ -116,8 +116,8 @@
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
             <mat-label>Type of Trade</mat-label>
             <mat-select formControlName="typeOfTrade">
-              @for (t of typesOfTrade; track t) {
-                <mat-option [value]="t">{{ typeOfTradeLabel[t] }}</mat-option>
+              @for (t of lookup.byCategory('TypeOfTrade'); track t.id) {
+                <mat-option [value]="t.id">{{ t.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -125,8 +125,8 @@
             <mat-label>Direction</mat-label>
             <mat-select formControlName="directional">
               <mat-option [value]="null">—</mat-option>
-              @for (d of directionalOptions; track d) {
-                <mat-option [value]="d">{{ d }}</mat-option>
+              @for (d of lookup.byCategory('Directional'); track d.id) {
+                <mat-option [value]="d.id">{{ d.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -136,16 +136,16 @@
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
             <mat-label>Budget</mat-label>
             <mat-select formControlName="budget">
-              @for (b of budgets; track b) {
-                <mat-option [value]="b">{{ b }}</mat-option>
+              @for (b of lookup.byCategory('Budget'); track b.id) {
+                <mat-option [value]="b.id">{{ b.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
             <mat-label>Strategy</mat-label>
             <mat-select formControlName="strategy">
-              @for (s of strategies; track s) {
-                <mat-option [value]="s">{{ strategyLabel[s] }}</mat-option>
+              @for (s of lookup.byCategory('Strategy'); track s.id) {
+                <mat-option [value]="s.id">{{ s.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -153,8 +153,8 @@
             <mat-label>Timeframe</mat-label>
             <mat-select formControlName="timeframe">
               <mat-option [value]="null">—</mat-option>
-              @for (t of timeframes; track t) {
-                <mat-option [value]="t">{{ timeframeLabel[t] }}</mat-option>
+              @for (t of lookup.byCategory('Timeframe'); track t.id) {
+                <mat-option [value]="t.id">{{ t.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -195,8 +195,8 @@
             <mat-label>Management Rating</mat-label>
             <mat-select formControlName="managementRating">
               <mat-option [value]="null">—</mat-option>
-              @for (r of managementRatings; track r) {
-                <mat-option [value]="r">{{ managementRatingLabel[r] }}</mat-option>
+              @for (r of lookup.byCategory('ManagementRating'); track r.id) {
+                <mat-option [value]="r.id">{{ r.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>

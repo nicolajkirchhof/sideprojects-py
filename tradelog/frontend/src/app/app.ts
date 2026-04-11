@@ -12,6 +12,7 @@ import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router
 import { AccountSwitcherComponent } from './shared/account-switcher/account-switcher';
 import { SyncControlComponent } from './shared/sync-control/sync-control';
 import { ThemeService } from './shared/theme.service';
+import { LookupService } from './shared/lookup.service';
 
 @Component({
   selector: 'app-root',
@@ -34,6 +35,11 @@ export class App {
   private breakpointObserver = inject(BreakpointObserver);
   private router = inject(Router);
   protected theme = inject(ThemeService);
+  private lookupService = inject(LookupService);
+
+  constructor() {
+    this.lookupService.refresh();
+  }
 
   isHandset = toSignal(
     this.breakpointObserver.observe(Breakpoints.Handset).pipe(

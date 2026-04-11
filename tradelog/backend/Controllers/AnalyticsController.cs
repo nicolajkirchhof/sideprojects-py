@@ -19,19 +19,26 @@ public class AnalyticsController : ControllerBase
         _context = context;
     }
 
+    private async Task<Dictionary<int, string>> GetLookupNames()
+    {
+        return await _context.LookupValues
+            .IgnoreQueryFilters()
+            .ToDictionaryAsync(lv => lv.Id, lv => lv.Name);
+    }
+
     [HttpGet("strategies")]
     public async Task<ActionResult<IEnumerable<StrategyPerformanceDto>>> GetStrategyPerformance()
     {
         var (pnlsBySymbol, trades) = await LoadClosedData();
+        var names = await GetLookupNames();
 
-        // Group PNLs by strategy (via Trade linkage by symbol)
         var strategyPnls = new Dictionary<string, List<SymbolPnl>>();
         var strategyCommissions = new Dictionary<string, decimal>();
 
         foreach (var g in pnlsBySymbol.GroupBy(p => p.Symbol))
         {
             var entry = trades.GetValueOrDefault(g.Key);
-            var strategy = entry?.Strategy.ToString() ?? "Unknown";
+            var strategy = entry != null ? names.GetValueOrDefault(entry.Strategy, "Unknown") : "Unknown";
             if (!strategyPnls.ContainsKey(strategy))
             {
                 strategyPnls[strategy] = new List<SymbolPnl>();
@@ -67,11 +74,12 @@ public class AnalyticsController : ControllerBase
     public async Task<ActionResult<IEnumerable<EquityCurvePointDto>>> GetStrategyEquityCurve(string strategy)
     {
         var (pnlsBySymbol, trades) = await LoadClosedData();
+        var names = await GetLookupNames();
 
         var filtered = pnlsBySymbol.Where(p =>
         {
             var entry = trades.GetValueOrDefault(p.Symbol);
-            return entry?.Strategy.ToString() == strategy;
+            return entry != null && names.GetValueOrDefault(entry.Strategy) == strategy;
         }).ToList();
 
         return AnalyticsComputations.BuildEquityCurve(filtered);
@@ -81,6 +89,7 @@ public class AnalyticsController : ControllerBase
     public async Task<ActionResult<IEnumerable<BudgetPerformanceDto>>> GetBudgetPerformance()
     {
         var (pnlsBySymbol, trades) = await LoadClosedData();
+        var names = await GetLookupNames();
 
         var budgetPnls = new Dictionary<string, List<SymbolPnl>>();
         var budgetCommissions = new Dictionary<string, decimal>();
@@ -88,7 +97,7 @@ public class AnalyticsController : ControllerBase
         foreach (var g in pnlsBySymbol.GroupBy(p => p.Symbol))
         {
             var entry = trades.GetValueOrDefault(g.Key);
-            var budget = entry?.Budget.ToString() ?? "Unknown";
+            var budget = entry != null ? names.GetValueOrDefault(entry.Budget, "Unknown") : "Unknown";
             if (!budgetPnls.ContainsKey(budget))
             {
                 budgetPnls[budget] = new List<SymbolPnl>();
@@ -123,11 +132,12 @@ public class AnalyticsController : ControllerBase
     public async Task<ActionResult<IEnumerable<EquityCurvePointDto>>> GetBudgetEquityCurve(string budget)
     {
         var (pnlsBySymbol, trades) = await LoadClosedData();
+        var names = await GetLookupNames();
 
         var filtered = pnlsBySymbol.Where(p =>
         {
             var entry = trades.GetValueOrDefault(p.Symbol);
-            return entry?.Budget.ToString() == budget;
+            return entry != null && names.GetValueOrDefault(entry.Budget) == budget;
         }).ToList();
 
         return AnalyticsComputations.BuildEquityCurve(filtered);
@@ -211,6 +221,7 @@ public class AnalyticsController : ControllerBase
     [HttpGet("chains")]
     public async Task<ActionResult<IEnumerable<ChainSummaryDto>>> GetChains()
     {
+        var names = await GetLookupNames();
         var allTrades = await _context.Trades.OrderBy(t => t.Date).ToListAsync();
         var childrenByParent = allTrades
             .Where(t => t.ParentTradeId.HasValue)
@@ -309,8 +320,8 @@ public class AnalyticsController : ControllerBase
             {
                 RootTradeId = root.Id,
                 Symbol = root.Symbol,
-                Strategy = root.Strategy.ToString(),
-                Budget = root.Budget.ToString(),
+                Strategy = names.GetValueOrDefault(root.Strategy, "Unknown"),
+                Budget = names.GetValueOrDefault(root.Budget, "Unknown"),
                 ChainLength = chainTrades.Count,
                 Status = hasOpen ? "Open" : "Closed",
                 StartDate = root.Date,

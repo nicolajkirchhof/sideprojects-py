@@ -20,6 +20,7 @@ public class InstrumentSummariesControllerTests : IDisposable
         using var ctx = _fixture.CreateContext();
         ctx.Accounts.Add(new Account { Id = _fixture.TestAccountId, IbkrAccountId = "U1234", Name = "Test" });
         ctx.SaveChanges();
+        LookupSeeder.Seed(ctx, _fixture.TestAccountId);
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public class InstrumentSummariesControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -72,7 +73,7 @@ public class InstrumentSummariesControllerTests : IDisposable
         var summary = summaries[0];
         Assert.Equal(tradeId, summary.TradeId);
         Assert.Equal("SPY", summary.Symbol);
-        Assert.Equal("ShortPut", summary.TypeOfTrade);
+        Assert.Equal("Short Put", summary.TypeOfTrade);
         Assert.Equal(2, summary.OptionLegCount);
         Assert.Equal(1, summary.StockLegCount);
         Assert.Equal("Open", summary.Status);
@@ -86,7 +87,7 @@ public class InstrumentSummariesControllerTests : IDisposable
             ctx.Trades.Add(new Trade
             {
                 Symbol = "QQQ", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortStrangle, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortStrangle, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             });
             await ctx.SaveChangesAsync();
@@ -112,7 +113,7 @@ public class InstrumentSummariesControllerTests : IDisposable
             var openTrade = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(openTrade);
@@ -129,7 +130,7 @@ public class InstrumentSummariesControllerTests : IDisposable
             var closedTrade = new Trade
             {
                 Symbol = "QQQ", Date = new(2025, 5, 1),
-                TypeOfTrade = TypeOfTrade.LongCall, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                TypeOfTrade = LookupSeeder.TypeLongCall, Budget = LookupSeeder.BudgetSwing, Strategy = LookupSeeder.StrategyBreakoutMomentum,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(closedTrade);

@@ -22,6 +22,7 @@ public class OptionPositionsControllerTests : IDisposable
         using var ctx = _fixture.CreateContext();
         ctx.Accounts.Add(new Account { Id = _fixture.TestAccountId, IbkrAccountId = "U1234", Name = "Test" });
         ctx.SaveChanges();
+        LookupSeeder.Seed(ctx, _fixture.TestAccountId);
     }
 
     private OptionPosition MakePosition(string symbol, string contractId, int? tradeId = null) => new()
@@ -41,7 +42,7 @@ public class OptionPositionsControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -74,7 +75,7 @@ public class OptionPositionsControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -106,7 +107,7 @@ public class OptionPositionsControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);

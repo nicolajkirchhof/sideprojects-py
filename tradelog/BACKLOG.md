@@ -1,144 +1,14 @@
 # Tradelog — Product Backlog
 
-## E1: Date Format Settings
+## Completed
 
-Global application setting controlling how dates display and how date inputs behave. Persisted as app-wide config (not per-user). Default: `yyyy-MM-dd` (ISO).
-
-### E1-S1: Date format configuration service
-
-**As a** trader,
-**I want to** choose my preferred date format (ISO / US / German),
-**So that** dates across the application match my locale preference.
-
-**Acceptance criteria:**
-- [ ] Three supported formats: `yyyy-MM-dd` (ISO, default), `MM/dd/yyyy` (US), `dd.MM.yyyy` (German)
-- [ ] Setting persisted in `localStorage` and exposed via an injectable `DateFormatService` signal
-- [ ] Changing the format applies immediately without page reload
-
-**Affected layers:** Frontend (service)
-**Dependencies:** None
-**Notes:** This is a frontend-only setting for now. If multi-user support is added later, migrate to DB-backed per-user preference.
+- ~~E1: Date Format Settings~~ — shipped (DateFormatService, AppDatePipe, AppDateAdapter, Settings page)
+- ~~E2-S1: Opened/Closed columns on option-positions table~~ — shipped
+- ~~E3-S1 to S4: Configurable Enums~~ — shipped (LookupValues table, LookupsController CRUD, all frontend dropdowns use LookupService). Settings UI for managing values (E3-S3) deferred — API is ready.
 
 ---
 
-### E1-S2: Apply date format to all table columns
-
-**As a** trader,
-**I want** all date columns in every table to respect my chosen format,
-**So that** I see consistent dates across the application.
-
-**Acceptance criteria:**
-- [ ] All `| date:` pipes across option-positions, stock-positions, trades, capital, weekly-prep, accounts use the format from `DateFormatService`
-- [ ] Existing `shortDate` pipes replaced with a custom pipe or directive that reads the service
-- [ ] Sorting by date columns still works correctly (sorts by underlying Date, not display string)
-
-**Affected layers:** Frontend (pipe + all table templates)
-**Dependencies:** E1-S1
-**Notes:** Consider a shared `AppDatePipe` that injects `DateFormatService` to avoid passing the format everywhere.
-
----
-
-### E1-S3: Apply date format to all date inputs
-
-**As a** trader,
-**I want** date pickers and text inputs for dates to match my chosen format,
-**So that** I enter dates in a consistent format.
-
-**Acceptance criteria:**
-- [ ] All `mat-datepicker` inputs display the selected date in the configured format
-- [ ] Manual text entry in date fields parses the configured format
-- [ ] Invalid date input shows a validation error, does not silently accept the wrong format
-
-**Affected layers:** Frontend (MatDatepicker custom adapter + all form templates)
-**Dependencies:** E1-S1
-**Notes:** Angular Material supports custom `DateAdapter` — implement a format-aware adapter that reads from `DateFormatService`.
-
----
-
-### E1-S4: Settings page with date format selector
-
-**As a** trader,
-**I want** a Settings page accessible from the sidebar,
-**So that** I can change the date format and any future app-wide settings.
-
-**Acceptance criteria:**
-- [ ] New `/settings` route with a standalone component in the sidebar navigation
-- [ ] Radio group or dropdown for date format selection with live preview of a sample date
-- [ ] Persists on selection (auto-save, no submit button needed)
-- [ ] Page is extensible for future settings (layout should use sections/cards)
-
-**Affected layers:** Frontend (new route, component, sidebar nav)
-**Dependencies:** E1-S1
-
----
-
-## E2: Option Position Table — Opened & Closed Columns
-
-Currently the option-positions table only shows Expiry. Add Opened and Closed as visible, sortable columns.
-
-### E2-S1: Add Opened and Closed columns to option-positions table
-
-**As a** trader,
-**I want to** see when each option position was opened and closed directly in the table,
-**So that** I can sort and scan positions by entry/exit timing without opening the detail sidebar.
-
-**Acceptance criteria:**
-- [ ] `Opened` column added before the existing `Expiry` column, with `mat-sort-header`
-- [ ] `Closed` column added after `Expiry`, with `mat-sort-header`
-- [ ] Closed shows `—` (muted) for open positions (null value)
-- [ ] Both columns use the date format from `DateFormatService` (or the existing pipe if E1 is not yet implemented)
-- [ ] Column order in table: Symbol, Contract, R, Strike, Opened, Expiry, Closed, Pos, Cost, ...
-
-**Affected layers:** Frontend (option-positions.html, option-positions.ts — displayedColumns array)
-**Dependencies:** None (E1-S2 will update the date pipe later if implemented first)
-
----
-
-## E3: Configurable Enums (DB-backed Lookups)
-
-Replace hardcoded C# enums with database-backed lookup tables so users can add, rename, and remove values through the UI. Renaming updates all historical references.
-
-> **Architectural decision required.** This epic changes the data model fundamentally (int enums → FK references or string-based lookups). Switch to `/architect` before implementation to decide: generic lookup table vs per-enum table, migration strategy for existing int-valued rows, and cascading rename semantics.
-
-### E3-S1: Data model for configurable lookups
-
-**As a** developer,
-**I want** enum values stored in the database as lookup rows,
-**So that** users can manage them without code changes or redeployment.
-
-**Acceptance criteria:**
-- [ ] Each configurable enum has a corresponding lookup table (or rows in a generic table) with at minimum: `Id`, `AccountId`, `Name`, `SortOrder`, `IsActive`
-- [ ] Existing integer enum values are migrated to FK references in a data migration
-- [ ] Historical trades/positions referencing a renamed value automatically reflect the new name
-- [ ] Deleting a lookup value is soft-delete (`IsActive = false`) — prevents orphaned FK references
-- [ ] Enums to convert: `Strategy`, `TypeOfTrade`, `Budget`, `Timeframe`, `DirectionalBias`, `ManagementRating`
-
-**Affected layers:** Data model, EF migration, all backend services that read/write these fields
-**Dependencies:** Architectural decision (see note above)
-**Notes:** Start with `Strategy` and `TypeOfTrade` as the highest-priority pair. The remaining four can follow in a second pass once the pattern is proven.
-
----
-
-### E3-S2: CRUD API for lookup values
-
-**As a** trader,
-**I want** API endpoints to list, create, rename, reorder, and deactivate lookup values,
-**So that** the settings UI can manage them.
-
-**Acceptance criteria:**
-- [ ] `GET /api/lookups/{enumType}` — returns ordered list of active values for an enum type
-- [ ] `POST /api/lookups/{enumType}` — creates a new value (name + sort order)
-- [ ] `PUT /api/lookups/{enumType}/{id}` — renames a value; cascades rename to all referencing rows
-- [ ] `PATCH /api/lookups/{enumType}/{id}/deactivate` — soft-deletes; value no longer appears in dropdowns but historical data is preserved
-- [ ] `PATCH /api/lookups/{enumType}/{id}/reorder` — updates sort order
-- [ ] Validation: duplicate names within the same enum type are rejected
-
-**Affected layers:** API (new controller), backend services
-**Dependencies:** E3-S1
-
----
-
-### E3-S3: Settings UI for managing lookup values
+## E3-S3: Settings UI for managing lookup values
 
 **As a** trader,
 **I want** a section in the Settings page where I can add, rename, reorder, and deactivate enum values,
@@ -152,40 +22,162 @@ Replace hardcoded C# enums with database-backed lookup tables so users can add, 
 - [ ] "Deactivate" action with confirmation; deactivated values shown in a collapsed "Inactive" section with a "Reactivate" option
 - [ ] Changes save immediately (no form-level submit)
 
-**Affected layers:** Frontend (settings component, new API service)
-**Dependencies:** E3-S2, E1-S4 (shares the Settings page shell)
+**Affected layers:** Frontend (settings component, LookupService already exists)
+**Dependencies:** None (API + service already shipped)
 
 ---
 
-### E3-S4: Replace hardcoded enum dropdowns with dynamic lookups
+## E4: Trade Creation from Positions
+
+Streamline the workflow of creating trade theses from automatically-synced IBKR positions. Currently positions arrive via Flex sync without a linked trade — the user must manually create a trade and assign positions separately.
+
+### E4-S0: Fix view/edit mode for all trade form fields
 
 **As a** trader,
-**I want** all form dropdowns (Strategy, TypeOfTrade, etc.) to pull their options from the database,
-**So that** newly added values appear immediately in trade entry forms.
+**I want** all fields on the trade detail sidebar to be read-only in view mode and editable only after clicking Edit,
+**So that** I don't accidentally modify trade data while reviewing.
 
 **Acceptance criteria:**
-- [ ] All `mat-select` dropdowns for configurable enums fetch values from the lookup API
-- [ ] Deactivated values do NOT appear in dropdowns for new entries
-- [ ] Deactivated values DO still display correctly on historical trades (read-only rendering)
-- [ ] Forms affected: Trades, Option Positions (if applicable), Portfolio, Analytics filters
-- [ ] Enum labels used in table cells also resolve from the lookup cache (not hardcoded label maps)
+- [ ] Quill rich text editors are read-only in view mode (`[readOnly]` or Quill's `enable()/disable()`)
+- [ ] Checkboxes are visually disabled and not clickable in view mode
+- [ ] Leg picker "Assign Positions" button is hidden in view mode
+- [ ] "Add Event" button is hidden in view mode
+- [ ] "Create Follow-Up" button is visible in view mode (it navigates, doesn't mutate)
+- [ ] Verify the same pattern works on all other pages that use view/edit mode (accounts, option-positions, stock-positions, capital, weekly-prep, portfolio)
 
-**Affected layers:** Frontend (all form components, shared lookup service with caching)
-**Dependencies:** E3-S2
+**Affected layers:** Frontend (trades.html primarily, quick audit of other pages)
+**Dependencies:** None
 
 ---
 
-## Suggested Implementation Order
+### E4-S0b: Sortable columns on Trades table
+
+**As a** trader,
+**I want to** sort the trades table by any column,
+**So that** I can find trades by date, strategy, symbol, or rating quickly.
+
+**Acceptance criteria:**
+- [ ] All columns in the Trades table have `mat-sort-header`
+- [ ] Default sort: Date descending (current behavior preserved)
+- [ ] Switch from raw signal array to `MatTableDataSource` (enables sort + client-side filter)
+- [ ] Include the Status column from E4-S1 once implemented
+
+**Affected layers:** Frontend (trades.ts, trades.html)
+**Dependencies:** None
+
+---
+
+### E4-S0c: Symbol autocomplete filter on Trades table
+
+**As a** trader,
+**I want to** filter trades by typing a symbol with autocomplete suggestions,
+**So that** I can quickly narrow the table to a specific underlying.
+
+**Acceptance criteria:**
+- [ ] New text input in the filter bar (alongside Budget/Strategy dropdowns) with `mat-autocomplete`
+- [ ] Autocomplete suggests from distinct symbols in the current trades list, sorted alphabetically
+- [ ] Partial matching: typing "SP" shows "SPY", "SPXL", etc.
+- [ ] Selecting or typing a symbol filters the table client-side
+- [ ] Clearing the input removes the filter
+- [ ] Filter combines with Budget/Strategy filters (AND logic)
+
+**Affected layers:** Frontend (trades.ts, trades.html)
+**Dependencies:** E4-S0b (sorting needs `MatTableDataSource` which also supports filtering)
+
+---
+
+### E4-S1: Trade status field (Open/Closed)
+
+**As a** trader,
+**I want** each trade to show whether it's open or closed based on its linked positions,
+**So that** I can see at a glance which trades are still active.
+
+**Acceptance criteria:**
+- [ ] `Trade` model gains a `Status` string field (nullable, values: `"Open"`, `"Closed"`, null for no linked positions)
+- [ ] Status recomputed whenever: a position is assigned/unassigned, a position is closed/reopened, or during Flex sync
+- [ ] Logic: trade has ≥1 linked position AND all linked positions are closed → `"Closed"`. Otherwise → `"Open"`. No positions → null
+- [ ] For stock positions, "closed" = running total position (`TotalPos`) reaches zero
+- [ ] Trades table shows Status as a sortable, filterable column
+- [ ] EF migration adds the column; startup backfill computes status for existing trades
+
+**Affected layers:** Data model, API, Frontend
+**Dependencies:** None
+**Notes:** Recompute logic should be a shared service called from multiple write paths. Needs `/architect` for the recompute trigger design.
+
+---
+
+### E4-S2: Position picker on New Trade
+
+**As a** trader,
+**I want to** select unlinked positions when creating a new trade,
+**So that** the trade and position assignment happen in a single step.
+
+**Acceptance criteria:**
+- [ ] "New Trade" opens the sidebar in create mode with a position picker visible immediately
+- [ ] Picker shows unlinked Option Positions and Stock Positions (`TradeId IS NULL`)
+- [ ] Symbol filter text input at the top filters both sections
+- [ ] Checkboxes for multi-select; mixed option + stock selection supported
+- [ ] When positions are selected, form auto-fills: `Symbol` from first selection, `Date` from earliest opened date
+- [ ] On save: Trade created AND selected positions linked in one API call
+- [ ] If no positions selected, trade is still created (positions can be added later)
+
+**Affected layers:** API (extend `POST /api/trades` to accept position IDs), Frontend
+**Dependencies:** None (but benefits from E4-S0b for consistent table UX)
+**Notes:** Needs `/architect` for the composite API endpoint design (trade + position IDs in one request).
+
+---
+
+### E4-S4: Auto-update trade status on position changes
+
+**As a** trader,
+**I want** my trade's status to update automatically when positions are synced or closed,
+**So that** I don't have to manually track which trades are still active.
+
+**Acceptance criteria:**
+- [ ] After Flex sync closes/creates positions → recompute status for affected trades
+- [ ] After option events (expiry/assignment) → recompute status for affected trades
+- [ ] After manual position close in the UI → recompute the linked trade's status
+- [ ] After position assign/unassign → recompute status for both old and new trade
+- [ ] Recompute is idempotent
+
+**Affected layers:** Backend (FlexSyncService, OptionPositionsController, StockPositionsController)
+**Dependencies:** E4-S1
+
+---
+
+### E4-S3: Create Trade from Position pages (deferred)
+
+**As a** trader,
+**I want to** select positions on the Option/Stock Positions page and click "Create Trade",
+**So that** I can start a trade from the positions I'm looking at.
+
+**Acceptance criteria:**
+- [ ] Row checkboxes on Option Positions and Stock Positions tables for multi-select
+- [ ] "Create Trade" button appears when unlinked rows are selected
+- [ ] Navigates to Trades page with position IDs as query params
+- [ ] Trades page opens New Trade form pre-filled with those positions
+- [ ] Warning if selected positions span multiple symbols
+
+**Affected layers:** Frontend (option-positions, stock-positions, trades)
+**Dependencies:** E4-S2
+**Notes:** Lower priority — E4-S2 covers the core workflow from the Trades page. Defer unless E4-S2 feels insufficient.
+
+---
+
+## Implementation Order
 
 ```
-E2-S1  (quick win, no dependencies, ~30 min)
+E4-S0   (fix view/edit mode — bug fix, independent)
+E4-S0b  (sortable trades table — independent)
+E4-S0c  (symbol autocomplete — depends on S0b)
   ↓
-E1-S1 → E1-S2 → E1-S3 → E1-S4  (date format, incremental)
+E4-S1   (trade status field — needs /architect)
   ↓
-E3-S1 → E3-S2 → E3-S3 → E3-S4  (configurable enums, needs /architect first)
+E4-S2   (position picker on New Trade — needs /architect for API)
+  ↓
+E4-S4   (auto-update status on sync — depends on S1)
+  ↓
+E4-S3   (create from position pages — deferred)
+  ↓
+E3-S3   (settings UI for lookups — independent, low priority)
 ```
-
-**Rationale:**
-- E2-S1 is a single-file frontend change — ship it immediately.
-- E1 is self-contained and builds incrementally (service → pipes → inputs → settings page).
-- E3 is the largest and requires an architectural decision before any code. Start it after E1 ships so the Settings page (E1-S4) already exists as a shell for E3-S3.

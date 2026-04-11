@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { TradesService, Budget, Strategy, TypeOfTrade, TradeUpsert } from './trades.service';
+import { TradesService, TradeUpsert } from './trades.service';
 
 describe('TradesService', () => {
   let service: TradesService;
@@ -33,10 +33,10 @@ describe('TradesService', () => {
   });
 
   it('should GET entries with budget and strategy filters', () => {
-    service.getAll({ budget: Budget.Drift, strategy: Strategy.BreakoutMomentum }).subscribe();
+    service.getAll({ budget: 1, strategy: 3 }).subscribe();
     const req = httpMock.expectOne((r) => r.url === '/api/trades');
-    expect(req.request.params.get('budget')).toBe('Drift');
-    expect(req.request.params.get('strategy')).toBe('BreakoutMomentum');
+    expect(req.request.params.get('budget')).toBe('1');
+    expect(req.request.params.get('strategy')).toBe('3');
     req.flush([]);
   });
 
@@ -49,8 +49,8 @@ describe('TradesService', () => {
 
   it('should POST to create entry', () => {
     const payload: TradeUpsert = {
-      symbol: 'AAPL', date: '2025-06-15', typeOfTrade: TypeOfTrade.ShortStrangle,
-      budget: Budget.Drift, strategy: Strategy.PositiveDrift,
+      symbol: 'AAPL', date: '2025-06-15', typeOfTrade: 1,
+      budget: 2, strategy: 3,
       newsCatalyst: false, recentEarnings: false, sectorSupport: true, ath: false,
     };
     service.create(payload).subscribe();
@@ -62,8 +62,8 @@ describe('TradesService', () => {
 
   it('should PUT to update entry', () => {
     const payload: TradeUpsert = {
-      symbol: 'AAPL', date: '2025-06-15', typeOfTrade: TypeOfTrade.ShortStrangle,
-      budget: Budget.Drift, strategy: Strategy.PositiveDrift,
+      symbol: 'AAPL', date: '2025-06-15', typeOfTrade: 1,
+      budget: 2, strategy: 3,
       newsCatalyst: false, recentEarnings: false, sectorSupport: true, ath: false,
     };
     service.update(5, payload).subscribe();

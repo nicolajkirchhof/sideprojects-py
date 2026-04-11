@@ -29,7 +29,7 @@
 
           <ng-container matColumnDef="typeOfTrade">
             <th mat-header-cell *matHeaderCellDef>Type</th>
-            <td mat-cell *matCellDef="let r">{{ typeOfTradeLabel[r.typeOfTrade] || r.typeOfTrade }}</td>
+            <td mat-cell *matCellDef="let r">{{ r.typeOfTrade }}</td>
           </ng-container>
 
           <ng-container matColumnDef="strategy">
@@ -92,7 +92,7 @@
 
         <ng-container matColumnDef="currentSetup">
           <th mat-header-cell *matHeaderCellDef>Setup</th>
-          <td mat-cell *matCellDef="let r">{{ typeOfTradeLabel[r.currentSetup] || r.currentSetup || '—' }}</td>
+          <td mat-cell *matCellDef="let r">{{ r.currentSetup || '—' }}</td>
           <td mat-footer-cell *matFooterCellDef></td>
         </ng-container>
 
@@ -186,7 +186,7 @@
 
         <ng-container matColumnDef="positionType">
           <th mat-header-cell *matHeaderCellDef>Type</th>
-          <td mat-cell *matCellDef="let r">{{ typeOfTradeLabel[r.positionType] || r.positionType || '—' }}</td>
+          <td mat-cell *matCellDef="let r">{{ r.positionType || '—' }}</td>
         </ng-container>
 
         <ng-container matColumnDef="totalPos">

@@ -1,71 +1,7 @@
 namespace tradelog.Models;
 
-public enum Budget
-{
-    LongTerm,
-    Drift,
-    Swing,
-    Speculative
-}
-
-public enum Strategy
-{
-    PositiveDrift,
-    RangeBound,
-    PEAD,
-    BreakoutMomentum,
-    IVMeanReversion,
-    SectorStrength,
-    SectorWeakness,
-    GreenLineBreakout,
-    Slingshot,
-    PreEarnings
-}
-
-public enum TypeOfTrade
-{
-    ShortStrangle,
-    ShortPutSpread,
-    ShortCallSpread,
-    LongCall,
-    LongPut,
-    LongCallVertical,
-    LongPutVertical,
-    SyntheticLong,
-    CoveredStrangle,
-    Butterfly,
-    RatioDiagonalSpread,
-    LongStrangle,
-    ShortPut,
-    ShortCall,
-    LongStock,
-    ShortStock,
-    IronCondor,
-    XYZ,
-    PMCC,
-    CalendarSpread
-}
-
-public enum DirectionalBias
-{
-    Bullish,
-    Neutral,
-    Bearish
-}
-
-public enum Timeframe
-{
-    OneDay,
-    OneWeek,
-    DeltaBand
-}
-
-public enum ManagementRating
-{
-    AsPlanned,
-    MinorAdjustments,
-    Rogue
-}
+// Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating
+// are now DB-backed lookup values — see LookupValue.cs and LookupCategory.
 
 public enum PositionRight
 {

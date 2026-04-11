@@ -19,10 +19,18 @@ public class InstrumentSummariesController : ControllerBase
         _context = context;
     }
 
+    private async Task<Dictionary<int, string>> GetLookupNames()
+    {
+        return await _context.LookupValues
+            .IgnoreQueryFilters()
+            .ToDictionaryAsync(lv => lv.Id, lv => lv.Name);
+    }
+
     [HttpGet("options")]
     public async Task<ActionResult<IEnumerable<OptionInstrumentSummaryDto>>> GetOptionSummaries(
         [FromQuery] string? status)
     {
+        var names = await GetLookupNames();
         var positions = await _context.OptionPositions
             .OrderBy(p => p.Symbol).ThenBy(p => p.Expiry)
             .ToListAsync();
@@ -148,8 +156,8 @@ public class InstrumentSummariesController : ControllerBase
                 Dit = dit,
                 Dte = dte,
                 Status = isOpen ? "Open" : "Closed",
-                Budget = entry?.Budget.ToString(),
-                CurrentSetup = entry?.TypeOfTrade.ToString(),
+                Budget = entry != null ? names.GetValueOrDefault(entry.Budget) : null,
+                CurrentSetup = entry != null ? names.GetValueOrDefault(entry.TypeOfTrade) : null,
                 Strikes = strikes,
                 IntendedManagement = entry?.IntendedManagement,
                 Pnl = sumUnrealizedPnlValue + sumRealizedPnl,
@@ -177,6 +185,7 @@ public class InstrumentSummariesController : ControllerBase
     [HttpGet("trades")]
     public async Task<ActionResult<IEnumerable<TradeInstrumentSummaryDto>>> GetTradeSummaries()
     {
+        var names = await GetLookupNames();
         var positions = await _context.StockPositions
             .OrderBy(t => t.Symbol).ThenBy(t => t.Date).ThenBy(t => t.Id)
             .ToListAsync();
@@ -219,8 +228,8 @@ public class InstrumentSummariesController : ControllerBase
             {
                 Symbol = symbol,
                 Status = last.TotalPos != 0 ? "Open" : "Closed",
-                Budget = entry?.Budget.ToString(),
-                PositionType = entry?.TypeOfTrade.ToString(),
+                Budget = entry != null ? names.GetValueOrDefault(entry.Budget) : null,
+                PositionType = entry != null ? names.GetValueOrDefault(entry.TypeOfTrade) : null,
                 IntendedManagement = entry?.IntendedManagement,
                 TotalPos = last.TotalPos,
                 AvgPrice = last.AvgPrice,
@@ -244,6 +253,7 @@ public class InstrumentSummariesController : ControllerBase
     public async Task<ActionResult<IEnumerable<TradeSummaryDto>>> GetTradeOverview(
         [FromQuery] string? status)
     {
+        var names = await GetLookupNames();
         var trades = await _context.Trades
             .OrderByDescending(t => t.Date)
             .ToListAsync();
@@ -322,9 +332,9 @@ public class InstrumentSummariesController : ControllerBase
             {
                 TradeId = trade.Id,
                 Symbol = trade.Symbol,
-                TypeOfTrade = trade.TypeOfTrade.ToString(),
-                Strategy = trade.Strategy.ToString(),
-                Budget = trade.Budget.ToString(),
+                TypeOfTrade = names.GetValueOrDefault(trade.TypeOfTrade, ""),
+                Strategy = names.GetValueOrDefault(trade.Strategy, ""),
+                Budget = names.GetValueOrDefault(trade.Budget, ""),
                 Status = isOpen ? "Open" : "Closed",
                 Date = trade.Date,
                 OptionLegCount = opts.Count,

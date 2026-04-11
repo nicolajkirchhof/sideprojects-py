@@ -10,9 +10,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ContentArea } from '../shared/content-area/content-area';
 import { PortfolioService, PortfolioDto, PortfolioUpsert } from './portfolio.service';
-import { Budget, Strategy, STRATEGY_LABELS } from '../trades/trades.service';
 import { pnlColor } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
+import { LookupService } from '../shared/lookup.service';
 
 @Component({
   selector: 'app-portfolio',
@@ -36,6 +36,7 @@ export class PortfolioComponent {
   private service = inject(PortfolioService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
+  protected lookup = inject(LookupService);
 
   loading = signal(false);
 
@@ -48,9 +49,6 @@ export class PortfolioComponent {
   editMode = signal(false);
   selected = signal<PortfolioDto | null>(null);
 
-  budgets = Object.values(Budget);
-  strategies = Object.values(Strategy);
-  strategyLabel: Record<string, string> = STRATEGY_LABELS;
   pnlColor = pnlColor;
 
   constructor() {

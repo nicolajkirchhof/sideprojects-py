@@ -21,6 +21,7 @@ public class TradesControllerTests : IDisposable
         using var ctx = _fixture.CreateContext();
         ctx.Accounts.Add(new Account { Id = _fixture.TestAccountId, IbkrAccountId = "U1234", Name = "Test" });
         ctx.SaveChanges();
+        LookupSeeder.Seed(ctx, _fixture.TestAccountId);
     }
 
     [Fact]
@@ -32,7 +33,7 @@ public class TradesControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -75,7 +76,7 @@ public class TradesControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "QQQ", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortStrangle, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortStrangle, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -102,7 +103,7 @@ public class TradesControllerTests : IDisposable
             var trade = new Trade
             {
                 Symbol = "IWM", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(trade);
@@ -136,7 +137,7 @@ public class TradesControllerTests : IDisposable
     private Trade MakeTrade(string symbol, int? parentTradeId = null) => new()
     {
         Symbol = symbol, Date = new(2025, 6, 1),
-        TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+        TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
         ParentTradeId = parentTradeId, AccountId = _fixture.TestAccountId
     };
 

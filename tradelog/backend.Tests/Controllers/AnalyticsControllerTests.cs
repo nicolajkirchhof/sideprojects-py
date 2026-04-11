@@ -19,6 +19,7 @@ public class AnalyticsControllerTests : IDisposable
         using var ctx = _fixture.CreateContext();
         ctx.Accounts.Add(new Account { Id = _fixture.TestAccountId, IbkrAccountId = "U1234", Name = "Test" });
         ctx.SaveChanges();
+        LookupSeeder.Seed(ctx, _fixture.TestAccountId);
     }
 
     [Fact]
@@ -30,7 +31,7 @@ public class AnalyticsControllerTests : IDisposable
             var root = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 5, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(root);
@@ -39,7 +40,7 @@ public class AnalyticsControllerTests : IDisposable
             ctx.Trades.Add(new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 ParentTradeId = root.Id, AccountId = _fixture.TestAccountId
             });
 
@@ -47,7 +48,7 @@ public class AnalyticsControllerTests : IDisposable
             ctx.Trades.Add(new Trade
             {
                 Symbol = "QQQ", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.LongCall, Budget = Budget.Swing, Strategy = Strategy.BreakoutMomentum,
+                TypeOfTrade = LookupSeeder.TypeLongCall, Budget = LookupSeeder.BudgetSwing, Strategy = LookupSeeder.StrategyBreakoutMomentum,
                 AccountId = _fixture.TestAccountId
             });
             await ctx.SaveChangesAsync();
@@ -72,7 +73,7 @@ public class AnalyticsControllerTests : IDisposable
             var root = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 5, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(root);
@@ -90,7 +91,7 @@ public class AnalyticsControllerTests : IDisposable
             var child = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 ParentTradeId = root.Id, AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(child);
@@ -126,7 +127,7 @@ public class AnalyticsControllerTests : IDisposable
             var root = new Trade
             {
                 Symbol = "IWM", Date = new(2025, 5, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(root);
@@ -144,7 +145,7 @@ public class AnalyticsControllerTests : IDisposable
             var child = new Trade
             {
                 Symbol = "IWM", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 ParentTradeId = root.Id, AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(child);
@@ -176,7 +177,7 @@ public class AnalyticsControllerTests : IDisposable
             var root = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 5, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(root);
@@ -188,7 +189,7 @@ public class AnalyticsControllerTests : IDisposable
             var child = new Trade
             {
                 Symbol = "SPY", Date = new(2025, 6, 1),
-                TypeOfTrade = TypeOfTrade.ShortPut, Budget = Budget.Drift, Strategy = Strategy.PositiveDrift,
+                TypeOfTrade = LookupSeeder.TypeShortPut, Budget = LookupSeeder.BudgetDrift, Strategy = LookupSeeder.StrategyPositiveDrift,
                 ParentTradeId = root.Id, AccountId = _fixture.TestAccountId
             };
             ctx.Trades.Add(child);

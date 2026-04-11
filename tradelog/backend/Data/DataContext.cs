@@ -26,6 +26,7 @@ public class DataContext : DbContext
     public DbSet<WeeklyPrep> WeeklyPreps { get; set; }
     public DbSet<Portfolio> Portfolios { get; set; }
     public DbSet<StockPriceCache> StockPriceCaches { get; set; }
+    public DbSet<LookupValue> LookupValues { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -56,6 +57,18 @@ public class DataContext : DbContext
         modelBuilder.Entity<Capital>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<WeeklyPrep>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<Portfolio>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<LookupValue>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+
+        // ────────────────────────────────────────────
+        // Lookup values — unique name per category per account
+        // ────────────────────────────────────────────
+
+        modelBuilder.Entity<LookupValue>()
+            .HasIndex(e => new { e.AccountId, e.Category, e.Name })
+            .IsUnique();
+
+        modelBuilder.Entity<LookupValue>()
+            .HasIndex(e => new { e.AccountId, e.Category, e.SortOrder });
 
         // ────────────────────────────────────────────
         // Indexes

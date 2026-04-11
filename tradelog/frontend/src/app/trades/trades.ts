@@ -16,12 +16,12 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { QuillModule } from 'ngx-quill';
 import {
   TradesService, Trade, TradeUpsert, OptionLegDto, StockLegDto, TradeEventDto,
-  Budget, Strategy, TypeOfTrade, DirectionalBias, Timeframe, ManagementRating, TradeEventType,
-  STRATEGY_LABELS, TYPE_OF_TRADE_LABELS, TIMEFRAME_LABELS, MANAGEMENT_RATING_LABELS, TRADE_EVENT_TYPE_LABELS,
+  TradeEventType, TRADE_EVENT_TYPE_LABELS,
 } from './trades.service';
 import { forkJoin, Observable } from 'rxjs';
 import { toIsoOrNull } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
+import { LookupService } from '../shared/lookup.service';
 
 @Component({
   selector: 'app-trades',
@@ -50,6 +50,7 @@ export class Trades {
   private service = inject(TradesService);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
+  protected lookup = inject(LookupService);
 
   loading = signal(false);
 
@@ -64,22 +65,8 @@ export class Trades {
   selected = signal<Trade | null>(null);
 
   // Filter state
-  filterBudget = signal<Budget | null>(null);
-  filterStrategy = signal<Strategy | null>(null);
-
-  // Enum values for dropdowns
-  budgets = Object.values(Budget);
-  strategies = Object.values(Strategy);
-  typesOfTrade = Object.values(TypeOfTrade);
-  directionalOptions = Object.values(DirectionalBias);
-  timeframes = Object.values(Timeframe);
-  managementRatings = Object.values(ManagementRating);
-
-  // Labels (cast to index-friendly type for template access)
-  strategyLabel: Record<string, string> = STRATEGY_LABELS;
-  typeOfTradeLabel: Record<string, string> = TYPE_OF_TRADE_LABELS;
-  timeframeLabel: Record<string, string> = TIMEFRAME_LABELS;
-  managementRatingLabel: Record<string, string> = MANAGEMENT_RATING_LABELS;
+  filterBudget = signal<number | null>(null);
+  filterStrategy = signal<number | null>(null);
 
   // Follow-up chain
   childTradeIds = signal<number[]>([]);
@@ -236,7 +223,7 @@ export class Trades {
       typeOfTrade: null,
       notes: '',
       directional: null,
-      timeframe: Timeframe.OneDay,
+      timeframe: null,
       budget: null,
       strategy: null,
       newsCatalyst: false,

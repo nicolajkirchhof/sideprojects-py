@@ -22,6 +22,8 @@ public class PortfolioController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<PortfolioDto>>> GetAll()
     {
+        var names = await _context.LookupValues.IgnoreQueryFilters()
+            .ToDictionaryAsync(lv => lv.Id, lv => lv.Name);
         var portfolios = await _context.Portfolios.ToListAsync();
 
         // Get latest netLiquidity for allocation %
@@ -57,7 +59,7 @@ public class PortfolioController : ControllerBase
         foreach (var p in openPositions)
         {
             var entry = latestEntries.GetValueOrDefault(p.Symbol);
-            var budget = entry?.Budget.ToString() ?? "Unknown";
+            var budget = entry != null ? names.GetValueOrDefault(entry.Budget, "Unknown") : "Unknown";
             var log = latestLogs.GetValueOrDefault(p.ContractId);
 
             if (!budgetMargin.ContainsKey(budget))
@@ -75,8 +77,8 @@ public class PortfolioController : ControllerBase
 
         var result = portfolios.Select(pf =>
         {
-            var budgetKey = pf.Budget.ToString();
-            var margin = budgetMargin.GetValueOrDefault(budgetKey, 0);
+            var budgetName = names.GetValueOrDefault(pf.Budget, "Unknown");
+            var margin = budgetMargin.GetValueOrDefault(budgetName, 0);
             var currentAllocation = netLiquidity > 0
                 ? Math.Round(margin * 100 / netLiquidity, 1)
                 : 0;
@@ -84,12 +86,12 @@ public class PortfolioController : ControllerBase
             return new PortfolioDto
             {
                 Id = pf.Id,
-                Budget = budgetKey,
-                Strategy = pf.Strategy.ToString(),
+                Budget = budgetName,
+                Strategy = names.GetValueOrDefault(pf.Strategy, "Unknown"),
                 MinAllocation = pf.MinAllocation,
                 MaxAllocation = pf.MaxAllocation,
                 CurrentAllocation = currentAllocation,
-                Pnl = Math.Round(budgetPnl.GetValueOrDefault(budgetKey, 0), 2),
+                Pnl = Math.Round(budgetPnl.GetValueOrDefault(budgetName, 0), 2),
             };
         }).ToList();
 

@@ -17,9 +17,6 @@ import {
 } from './instrument-summaries.service';
 import { pnlColor } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
-import {
-  TYPE_OF_TRADE_LABELS,
-} from '../trades/trades.service';
 
 @Component({
   selector: 'app-instrument-summaries',
@@ -66,7 +63,6 @@ export class InstrumentSummaries {
 
   statusFilter = signal('open');
   filterSymbol = signal('');
-  typeOfTradeLabel: Record<string, string> = TYPE_OF_TRADE_LABELS;
   pnlColor = pnlColor;
 
   // Portfolio totals
