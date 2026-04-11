@@ -43,6 +43,34 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # ---- global flat dark theme --------------------------------------
+        self.setStyleSheet("""
+            QMainWindow, QWidget { background: #1a1a1a; color: #ddd; }
+            QTabWidget::pane { border: 1px solid #333; }
+            QTabBar::tab { background: #222; color: #aaa; padding: 6px 12px;
+                           border: 1px solid #333; border-bottom: none; }
+            QTabBar::tab:selected { background: #333; color: #fff; }
+            QTabBar::tab:hover { background: #2a2a2a; }
+            QComboBox { background: #222; border: 1px solid #555;
+                        padding: 3px 6px; color: #ddd; }
+            QComboBox:hover { border-color: #888; }
+            QComboBox QAbstractItemView { background: #222; color: #ddd;
+                                          selection-background-color: #444; }
+            QComboBox::drop-down { border: none; }
+            QLineEdit { background: #222; border: 1px solid #555;
+                        padding: 3px; color: #ddd; }
+            QLineEdit:focus { border-color: #888; }
+            QPushButton { background: #222; border: 1px solid #555;
+                          border-radius: 3px; padding: 3px 8px; color: #ddd; }
+            QPushButton:hover { background: #444; border-color: #888; }
+            QPushButton:pressed { background: #555; }
+            QLabel { color: #ddd; }
+            QScrollArea { border: none; background: #111111; }
+            QScrollBar:vertical { background: #1a1a1a; width: 8px; }
+            QScrollBar::handle:vertical { background: #555; border-radius: 4px; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+        """)
+
         # ---- data state ------------------------------------------------
         self._full_df:  pd.DataFrame = pd.DataFrame()
         self._spy_df:   pd.DataFrame = pd.DataFrame()
@@ -359,7 +387,7 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
         self._end_year_cb.clear()
         self._start_year_cb.addItems([str(y) for y in all_years])
         self._end_year_cb.addItems([str(y) for y in all_years])
-        default_start = max(2006, all_years[0])
+        default_start = max(2007, all_years[0])
         if default_start > all_years[-1]:
             default_start = all_years[0]
         self._start_year_cb.setCurrentText(str(default_start))
@@ -752,13 +780,9 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
         toolbar.addWidget(ibkr_label)
         toolbar.addWidget(self._ibkr_combo)
 
-        _btn_style = ('QPushButton { color: white; font-size: 13pt; padding: 3px 8px;'
-                      ' border: 1px solid #555; border-radius: 3px; background: #222; }'
-                      'QPushButton:hover { background: #444; border-color: #888; }'
-                      'QPushButton:pressed { background: #555; }')
         self._load_btn = QtWidgets.QPushButton('▶')
         self._load_btn.setToolTip('Load symbol')
-        self._load_btn.setStyleSheet(_btn_style)
+        self._load_btn.setFixedHeight(self._ticker_input.sizeHint().height())
         toolbar.addWidget(self._load_btn)
         toolbar.addSpacing(20)
 
@@ -780,7 +804,7 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
         # Right side — Refresh button with icon
         self._refresh_btn = QtWidgets.QPushButton('⟳')
         self._refresh_btn.setToolTip('Sync current symbol from IBKR up to now')
-        self._refresh_btn.setStyleSheet(_btn_style)
+        self._refresh_btn.setFixedHeight(self._ticker_input.sizeHint().height())
         self._refresh_btn.clicked.connect(self._on_refresh_clicked)
         toolbar.addWidget(self._refresh_btn)
         toolbar.addSpacing(10)
@@ -803,20 +827,16 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
     def _make_scroll_tab(self, fig_size: tuple, tab_label: str):
         """Create a scrollable matplotlib canvas tab and return (canvas, tab_widget)."""
         tab_widget = QtWidgets.QWidget()
-        tab_widget.setStyleSheet('background-color: #111111;')
         tab_layout = QtWidgets.QVBoxLayout(tab_widget)
 
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet('background-color: #111111; border: none;')
         content = QtWidgets.QWidget()
-        content.setStyleSheet('background-color: #111111;')
         content_layout = QtWidgets.QVBoxLayout(content)
 
         fig    = Figure(figsize=fig_size, facecolor='#111111')
         fig.patch.set_facecolor('#111111')
         canvas = FigureCanvas(fig)
-        canvas.setStyleSheet('background-color: #111111;')
         content_layout.addWidget(canvas)
 
         scroll.setWidget(content)

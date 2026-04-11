@@ -1,6 +1,6 @@
 # Swing Plot Dashboard — Profit Mechanism Map
 
-This document maps every widget on the refactored `swing_plot` dashboard to the
+This document maps every widget on the `swing_plot` dashboard to the
 profit mechanisms (PMs) defined in `TradingPlaybook.md` and `InvestingPlaybook.md`,
 so each plot can be traced back to a concrete decision in a real strategy.
 
@@ -11,7 +11,36 @@ Roles:
 
 ---
 
-## Tab: Seasonality (Daily/Monthly Stats)
+## Tab: Price Chart
+
+6-pane PyQtGraph chart with on-demand IBKR refresh.
+
+| Widget | Role | PM / Decision |
+|---|---|---|
+| OHLC candles + MA overlay (5/10/20/50/100/200) + BB | T, I-DR | Universal context — price structure, trend, Bollinger envelope |
+| Legend overlay (symbol, OHLC, MA values + distance %) | T | PM-01 / PM-05 — instant read on trend alignment and MA distance |
+| SPY normalised overlay | T | PM-05 RS/RW — visual relative performance |
+| Volume bars (coloured by day change) + V20 MA | T | PM-01 — volume confirmation on breakouts and VCP dry-up |
+| ATR% (ATRP9 + ATRP20) + COTR (right axis) | T | PM-01 stop sizing (ATR%) + impulse detection (COTR ±1.75 threshold) |
+| IV/HV (right axis) + IVP (left axis, 50% ref line) | T, I-DR | PM-04 option structure choice (IVP); DRIFT IVP>50 gate; VRP regime |
+| Comparative RS vs SPY (RS + RSMA20) | T | **PM-05 RS/RW Divergence** — the core filter for every swing entry |
+| TTM Squeeze (momentum + squeeze dots) | T | PM-01 — breakout timing signal, VCP confirmation |
+| IBKR connection indicator + freshness badge | T, I-DR | Data recency awareness; manual refresh sync |
+
+**Primary role:** T + I-DR. The chart is the universal starting point.
+
+---
+
+## Tab: Probability Trees
+
+| Widget | Role | PM / Decision |
+|---|---|---|
+| Probability trees (daily/weekly/monthly) | T | Expected path distribution for PM-01 target setting |
+| Probability trees | I-DR | Expected range for IC wing selection (25Δ strike realism check) |
+
+---
+
+## Tab: Seasonality
 
 | Widget | Role | PM / Decision |
 |---|---|---|
@@ -23,7 +52,7 @@ Roles:
 
 ---
 
-## Tab: Volatility & VRP
+## Tab: Volatility
 
 Purpose: decide whether short premium is attractive *today*, and whether the
 symbol passes the IVP>50 gate shared by the entire DRIFT rotational block.
@@ -62,10 +91,10 @@ short-put assigned and held.
 
 ---
 
-## Tab: Trend & Pullback
+## Tab: Trend Regime
 
-Purpose: support pullback entries on uptrending, RS-positive names. This is
-the trader's home tab.
+Purpose: quantify MA20 regime behaviour — uptrend persistence, pullback depth and
+recovery, breakdown duration. The trader's conviction tab.
 
 | Widget | Role | PM / Decision |
 |---|---|---|
@@ -73,16 +102,31 @@ the trader's home tab.
 | MA20 Regime median durations | T | PM-01 holding-period target; PM-09 mean-reversion window |
 | Episode duration distribution (violins) | T | PM-09 Mean Reversion to Trend — pullback duration gives timeout for dip entries |
 | Max depth below MA20 (violins) | T | PM-09 stop-loss sizing for pullback entries; PM-01 stop-slack below MA20 |
-| Forward returns by regime (5d / 10d / 20d) | T | PM-01 — validates "buy uptrend, avoid breakdown". Now correctly measured from episode start. |
+| Forward returns by regime (5d / 10d / 20d) | T | PM-01 — validates "buy uptrend, avoid breakdown". Measured from episode start. |
+
+**Primary role:** T (PM-01, PM-09).
+
+---
+
+## Tab: Pullback and VCP
+
+Purpose: support pullback entries on uptrending names and detect Volatility
+Contraction Patterns (VCP) for breakout timing.
+
+| Widget | Role | PM / Decision |
+|---|---|---|
 | Intra-trend retracement depth (violins + scatter) | T | PM-09 pullback entry sizing — is 0.5×, 1×, 1.5× ATR the right buy level? |
 | **RS line vs SPY + 63d RS percentile** | T | **PM-05 RS/RW Divergence — the core filter.** Every PM-01/PM-02/PM-09 entry requires RS positive. |
 | **RS line vs SPY + 63d percentile** | T | PM-02 PEAD — post-earnings drift only held in RS-positive names |
+| **VCP tightness timeline** (10d range/close, tight/loose bands) | T | **PM-01 Breakout Momentum** — is the name in a tight consolidation right now? |
+| VCP tightness histogram + current marker | T | PM-01 — how tight is "tight" for this specific symbol (relative to its own history)? |
+| **Conditional fwd returns by tightness tercile** (5d/10d/20d) | T | PM-01 — does this name actually follow through after tight bases? |
 
 **Primary role:** T (PM-01, PM-05, PM-09).
 
 ---
 
-## Tab: Move & OTM Options
+## Tab: Move and Options
 
 Purpose: decide whether a swing thesis can be expressed via **long OTM options**
 (fat tails required) and size stops/targets. Bridges trader and long-premium
@@ -98,20 +142,27 @@ trades.
 | HV episode duration violins | T | Regime persistence — how long do vol states last on this name? |
 | HV transition heatmap | T | Probability that High HV mean-reverts vs persists — sizing signal for long gamma |
 | Impulse forward returns (±1.75× ATR impulse sessions) | T | **PM-01 exit rule validation** — after a big move, does it continue (hold) or fade (exit)? |
+| **Overnight reversal** — distributions, hit rate, rolling edge | T | **PM-08 Overnight Reversal** — does this name show a reversal premium after large intraday drops? |
 
-**Primary role:** T (PM-01, PM-04). Secondary: long-premium expression of any PM.
+**Primary role:** T (PM-01, PM-04, PM-08). Secondary: long-premium expression of any PM.
 
 ---
 
-## Tab: Price Chart + Probability Trees
+## Tab: Earnings Drift
 
-(Unchanged by this refactor; included for completeness.)
+Purpose: visualise PM-02 (PEAD) and PM-03 (Pre-Earnings Anticipation) on a
+per-symbol basis using the momentum_earnings per-ticker parquet dataset.
 
 | Widget | Role | PM / Decision |
 |---|---|---|
-| PyQtGraph multi-pane chart | T, I-DR | Universal context — price, MAs, Bollinger, volume, IV/HV, SPY overlay |
-| Probability trees (daily/weekly/monthly) | T | Expected path distribution for PM-01 target setting |
-| Probability trees | I-DR | Expected range for IC wing selection (25Δ strike realism check) |
+| All earnings events cluster (t-20 to t+24, median + IQR) | T | PM-02 — is PEAD real on this name? Direction and magnitude of post-earnings drift. |
+| Beats cluster + Misses cluster | T | PM-02 — surprise-direction split; beat drift vs miss drift asymmetry |
+| Median drift comparison (All / Beats / Misses) | T | PM-02 / PM-03 — combined view of pre- and post-earnings drift patterns |
+| Hit rate at +5d / +10d / +20d by group | T | PM-02 — statistical reliability of the drift at each horizon |
+| **Pre-drift vs post-drift scatter** (t-20→t-1 vs t-1→t+5, coloured beat/miss) | T | **PM-03 Pre-Earnings Anticipation** — does pre-earnings drift predict the surprise direction? |
+| **Conditional hit rate** (P(beat\|pre>0), P(beat\|pre<0), P(+5d>0\|pre>0/pre<0)) | T | **PM-03** — quantifies the predictive value of pre-earnings drift for entry timing |
+
+**Primary role:** T (PM-02, PM-03).
 
 ---
 
@@ -119,13 +170,15 @@ trades.
 
 | Tab | Trader (T) | LT Investor (I-LT) | DRIFT (I-DR) |
 |---|:---:|:---:|:---:|
-| Seasonality | ○ | — | ● |
-| Volatility & VRP | ○ | ○ | ● |
-| Drawdown | ○ | ● | ○ |
-| Trend & Pullback | ● | — | — |
-| Move & OTM Options | ● | — | ○ |
 | Price Chart | ● | ○ | ● |
 | Probability Trees | ● | — | ○ |
+| Seasonality | ○ | — | ● |
+| Volatility | ○ | ○ | ● |
+| Drawdown | ○ | ● | ○ |
+| Trend Regime | ● | — | — |
+| Pullback and VCP | ● | — | — |
+| Move and Options | ● | — | ○ |
+| Earnings Drift | ● | — | — |
 
 ● primary · ○ secondary · — not relevant
 
@@ -138,12 +191,9 @@ These were dropped in the refactor because they did not map cleanly to any PM:
 - **Gap vs intraday decomposition** — no PM uses gap-fill as an entry edge (swing holds span many sessions; DPM-04 is a day-trade PM).
 - **IV-change vs price-change scatter** — noisy, no PM uses delta-IV dynamics directly.
 - **IV Rank (IVR)** — replaced by **IV Percentile (IVP)** across the dashboard; IVP is what the InvestingPlaybook references (`IVP > 50` is the DRIFT rotational filter).
+- **EMA Distance pane** — MA distances are now shown inline in the chart legend overlay.
 
 ## Known gaps (future work)
 
-Still missing for full PM coverage:
-
-- **PM-02 PEAD / PM-03 Pre-Earnings Anticipation** — no earnings-reaction clustering view yet (consider a per-earnings ATR magnitude + fwd-return tab)
-- **VCP tightness / range-contraction detector** — PM-01 entry refinement
 - **DPM-06 0DTE VRP by day-of-week / VIX regime** — separate dashboard, out of scope for swing_plot
 - **Investing §01 factor-tilt drift** — cross-ETF allocation drift vs target weights (better served by a dedicated portfolio dashboard)

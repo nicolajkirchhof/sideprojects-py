@@ -9,9 +9,19 @@ import calendar
 
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from scipy.stats import norm as _scipy_norm
+
+# Standard dark legend for all tabs — set once, applies everywhere
+mpl.rcParams.update({
+    'legend.facecolor':  '#1a1a1a',
+    'legend.edgecolor':  '#333333',
+    'legend.labelcolor': 'white',
+    'legend.fontsize':   'x-small',
+    'legend.framealpha': 0.9,
+})
 
 from finance.utils.plots import violinplot_columns_with_labels, plot_probability_tree, annotate_violin
 from finance.utils.momentum_data import load_ticker_earnings_events
@@ -150,7 +160,8 @@ def render_volatility_analysis(fig: Figure, df: pd.DataFrame, start_year: int, e
         ax_ivp.set_title(f'IV Percentile (1y)   current: {float(ivp.iloc[-1]):.0f}')
         ax_ivp.set_ylabel('IVP (%)')
         leg = ax_ivp.legend(fontsize='x-small', loc='upper left')
-        plt.setp(leg.get_texts(), color='white')
+
+
     else:
         ax_ivp.set_title('IVP — insufficient history')
 
@@ -170,7 +181,8 @@ def render_volatility_analysis(fig: Figure, df: pd.DataFrame, start_year: int, e
             ax_vrp.set_title(f'Variance Risk Premium   current: {cur_vrp:+.2f}  ({cur_pct:.0f}th pctile)')
             ax_vrp.set_ylabel('IV − HV')
             leg = ax_vrp.legend(fontsize='x-small', loc='upper left')
-            plt.setp(leg.get_texts(), color='white')
+    
+
     else:
         ax_vrp.set_title('VRP — no HV data')
 
@@ -186,7 +198,7 @@ def render_volatility_analysis(fig: Figure, df: pd.DataFrame, start_year: int, e
     for col in hv_cols:
         ax_hv_time.plot(df_vol.index, df_vol[col], label=col, alpha=0.6, lw=1)
     ax_hv_time.set_title('IV vs Realized Volatilities')
-    leg = ax_hv_time.legend(ncol=len(hv_cols) + 1, loc='upper left', framealpha=0.3)
+    leg = ax_hv_time.legend(ncol=len(hv_cols) + 1, loc='upper left')
     plt.setp(leg.get_texts(), color='white')
 
     # ---- IV vs HV14 scatter ----
@@ -198,7 +210,8 @@ def render_volatility_analysis(fig: Figure, df: pd.DataFrame, start_year: int, e
         ax_hv14.set_xlabel('HV14')
         ax_hv14.set_ylabel('IV')
         leg = ax_hv14.legend(framealpha=0.3)
-        plt.setp(leg.get_texts(), color='white')
+
+
 
     # ---- IV vs HV20 scatter ----
     if 'hv20' in df_vol.columns:
@@ -209,7 +222,8 @@ def render_volatility_analysis(fig: Figure, df: pd.DataFrame, start_year: int, e
         ax_hv20.set_xlabel('HV20')
         ax_hv20.set_ylabel('IV')
         leg = ax_hv20.legend(framealpha=0.3)
-        plt.setp(leg.get_texts(), color='white')
+
+
 
     # ---- Rolling 60d correlation to SPY ----
     if have_spy:
@@ -276,7 +290,8 @@ def render_drawdown_analysis(fig: Figure, df: pd.DataFrame, start_year: int, end
         ax_tuw.set_xlabel('Days from ATH to next ATH (log scale)')
         ax_tuw.set_ylabel('# Episodes')
         leg = ax_tuw.legend(fontsize='x-small')
-        plt.setp(leg.get_texts(), color='white')
+
+
     else:
         ax_tuw.set_title('Time Underwater — no episodes')
 
@@ -338,13 +353,15 @@ def render_drawdown_analysis(fig: Figure, df: pd.DataFrame, start_year: int, end
 
     if counts['med'] > 0:
         ncol = 5 if counts['med'] > 15 else 3
-        leg = ax_med.legend(loc='lower left', fontsize=8, ncol=ncol, framealpha=0.3)
-        plt.setp(leg.get_texts(), color='white')
+        leg = ax_med.legend(loc='lower left', fontsize=8, ncol=ncol)
+
+
 
     ax_long.set_xlabel('Days since ATH')
     if counts['long'] > 0:
-        leg = ax_long.legend(loc='lower left', fontsize=9, ncol=4, framealpha=0.3)
-        plt.setp(leg.get_texts(), color='white')
+        leg = ax_long.legend(loc='lower left', fontsize=9, ncol=4)
+
+
 
     fig.tight_layout()
 
@@ -787,7 +804,8 @@ def _render_hv_impulse_section(fig, spec, hv_series, hv_regime, hv_episodes,
         ax_imp.set_title(f'Median Fwd Returns after ±1.75× ATR Impulse')
         ax_imp.set_ylabel('Return %')
         leg = ax_imp.legend(fontsize='x-small')
-        plt.setp(leg.get_texts(), color='white')
+
+
     else:
         ax_imp.set_title('No impulse sessions found at 1.75× ATR threshold')
 
@@ -988,7 +1006,8 @@ def _render_vcp_section(fig, spec, df, symbol):
         ax_cond.set_title('Median fwd return by tightness tercile')
         ax_cond.set_ylabel('Return %')
         leg = ax_cond.legend(fontsize='x-small')
-        plt.setp(leg.get_texts(), color='white')
+
+
     else:
         ax_cond.set_title('VCP conditional — insufficient data')
 
@@ -1096,7 +1115,8 @@ def render_pead(fig: Figure, symbol: str = ''):
         ax.set_xlabel('Trading days from announcement')
         ax.set_ylabel('Return %')
         leg = ax.legend(fontsize='x-small', loc='upper left')
-        plt.setp(leg.get_texts(), color='white')
+
+
 
     # Top panel — all events
     _plot_cluster(ax_all, paths, f'All earnings events — {symbol}', '#48dbfb', '#48dbfb')
@@ -1121,7 +1141,8 @@ def render_pead(fig: Figure, symbol: str = ''):
         ax_med.set_xlabel('Trading days from announcement')
         ax_med.set_ylabel('Median return %')
         leg = ax_med.legend(fontsize='x-small', loc='upper left')
-        plt.setp(leg.get_texts(), color='white')
+
+
 
     # Hit rate at t=+5, +10, +20 (% of events with return > 0)
     horizons = [5, 10, 20]
@@ -1146,7 +1167,8 @@ def render_pead(fig: Figure, symbol: str = ''):
         ax_hit.set_title('Hit Rate (% positive) by horizon')
         ax_hit.set_ylabel('% events > 0')
         leg = ax_hit.legend(fontsize='x-small', loc='upper right')
-        plt.setp(leg.get_texts(), color='white')
+
+
 
     # -------- Pre-earnings anticipation (PM-03) --------
     # Pre-drift = return from t=-20 to t=-1 (end of the day before announcement).
@@ -1175,7 +1197,8 @@ def render_pead(fig: Figure, symbol: str = ''):
         ax_pre_sc.set_xlabel('Pre-earnings return %')
         ax_pre_sc.set_ylabel('Post (+5d) return %')
         leg = ax_pre_sc.legend(fontsize='x-small', loc='upper left')
-        plt.setp(leg.get_texts(), color='white')
+
+
 
         # Conditional: does positive pre-drift predict a beat and/or positive +5d?
         # Bars for: P(beat | pre>0), P(beat | pre<0), P(+5d>0 | pre>0), P(+5d>0 | pre<0)
