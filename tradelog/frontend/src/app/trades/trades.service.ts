@@ -97,6 +97,11 @@ export interface StockLegDto {
 
 export type TradeUpsert = Omit<Trade, 'id'> & Partial<Pick<Trade, 'id'>>;
 
+export interface TradeCreatePayload extends TradeUpsert {
+  optionPositionIds?: number[];
+  stockPositionIds?: number[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class TradesService {
   private http = inject(HttpClient);
@@ -113,7 +118,7 @@ export class TradesService {
     return this.http.get<TradeDetail>(`/api/trades/${id}`);
   }
 
-  create(payload: TradeUpsert): Observable<Trade> {
+  create(payload: TradeCreatePayload): Observable<Trade> {
     return this.http.post<Trade>('/api/trades', payload);
   }
 

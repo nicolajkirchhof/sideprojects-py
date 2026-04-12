@@ -287,7 +287,59 @@
           </button>
         }
 
-        <!-- Legs section (edit mode only) -->
+        <!-- Position picker for create mode -->
+        @if (isCreating() && showLegPicker()) {
+          <div class="border-t border-white/10 pt-3 mt-2">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-medium uppercase tracking-wide opacity-50">Link Positions</span>
+            </div>
+
+            <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+              <mat-label>Filter by symbol</mat-label>
+              <input matInput (input)="loadUnassignedPositions($any($event.target).value || undefined)" placeholder="SPY">
+            </mat-form-field>
+
+            @if (unassignedOptions().length > 0) {
+              <div class="text-xs opacity-50 mb-1">Options</div>
+              @for (pos of unassignedOptions(); track pos.id) {
+                <label class="flex items-center gap-2 text-xs py-1 cursor-pointer hover:bg-white/5 rounded px-1">
+                  <input type="checkbox" [checked]="selectedLegIds().options.has(pos.id)"
+                         (change)="toggleLegSelection('options', pos.id); onCreateModeSelectionChange()">
+                  <span class="font-medium">{{ pos.symbol }}</span>
+                  <span>{{ pos.right === 'Put' ? 'P' : 'C' }} {{ pos.strike }}</span>
+                  <span class="opacity-70">{{ pos.expiry | appDate }}</span>
+                  <span>x{{ pos.pos }}</span>
+                </label>
+              }
+            }
+
+            @if (unassignedStocks().length > 0) {
+              <div class="text-xs opacity-50 mb-1 mt-2">Stocks</div>
+              @for (pos of unassignedStocks(); track pos.id) {
+                <label class="flex items-center gap-2 text-xs py-1 cursor-pointer hover:bg-white/5 rounded px-1">
+                  <input type="checkbox" [checked]="selectedLegIds().stocks.has(pos.id)"
+                         (change)="toggleLegSelection('stocks', pos.id); onCreateModeSelectionChange()">
+                  <span class="font-medium">{{ pos.symbol }}</span>
+                  <span>{{ pos.posChange > 0 ? '+' : '' }}{{ pos.posChange }} @ {{ pos.price | number:'1.2-2' }}</span>
+                  <span class="opacity-70">{{ pos.date | appDate }}</span>
+                </label>
+              }
+            }
+
+            @if (unassignedOptions().length === 0 && unassignedStocks().length === 0) {
+              <div class="text-xs opacity-40 py-2">No unassigned positions found</div>
+            }
+
+            @let sel = selectedLegIds();
+            @if (sel.options.size > 0 || sel.stocks.size > 0) {
+              <div class="text-xs mt-2 opacity-60">
+                {{ sel.options.size + sel.stocks.size }} position(s) selected — will be linked on save
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Legs section (existing trade) -->
         @if (!isCreating() && selected()) {
           <div class="border-t border-white/10 pt-3 mt-2">
             <div class="flex items-center justify-between mb-2">

@@ -18,7 +18,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { QuillModule } from 'ngx-quill';
 import {
-  TradesService, Trade, TradeUpsert, OptionLegDto, StockLegDto, TradeEventDto,
+  TradesService, Trade, TradeUpsert, TradeCreatePayload, OptionLegDto, StockLegDto, TradeEventDto,
   TradeEventType, TRADE_EVENT_TYPE_LABELS,
 } from './trades.service';
 import { forkJoin, Observable } from 'rxjs';
@@ -281,8 +281,52 @@ export class Trades {
     this.optionLegs.set([]);
     this.stockLegs.set([]);
     this.events.set([]);
-    this.showLegPicker.set(false);
     this.showEventForm.set(false);
+
+    // In create mode, show the position picker immediately with all unassigned positions
+    this.selectedLegIds.set({ options: new Set(), stocks: new Set() });
+    this.showLegPicker.set(true);
+    this.loadUnassignedPositions();
+  }
+
+  /** Loads all unassigned positions, optionally filtered by symbol. */
+  loadUnassignedPositions(symbol?: string): void {
+    forkJoin([
+      this.service.getUnassignedOptionPositions(symbol),
+      this.service.getUnassignedStockPositions(symbol),
+    ]).subscribe({
+      next: ([options, stocks]) => {
+        this.unassignedOptions.set(options);
+        this.unassignedStocks.set(stocks);
+      },
+      error: () => this.notify.error('Failed to load unassigned positions'),
+    });
+  }
+
+  /** Called when position selection changes in create mode — auto-fills symbol and date. */
+  onCreateModeSelectionChange(): void {
+    if (!this.isCreating()) return;
+    const ids = this.selectedLegIds();
+    const selectedOpts = this.unassignedOptions().filter(p => ids.options.has(p.id));
+    const selectedStks = this.unassignedStocks().filter(p => ids.stocks.has(p.id));
+    const allSelected = [...selectedOpts, ...selectedStks];
+    if (allSelected.length === 0) return;
+
+    // Auto-fill symbol from first selection
+    const symbol = selectedOpts[0]?.symbol ?? selectedStks[0]?.symbol;
+    if (symbol && !this.form.get('symbol')?.value) {
+      this.form.patchValue({ symbol });
+    }
+
+    // Auto-fill date from earliest position
+    const dates = [
+      ...selectedOpts.map(p => p.expiry ? new Date(p.expiry) : null),
+      ...selectedStks.map(p => p.date ? new Date(p.date) : null),
+    ].filter((d): d is Date => d !== null);
+    if (dates.length > 0) {
+      const earliest = new Date(Math.min(...dates.map(d => d.getTime())));
+      this.form.patchValue({ date: earliest });
+    }
   }
 
   onCancel(): void {
@@ -328,9 +372,17 @@ export class Trades {
       parentTradeId: v.parentTradeId || null,
     };
 
-    const obs = this.isCreating() || !payload.id
-      ? this.service.create(payload)
-      : this.service.update(payload.id as number, payload);
+    let obs;
+    if (this.isCreating() || !payload.id) {
+      const createPayload: TradeCreatePayload = {
+        ...payload,
+        optionPositionIds: [...this.selectedLegIds().options],
+        stockPositionIds: [...this.selectedLegIds().stocks],
+      };
+      obs = this.service.create(createPayload);
+    } else {
+      obs = this.service.update(payload.id as number, payload);
+    }
 
     obs.subscribe({
       next: () => {
