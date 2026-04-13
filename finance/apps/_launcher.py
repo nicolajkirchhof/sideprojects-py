@@ -57,7 +57,7 @@ class LauncherWindow(QtWidgets.QWidget):
 
             label = QtWidgets.QLabel(name)
             label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            label.setStyleSheet("color: #AAAAAA; font-size: 11px;")
+            label.setStyleSheet("font-size: 11px;")
             col.addWidget(label)
 
             layout.addLayout(col)

@@ -43,34 +43,6 @@ class SwingPlotWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # ---- global flat dark theme --------------------------------------
-        self.setStyleSheet("""
-            QMainWindow, QWidget { background: #1a1a1a; color: #ddd; }
-            QTabWidget::pane { border: 1px solid #333; }
-            QTabBar::tab { background: #222; color: #aaa; padding: 6px 12px;
-                           border: 1px solid #333; border-bottom: none; }
-            QTabBar::tab:selected { background: #333; color: #fff; }
-            QTabBar::tab:hover { background: #2a2a2a; }
-            QComboBox { background: #222; border: 1px solid #555;
-                        padding: 3px 6px; color: #ddd; }
-            QComboBox:hover { border-color: #888; }
-            QComboBox QAbstractItemView { background: #222; color: #ddd;
-                                          selection-background-color: #444; }
-            QComboBox::drop-down { border: none; }
-            QLineEdit { background: #222; border: 1px solid #555;
-                        padding: 3px; color: #ddd; }
-            QLineEdit:focus { border-color: #888; }
-            QPushButton { background: #222; border: 1px solid #555;
-                          border-radius: 3px; padding: 3px 8px; color: #ddd; }
-            QPushButton:hover { background: #444; border-color: #888; }
-            QPushButton:pressed { background: #555; }
-            QLabel { color: #ddd; }
-            QScrollArea { border: none; background: #111111; }
-            QScrollBar:vertical { background: #1a1a1a; width: 8px; }
-            QScrollBar::handle:vertical { background: #555; border-radius: 4px; }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-        """)
-
         # ---- data state ------------------------------------------------
         self._full_df:  pd.DataFrame = pd.DataFrame()
         self._spy_df:   pd.DataFrame = pd.DataFrame()
