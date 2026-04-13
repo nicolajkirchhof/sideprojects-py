@@ -566,7 +566,7 @@ export class Trades {
   }
 
   onSelectTradeById(tradeId: number): void {
-    const trade = this.trades().find(t => t.id === tradeId);
+    const trade = this.dataSource.data.find(t => t.id === tradeId);
     if (trade) {
       this.onRowSelect(trade);
     } else {
