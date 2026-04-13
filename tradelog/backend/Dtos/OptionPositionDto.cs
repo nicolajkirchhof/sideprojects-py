@@ -41,4 +41,7 @@ public class OptionPositionDto
 
     /// <summary>Number of greek log samples recorded since the position was opened. Null = never computed.</summary>
     public int? LogCount { get; set; }
+
+    /// <summary>FK to the linked Trade (null if unlinked).</summary>
+    public int? TradeId { get; set; }
 }

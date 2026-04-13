@@ -21,6 +21,7 @@ import {
   TradesService, Trade, TradeUpsert, TradeCreatePayload, OptionLegDto, StockLegDto, TradeEventDto,
   TradeEventType, TRADE_EVENT_TYPE_LABELS,
 } from './trades.service';
+import { ActivatedRoute } from '@angular/router';
 import { forkJoin, Observable } from 'rxjs';
 import { toIsoOrNull } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
@@ -55,6 +56,7 @@ import { LookupService } from '../shared/lookup.service';
 })
 export class Trades {
   private service = inject(TradesService);
+  private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
   protected lookup = inject(LookupService);
@@ -165,6 +167,52 @@ export class Trades {
       date: [null, [Validators.required]],
       notes: [''],
       pnlImpact: [null],
+    });
+
+    // Handle createFrom query param (from position pages)
+    const createFrom = this.route.snapshot.queryParams['createFrom'];
+    if (createFrom) {
+      this.handleCreateFrom(createFrom);
+    }
+  }
+
+  /** Parses 'opt:1,2,3' or 'stk:4,5' from query params and opens New Trade with pre-selected positions. */
+  private handleCreateFrom(param: string): void {
+    const optIds = new Set<number>();
+    const stkIds = new Set<number>();
+
+    for (const chunk of param.split(' ')) {
+      if (chunk.startsWith('opt:')) {
+        chunk.slice(4).split(',').forEach(id => optIds.add(+id));
+      } else if (chunk.startsWith('stk:')) {
+        chunk.slice(4).split(',').forEach(id => stkIds.add(+id));
+      }
+    }
+
+    // Trigger New Trade mode, load positions, then pre-select after they arrive
+    this.isCreating.set(true);
+    this.editMode.set(true);
+    this.selected.set(null);
+    this.form.enable({ emitEvent: false });
+    this.form.get('id')?.disable({ emitEvent: false });
+    this.form.reset({ id: null, symbol: '', date: new Date() });
+    this.showSidebar.set(true);
+    this.optionLegs.set([]);
+    this.stockLegs.set([]);
+    this.events.set([]);
+    this.showEventForm.set(false);
+    this.showLegPicker.set(true);
+
+    forkJoin([
+      this.service.getUnassignedOptionPositions(),
+      this.service.getUnassignedStockPositions(),
+    ]).subscribe({
+      next: ([options, stocks]) => {
+        this.unassignedOptions.set(options);
+        this.unassignedStocks.set(stocks);
+        this.selectedLegIds.set({ options: optIds, stocks: stkIds });
+        this.onCreateModeSelectionChange();
+      },
     });
   }
 

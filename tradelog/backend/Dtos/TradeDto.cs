@@ -11,6 +11,8 @@ public class StockPositionDto
     public decimal Commission { get; set; }
     public int Multiplier { get; set; }
 
+    public int? TradeId { get; set; }
+
     // Computed (running position tracking)
     public int LastPos { get; set; }
     public int TotalPos { get; set; }

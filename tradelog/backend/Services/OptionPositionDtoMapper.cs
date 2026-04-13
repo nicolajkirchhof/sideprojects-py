@@ -75,6 +75,7 @@ public static class OptionPositionDtoMapper
             DurationPct = durationPct,
             Roic = roic,
             LogCount = p.LogCount,
+            TradeId = p.TradeId,
         };
     }
 }

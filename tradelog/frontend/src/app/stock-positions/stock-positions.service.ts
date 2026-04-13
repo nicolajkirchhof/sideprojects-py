@@ -12,6 +12,7 @@ export interface StockPositionDto {
   multiplier: number;
   bestExitPrice?: number | null;
   bestExitDate?: string | null;
+  tradeId?: number | null;
 
   // Computed
   lastPos: number;

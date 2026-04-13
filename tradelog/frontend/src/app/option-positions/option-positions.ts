@@ -1,4 +1,4 @@
-import { Component, signal, viewChild, effect, inject } from '@angular/core';
+import { Component, signal, viewChild, effect, inject, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { AppDatePipe } from '../shared/app-date.pipe';
@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -39,6 +40,7 @@ import { NotificationService } from '../shared/notification.service';
     MatSelectModule,
     MatButtonModule,
     MatIconModule,
+    MatCheckboxModule,
     MatButtonToggleModule,
     MatTooltipModule,
     MatDatepickerModule,
@@ -64,10 +66,34 @@ export class OptionPositions {
 
   dataSource = new MatTableDataSource<OptionPositionDto>([]);
   displayedColumns = [
-    'symbol', 'contractId', 'right', 'strike', 'opened', 'expiry', 'closed',
+    'select', 'symbol', 'contractId', 'right', 'strike', 'opened', 'expiry', 'closed',
     'pos', 'cost', 'lastPrice', 'unrealizedPnl', 'unrealizedPnlPct',
     'realizedPnl', 'delta', 'theta', 'logCount', 'durationPct', 'roic', 'actions',
   ];
+
+  // Multi-select for "Create Trade"
+  selectedIds = signal<Set<number>>(new Set());
+  hasUnlinkedSelection = computed(() => {
+    const ids = this.selectedIds();
+    if (ids.size === 0) return false;
+    return this.dataSource.data.some(p => ids.has(p.id) && !p.tradeId);
+  });
+
+  toggleSelect(id: number): void {
+    this.selectedIds.update(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  onCreateTradeFromSelected(): void {
+    const ids = [...this.selectedIds()].filter(id =>
+      this.dataSource.data.some(p => p.id === id && !p.tradeId)
+    );
+    if (ids.length === 0) return;
+    this.router.navigate(['/trades'], { queryParams: { createFrom: 'opt:' + ids.join(',') } });
+  }
 
   // Sidebar state
   showSidebar = signal(false);

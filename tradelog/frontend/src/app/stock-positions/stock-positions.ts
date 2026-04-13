@@ -1,5 +1,5 @@
-import { Component, effect, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { AppDatePipe } from '../shared/app-date.pipe';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
@@ -11,6 +11,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -30,6 +31,7 @@ import { NotificationService } from '../shared/notification.service';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressBarModule,
@@ -44,6 +46,7 @@ import { NotificationService } from '../shared/notification.service';
 export class StockPositions {
   private service = inject(StockPositionsService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
@@ -60,6 +63,30 @@ export class StockPositions {
 
   // Check if any trade has multiplier != 1 to show/hide the column
   hasMultiplier = signal(false);
+
+  // Multi-select for "Create Trade"
+  selectedIds = signal<Set<number>>(new Set());
+  hasUnlinkedSelection = computed(() => {
+    const ids = this.selectedIds();
+    if (ids.size === 0) return false;
+    return this.dataSource.data.some(p => ids.has(p.id) && !p.tradeId);
+  });
+
+  toggleSelect(id: number): void {
+    this.selectedIds.update(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  onCreateTradeFromSelected(): void {
+    const ids = [...this.selectedIds()].filter(id =>
+      this.dataSource.data.some(p => p.id === id && !p.tradeId)
+    );
+    if (ids.length === 0) return;
+    this.router.navigate(['/trades'], { queryParams: { createFrom: 'stk:' + ids.join(',') } });
+  }
 
   // Sidebar state
   showSidebar = signal(false);
@@ -113,8 +140,8 @@ export class StockPositions {
         this.applyFilter();
         this.hasMultiplier.set(this.dataSource.data.some(t => t.multiplier !== 1));
         this.displayedColumns.set(this.hasMultiplier()
-          ? ['symbol', 'date', 'posChange', 'price', 'multiplier', 'totalPos', 'avgPrice', 'pnl', 'commission']
-          : ['symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission']);
+          ? ['select', 'symbol', 'date', 'posChange', 'price', 'multiplier', 'totalPos', 'avgPrice', 'pnl', 'commission']
+          : ['select', 'symbol', 'date', 'posChange', 'price', 'totalPos', 'avgPrice', 'pnl', 'commission']);
         this.loading.set(false);
         if (!this.selected() && (data?.length ?? 0) > 0) {
           this.onRowSelect(data![0]);
