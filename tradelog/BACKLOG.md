@@ -2,9 +2,10 @@
 
 ## Completed
 
-- ~~E1: Date Format Settings~~ — shipped (DateFormatService, AppDatePipe, AppDateAdapter, Settings page)
-- ~~E2-S1: Opened/Closed columns on option-positions table~~ — shipped
-- ~~E3-S1 to S4: Configurable Enums~~ — shipped (LookupValues table, LookupsController CRUD, all frontend dropdowns use LookupService). Settings UI for managing values (E3-S3) deferred — API is ready.
+- ~~E1: Date Format Settings~~ — shipped
+- ~~E2-S1: Opened/Closed columns~~ — shipped
+- ~~E3: Configurable Enums (S1-S4)~~ — shipped (incl. Settings UI)
+- ~~E4: Trade Creation from Positions (S0-S4)~~ — shipped
 
 ---
 
@@ -164,20 +165,38 @@ Streamline the workflow of creating trade theses from automatically-synced IBKR 
 
 ---
 
+---
+
+## E5: View-Mode Consistency
+
+Fix visual and state inconsistencies in the sidebar's read-only (view) mode.
+
+### E5-S1: Consistent view-mode rendering for trade sidebar
+
+**As a** trader,
+**I want** all sidebar elements to look and behave as read-only when I haven't clicked Edit,
+**So that** I can trust I'm not accidentally modifying data while reviewing.
+
+**Acceptance criteria:**
+- [ ] Quill editors render with a muted/disabled visual state in view mode (reduced opacity, no editable border, cursor: default) — matching how Material inputs look when disabled
+- [ ] `pointer-events: none` retained as interaction blocker alongside the visual change
+- [ ] `showEventForm` is reset to `false` in `onRowSelect` (prevents stale event form leaking between rows)
+- [ ] Event form section guarded with `editMode()` so it cannot render in view mode even if the signal is stale
+- [ ] Leg picker for existing trades guarded with `editMode()` for the same reason
+- [ ] Same Quill disabled styling applied to weekly-prep page
+
+**Affected layers:** Frontend (`styles.css`, `trades.html`, `trades.ts`, `weekly-prep.html`)
+**Dependencies:** None
+
+**Root causes addressed:**
+1. `pointer-events-none` blocks interaction but doesn't change visual appearance — Quill editors look "active" (normal border, color) vs Material inputs that look grayed out
+2. `showEventForm` not reset in `onRowSelect` — event form can leak from previous edit session into view mode of a new row
+3. Leg picker and event form only guarded by their own show-signal, not by `editMode()` — stale state can make them visible in view mode
+
+---
+
 ## Implementation Order
 
 ```
-E4-S0   (fix view/edit mode — bug fix, independent)
-E4-S0b  (sortable trades table — independent)
-E4-S0c  (symbol autocomplete — depends on S0b)
-  ↓
-E4-S1   (trade status field — needs /architect)
-  ↓
-E4-S2   (position picker on New Trade — needs /architect for API)
-  ↓
-E4-S4   (auto-update status on sync — depends on S1)
-  ↓
-E4-S3   (create from position pages — deferred)
-  ↓
-E3-S3   (settings UI for lookups — independent, low priority)
+E5-S1  (view-mode consistency — bug fix)
 ```

@@ -276,6 +276,7 @@ export class Trades {
     this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
     this.showLegPicker.set(false);
+    this.showEventForm.set(false);
     this.loadLegs(row.id);
   }
 

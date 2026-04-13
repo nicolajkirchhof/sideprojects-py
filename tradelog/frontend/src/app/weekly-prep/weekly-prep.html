@@ -105,42 +105,42 @@
 
         <!-- Rich text fields -->
         <label class="text-sm font-medium">Notable Sectors</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notableSectors" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Volatility Notes</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="volatilityNotes" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Open Positions Requiring Management</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="openPositionsRequiringManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Portfolio Notes</label>
-        <div class="min-h-[80px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[80px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="editMode() ? quillModules : quillModulesOff" formControlName="portfolioNotes" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Watchlist</label>
-        <div class="min-h-[80px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[80px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="editMode() ? quillModules : quillModulesOff" formControlName="watchlist" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Learnings</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Focus for Improvement</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="focusForImprovement" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">External Comments</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="externalComments" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 

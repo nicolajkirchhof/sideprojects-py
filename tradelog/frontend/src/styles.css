@@ -257,3 +257,22 @@ quill-editor .ql-editor {
 .mat-mdc-row:hover {
   background-color: color-mix(in srgb, var(--mat-sys-on-surface) 6%, transparent);
 }
+
+/* ============================================================
+   QUILL READ-ONLY — muted appearance matching Material disabled fields
+   ============================================================ */
+
+.quill-readonly {
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.6;
+}
+.quill-readonly .ql-container {
+  border-color: transparent !important;
+}
+.quill-readonly .ql-toolbar {
+  display: none !important;
+}
+.quill-readonly .ql-editor {
+  color: var(--mat-sys-on-surface-variant);
+}

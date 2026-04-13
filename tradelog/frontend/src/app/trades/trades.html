@@ -230,7 +230,7 @@
             </button>
           }
         </div>
-        <div class="min-h-[120px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[120px]" [class.quill-readonly]="!editMode()">
           @if (showToolbar() && editMode()) {
             <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="notes" [readOnly]="!editMode()" theme="snow"></quill-editor>
           } @else {
@@ -239,22 +239,22 @@
         </div>
 
         <label class="text-sm font-medium">TA / FA Notes</label>
-        <div class="min-h-[80px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[80px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="taFaNotes" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Intended Management</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="intendedManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Actual Management</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="actualManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Learnings</label>
-        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
+        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
@@ -394,8 +394,8 @@
             }
           </div>
 
-          <!-- Leg picker -->
-          @if (showLegPicker()) {
+          <!-- Leg picker (only in edit mode) -->
+          @if (showLegPicker() && editMode()) {
             <div class="border border-white/20 rounded p-3 mt-2 bg-white/5">
               <div class="text-xs font-medium mb-2">Unassigned positions for {{ selected()!.symbol }}</div>
 
@@ -485,8 +485,8 @@
               <div class="text-xs opacity-40 py-2">No events logged</div>
             }
 
-            <!-- Inline add event form -->
-            @if (showEventForm()) {
+            <!-- Inline add event form (only in edit mode) -->
+            @if (showEventForm() && editMode()) {
               <div class="border border-white/20 rounded p-3 mt-2 bg-white/5 flex flex-col gap-2">
                 <div class="flex gap-2">
                   <mat-form-field appearance="outline" class="flex-1" subscriptSizing="dynamic">
