@@ -281,7 +281,7 @@
         }
 
         <!-- Follow-up button -->
-        @if (!isCreating() && selected()) {
+        @if (!isCreating() && selected() && editMode()) {
           <button mat-stroked-button type="button" class="!text-xs !min-h-[28px] !h-7 mt-2" (click)="onCreateFollowUp()">
             <mat-icon class="!text-sm !w-4 !h-4 mr-1">call_split</mat-icon> Create Follow-up
           </button>
