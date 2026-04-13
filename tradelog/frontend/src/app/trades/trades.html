@@ -230,8 +230,8 @@
             </button>
           }
         </div>
-        <div class="min-h-[120px]">
-          @if (showToolbar()) {
+        <div class="min-h-[120px]" [class.pointer-events-none]="!editMode()">
+          @if (showToolbar() && editMode()) {
             <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="notes" [readOnly]="!editMode()" theme="snow"></quill-editor>
           } @else {
             <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notes" [readOnly]="!editMode()" theme="snow"></quill-editor>
@@ -239,22 +239,22 @@
         </div>
 
         <label class="text-sm font-medium">TA / FA Notes</label>
-        <div class="min-h-[80px]">
+        <div class="min-h-[80px]" [class.pointer-events-none]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="taFaNotes" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Intended Management</label>
-        <div class="min-h-[60px]">
+        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="intendedManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Actual Management</label>
-        <div class="min-h-[60px]">
+        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="actualManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
         <label class="text-sm font-medium">Learnings</label>
-        <div class="min-h-[60px]">
+        <div class="min-h-[60px]" [class.pointer-events-none]="!editMode()">
           <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" [readOnly]="!editMode()" theme="snow"></quill-editor>
         </div>
 
