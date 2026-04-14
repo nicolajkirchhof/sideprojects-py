@@ -12,6 +12,7 @@ export interface StockPositionDto {
   multiplier: number;
   bestExitPrice?: number | null;
   bestExitDate?: string | null;
+  notes?: string | null;
   tradeId?: number | null;
 
   // Computed
@@ -31,6 +32,7 @@ export interface StockPositionUpsert {
   multiplier: number;
   bestExitPrice?: number | null;
   bestExitDate?: string | null;
+  notes?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

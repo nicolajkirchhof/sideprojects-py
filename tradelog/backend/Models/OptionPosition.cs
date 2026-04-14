@@ -54,6 +54,8 @@ public class OptionPosition : tradelog.Data.IAccountScoped
 
     public int? TradeId { get; set; }
 
+    public string? Notes { get; set; }
+
     /// <summary>Best exit price the position could have achieved (for trade review).</summary>
     public decimal? BestExitPrice { get; set; }
 

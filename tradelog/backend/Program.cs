@@ -1,4 +1,5 @@
 using tradelog.Data;
+using tradelog.Models;
 using tradelog.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
@@ -75,6 +76,36 @@ using (var scope = app.Services.CreateScope())
     if (statusBackfilled > 0)
     {
         app.Logger.LogInformation("Backfilled Status for {Count} trade(s).", statusBackfilled);
+    }
+
+    // Seed strategy documents from .md files (one-off — skips if documents already exist)
+    var hasDocuments = await context.Documents.IgnoreQueryFilters().AnyAsync();
+    if (!hasDocuments)
+    {
+        var mdDir = Path.Combine(app.Environment.ContentRootPath, "..", "investing_framework");
+        if (Directory.Exists(mdDir))
+        {
+            var accounts = await context.Accounts.IgnoreQueryFilters().ToListAsync();
+            foreach (var account in accounts)
+            {
+                foreach (var file in Directory.GetFiles(mdDir, "*.md"))
+                {
+                    var title = Path.GetFileNameWithoutExtension(file)
+                        .Replace("-", " ").Replace("_", " ");
+                    var content = await File.ReadAllTextAsync(file);
+                    context.Documents.Add(new Document
+                    {
+                        AccountId = account.Id,
+                        Title = title,
+                        Content = content,
+                        UpdatedAt = DateTime.UtcNow,
+                    });
+                }
+            }
+            await context.SaveChangesAsync();
+            app.Logger.LogInformation("Seeded {Count} strategy documents from .md files.",
+                Directory.GetFiles(mdDir, "*.md").Length);
+        }
     }
 }
 

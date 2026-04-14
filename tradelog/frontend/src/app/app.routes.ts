@@ -6,7 +6,7 @@ import { StockPositions } from './stock-positions/stock-positions';
 import { CapitalComponent } from './capital/capital';
 import { WeeklyPrepComponent } from './weekly-prep/weekly-prep';
 import { AnalyticsComponent } from './analytics/analytics';
-import { PortfolioComponent } from './portfolio/portfolio';
+import { StrategyLibraryComponent } from './strategy-library/strategy-library';
 import { GreeksHistoryComponent } from './greeks-history/greeks-history';
 import { AccountsComponent } from './accounts/accounts';
 import { About } from './about/about';
@@ -20,7 +20,7 @@ export const routes: Routes = [
     { path: 'capital', component: CapitalComponent },
     { path: 'weekly-prep', component: WeeklyPrepComponent },
     { path: 'analytics', component: AnalyticsComponent },
-    { path: 'portfolio', component: PortfolioComponent },
+    { path: 'strategy-library', component: StrategyLibraryComponent },
     { path: 'greeks-history', component: GreeksHistoryComponent },
     { path: 'accounts', component: AccountsComponent },
     { path: 'settings', component: SettingsComponent },

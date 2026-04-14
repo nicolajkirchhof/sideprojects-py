@@ -21,12 +21,12 @@ public class DataContext : DbContext
     public DbSet<OptionPosition> OptionPositions { get; set; }
     public DbSet<OptionPositionsLog> OptionPositionsLogs { get; set; }
     public DbSet<StockPosition> StockPositions { get; set; }
-    public DbSet<TradeEvent> TradeEvents { get; set; }
     public DbSet<Capital> Capitals { get; set; }
     public DbSet<WeeklyPrep> WeeklyPreps { get; set; }
-    public DbSet<Portfolio> Portfolios { get; set; }
     public DbSet<StockPriceCache> StockPriceCaches { get; set; }
     public DbSet<LookupValue> LookupValues { get; set; }
+    public DbSet<Document> Documents { get; set; }
+    public DbSet<DocumentStrategyLink> DocumentStrategyLinks { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,20 +44,17 @@ public class DataContext : DbContext
         }
 
         // ────────────────────────────────────────────
-        // Global query filters — scope all account-owned entities
-        // Reference CurrentAccountId property (not a local variable) so EF Core
-        // parameterizes the filter and re-evaluates it per query execution.
+        // Global query filters
         // ────────────────────────────────────────────
 
         modelBuilder.Entity<Trade>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<OptionPosition>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<OptionPositionsLog>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<StockPosition>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
-        modelBuilder.Entity<TradeEvent>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<Capital>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<WeeklyPrep>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
-        modelBuilder.Entity<Portfolio>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<LookupValue>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<Document>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
 
         // ────────────────────────────────────────────
         // Lookup values — unique name per category per account
@@ -71,10 +68,28 @@ public class DataContext : DbContext
             .HasIndex(e => new { e.AccountId, e.Category, e.SortOrder });
 
         // ────────────────────────────────────────────
+        // Document ↔ Strategy many-to-many junction
+        // ────────────────────────────────────────────
+
+        modelBuilder.Entity<DocumentStrategyLink>()
+            .HasKey(dsl => new { dsl.DocumentId, dsl.LookupValueId });
+
+        modelBuilder.Entity<DocumentStrategyLink>()
+            .HasOne(dsl => dsl.Document)
+            .WithMany(d => d.StrategyLinks)
+            .HasForeignKey(dsl => dsl.DocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DocumentStrategyLink>()
+            .HasOne(dsl => dsl.LookupValue)
+            .WithMany()
+            .HasForeignKey(dsl => dsl.LookupValueId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ────────────────────────────────────────────
         // Indexes
         // ────────────────────────────────────────────
 
-        // OptionPositionsLog: composite index for "latest snapshot" queries (account-scoped)
         modelBuilder.Entity<OptionPositionsLog>()
             .HasIndex(e => new { e.AccountId, e.ContractId, e.DateTime })
             .IsDescending(false, false, true)
@@ -92,11 +107,6 @@ public class DataContext : DbContext
         modelBuilder.Entity<OptionPosition>()
             .Property(e => e.CloseReasons)
             .HasConversion<int?>();
-
-        // Store TradeEventType as string
-        modelBuilder.Entity<TradeEvent>()
-            .Property(e => e.Type)
-            .HasConversion<string>();
 
         // ────────────────────────────────────────────
         // Foreign key configurations
@@ -119,12 +129,6 @@ public class DataContext : DbContext
             .WithMany(t => t.StockPositions)
             .HasForeignKey(p => p.TradeId)
             .OnDelete(DeleteBehavior.SetNull);
-
-        modelBuilder.Entity<TradeEvent>()
-            .HasOne<Trade>()
-            .WithMany(t => t.TradeEvents)
-            .HasForeignKey(e => e.TradeId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override int SaveChanges()

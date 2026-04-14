@@ -12,6 +12,7 @@ public class StockPositionDto
     public int Multiplier { get; set; }
 
     public int? TradeId { get; set; }
+    public string? Notes { get; set; }
 
     // Computed (running position tracking)
     public int LastPos { get; set; }

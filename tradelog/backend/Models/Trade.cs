@@ -58,5 +58,4 @@ public class Trade : tradelog.Data.IAccountScoped
     public int? ParentTradeId { get; set; }
     public ICollection<OptionPosition> OptionPositions { get; set; } = new List<OptionPosition>();
     public ICollection<StockPosition> StockPositions { get; set; } = new List<StockPosition>();
-    public ICollection<TradeEvent> TradeEvents { get; set; } = new List<TradeEvent>();
 }

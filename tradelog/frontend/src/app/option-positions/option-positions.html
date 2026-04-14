@@ -273,6 +273,11 @@
           </mat-form-field>
         </div>
 
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Notes</mat-label>
+          <textarea matInput formControlName="notes" rows="3"></textarea>
+        </mat-form-field>
+
         <!-- Computed fields (read-only, edit mode only) -->
         @if (!isCreating() && selected()) {
           <div class="border-t border-white/10 pt-3 mt-1">

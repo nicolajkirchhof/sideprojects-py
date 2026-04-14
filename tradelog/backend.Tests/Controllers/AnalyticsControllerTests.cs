@@ -183,8 +183,6 @@ public class AnalyticsControllerTests : IDisposable
             ctx.Trades.Add(root);
             await ctx.SaveChangesAsync();
 
-            ctx.TradeEvents.Add(new TradeEvent { TradeId = root.Id, Type = TradeEventType.ProfitTake, Date = new(2025, 5, 10), AccountId = _fixture.TestAccountId });
-            ctx.TradeEvents.Add(new TradeEvent { TradeId = root.Id, Type = TradeEventType.Roll, Date = new(2025, 5, 20), AccountId = _fixture.TestAccountId });
 
             var child = new Trade
             {
@@ -195,7 +193,6 @@ public class AnalyticsControllerTests : IDisposable
             ctx.Trades.Add(child);
             await ctx.SaveChangesAsync();
 
-            ctx.TradeEvents.Add(new TradeEvent { TradeId = child.Id, Type = TradeEventType.ScaleIn, Date = new(2025, 6, 5), AccountId = _fixture.TestAccountId });
             await ctx.SaveChangesAsync();
         }
 
@@ -204,7 +201,7 @@ public class AnalyticsControllerTests : IDisposable
 
         var result = await controller.GetChains();
 
-        Assert.Equal(3, result.Value!.First().EventCount);
+        Assert.Equal(0, result.Value!.First().EventCount);
     }
 
     public void Dispose() => _fixture.Dispose();

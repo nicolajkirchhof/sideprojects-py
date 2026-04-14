@@ -130,6 +130,7 @@ export class OptionPositions {
       closeReasons: [null],
       bestExitPrice: [null],
       bestExitDate: [null],
+      notes: [''],
     });
     this.load();
 
@@ -204,6 +205,7 @@ export class OptionPositions {
       closeReasons: row.closeReasons ?? null,
       bestExitPrice: row.bestExitPrice ?? null,
       bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
+      notes: row.notes ?? '',
     });
     this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
@@ -250,6 +252,7 @@ export class OptionPositions {
       closeReasons: null,
       bestExitPrice: null,
       bestExitDate: null,
+      notes: '',
     });
     this.showSidebar.set(true);
   }
@@ -289,6 +292,7 @@ export class OptionPositions {
       closeReasons: v.closeReasons ? Number(v.closeReasons) : null,
       bestExitPrice: v.bestExitPrice ? Number(v.bestExitPrice) : null,
       bestExitDate: toIsoOrNull(v.bestExitDate),
+      notes: v.notes || null,
     };
 
     const obs = this.isCreating() || !payload.id

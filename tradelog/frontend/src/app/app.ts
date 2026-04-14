@@ -61,7 +61,7 @@ export class App {
         if (url.startsWith('/capital')) return 'Capital';
         if (url.startsWith('/weekly-prep')) return 'Weekly Prep';
         if (url.startsWith('/analytics')) return 'Analytics';
-        if (url.startsWith('/portfolio')) return 'Portfolio';
+        if (url.startsWith('/strategy-library')) return 'Strategy Library';
         if (url.startsWith('/greeks-history')) return 'Greeks History';
         if (url.startsWith('/accounts')) return 'Accounts';
         if (url.startsWith('/settings')) return 'Settings';

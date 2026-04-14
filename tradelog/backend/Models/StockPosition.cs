@@ -31,6 +31,8 @@ public class StockPosition : tradelog.Data.IAccountScoped
     [StringLength(50)]
     public string? ExecutionId { get; set; }
 
+    public string? Notes { get; set; }
+
     /// <summary>Best exit price for this execution (for trade review).</summary>
     public decimal? BestExitPrice { get; set; }
 

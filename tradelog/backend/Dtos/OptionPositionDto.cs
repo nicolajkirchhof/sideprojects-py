@@ -44,4 +44,6 @@ public class OptionPositionDto
 
     /// <summary>FK to the linked Trade (null if unlinked).</summary>
     public int? TradeId { get; set; }
+
+    public string? Notes { get; set; }
 }

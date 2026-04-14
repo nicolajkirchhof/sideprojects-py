@@ -1,0 +1,76 @@
+@if (loading()) {
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+}
+
+<div class="flex flex-1 min-h-0">
+  <!-- Left panel: document list -->
+  <div class="w-64 border-r border-white/10 flex flex-col min-h-0">
+    <div class="flex items-center justify-between p-3 border-b border-white/10">
+      <span class="text-sm font-medium opacity-70">Documents</span>
+      <button mat-icon-button (click)="onNew()" matTooltip="New Document">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+    <div class="flex-1 overflow-auto">
+      <mat-nav-list>
+        @for (doc of documents(); track doc.id) {
+          <a mat-list-item
+             (click)="onSelect(doc)"
+             [class.bg-white]="selected()?.id === doc.id"
+             [class.!bg-opacity-5]="selected()?.id === doc.id">
+            <span class="text-sm truncate">{{ doc.title }}</span>
+          </a>
+        }
+        @if (documents().length === 0 && !loading()) {
+          <div class="text-xs opacity-40 p-4 text-center">No documents yet</div>
+        }
+      </mat-nav-list>
+    </div>
+  </div>
+
+  <!-- Right panel: viewer/editor -->
+  <div class="flex-1 flex flex-col min-h-0 p-4">
+    @if (editMode()) {
+      <!-- Edit mode -->
+      <form [formGroup]="form" (ngSubmit)="onSave()" class="flex flex-col flex-1 gap-3 min-h-0">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Title</mat-label>
+          <input matInput formControlName="title">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="flex-1">
+          <mat-label>Content (Markdown)</mat-label>
+          <textarea matInput formControlName="content" class="!flex-1 !min-h-[300px] !resize-none font-mono text-sm"></textarea>
+        </mat-form-field>
+
+        <div class="flex gap-2 justify-end">
+          @if (selected()) {
+            <button mat-stroked-button type="button" color="warn" (click)="onDelete()">Delete</button>
+          }
+          <span class="flex-1"></span>
+          <button mat-stroked-button type="button" (click)="onCancelEdit()">Cancel</button>
+          <button mat-flat-button color="primary" type="submit">Save</button>
+        </div>
+      </form>
+    } @else if (selected()) {
+      <!-- View mode -->
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-medium">{{ selected()!.title }}</h2>
+        <button mat-flat-button color="primary" (click)="onEdit()">
+          <mat-icon class="mr-1">edit</mat-icon>Edit
+        </button>
+      </div>
+      <div class="flex-1 overflow-auto">
+        <pre class="whitespace-pre-wrap text-sm opacity-80 font-sans leading-relaxed">{{ selected()!.content }}</pre>
+      </div>
+    } @else {
+      <!-- Empty state -->
+      <div class="flex flex-1 items-center justify-center">
+        <div class="text-center opacity-40">
+          <mat-icon class="!text-5xl !w-12 !h-12 mb-2">library_books</mat-icon>
+          <div class="text-sm">Select a document or create a new one</div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

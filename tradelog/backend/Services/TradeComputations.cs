@@ -53,6 +53,7 @@ public static class StockPositionComputations
                 Commission = t.Commission,
                 Multiplier = t.Multiplier,
                 TradeId = t.TradeId,
+                Notes = t.Notes,
                 LastPos = lastPos,
                 TotalPos = newTotal,
                 AvgPrice = Math.Round(newAvg, 6),

@@ -18,8 +18,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { QuillModule } from 'ngx-quill';
 import {
-  TradesService, Trade, TradeUpsert, TradeCreatePayload, OptionLegDto, StockLegDto, TradeEventDto,
-  TradeEventType, TRADE_EVENT_TYPE_LABELS,
+  TradesService, Trade, TradeUpsert, TradeCreatePayload, OptionLegDto, StockLegDto,
 } from './trades.service';
 import { ActivatedRoute } from '@angular/router';
 import { forkJoin, Observable } from 'rxjs';
@@ -101,13 +100,6 @@ export class Trades {
   unassignedStocks = signal<StockLegDto[]>([]);
   selectedLegIds = signal<{ options: Set<number>; stocks: Set<number> }>({ options: new Set(), stocks: new Set() });
 
-  // Trade events
-  events = signal<TradeEventDto[]>([]);
-  showEventForm = signal(false);
-  eventTypes = Object.values(TradeEventType);
-  eventTypeLabel: Record<string, string> = TRADE_EVENT_TYPE_LABELS;
-  eventForm!: FormGroup;
-
   // Quill config
   showToolbar = signal(false);
   quillModules: any = {
@@ -162,13 +154,6 @@ export class Trades {
       learnings: [''],
       parentTradeId: [null],
     });
-    this.eventForm = this.fb.group({
-      type: [null, [Validators.required]],
-      date: [null, [Validators.required]],
-      notes: [''],
-      pnlImpact: [null],
-    });
-
     // Handle createFrom query param (from position pages)
     const createFrom = this.route.snapshot.queryParams['createFrom'];
     if (createFrom) {
@@ -199,8 +184,6 @@ export class Trades {
     this.showSidebar.set(true);
     this.optionLegs.set([]);
     this.stockLegs.set([]);
-    this.events.set([]);
-    this.showEventForm.set(false);
     this.showLegPicker.set(true);
 
     forkJoin([
@@ -276,7 +259,6 @@ export class Trades {
     this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
     this.showLegPicker.set(false);
-    this.showEventForm.set(false);
     this.loadLegs(row.id);
   }
 
@@ -329,8 +311,6 @@ export class Trades {
     this.showSidebar.set(true);
     this.optionLegs.set([]);
     this.stockLegs.set([]);
-    this.events.set([]);
-    this.showEventForm.set(false);
 
     // In create mode, show the position picker immediately with all unassigned positions
     this.selectedLegIds.set({ options: new Set(), stocks: new Set() });
@@ -464,7 +444,6 @@ export class Trades {
         this.optionLegs.set(detail.optionPositions ?? []);
         this.stockLegs.set(detail.stockPositions ?? []);
         this.childTradeIds.set(detail.childTradeIds ?? []);
-        this.events.set(detail.events ?? []);
       },
       error: () => this.notify.error('Failed to load legs'),
     });
@@ -560,9 +539,7 @@ export class Trades {
     this.optionLegs.set([]);
     this.stockLegs.set([]);
     this.childTradeIds.set([]);
-    this.events.set([]);
     this.showLegPicker.set(false);
-    this.showEventForm.set(false);
   }
 
   onSelectTradeById(tradeId: number): void {
@@ -587,45 +564,4 @@ export class Trades {
     });
   }
 
-  // --- Trade events ---
-
-  onOpenEventForm(): void {
-    this.eventForm.reset({ type: null, date: new Date(), notes: '', pnlImpact: null });
-    this.showEventForm.set(true);
-  }
-
-  onSaveEvent(): void {
-    if (this.eventForm.invalid) {
-      this.eventForm.markAllAsTouched();
-      return;
-    }
-    const tradeId = this.selected()?.id;
-    if (!tradeId) return;
-
-    const v = this.eventForm.getRawValue();
-    this.service.createEvent(tradeId, {
-      type: v.type,
-      date: toIsoOrNull(v.date) as string,
-      notes: v.notes || null,
-      pnlImpact: v.pnlImpact ? Number(v.pnlImpact) : null,
-    }).subscribe({
-      next: (created) => {
-        this.events.update(list => [...list, created].sort((a, b) => a.date.localeCompare(b.date)));
-        this.showEventForm.set(false);
-        this.notify.success('Event added');
-      },
-      error: () => this.notify.error('Failed to add event'),
-    });
-  }
-
-  onDeleteEvent(eventId: number): void {
-    if (!confirm('Delete this event?')) return;
-    this.service.deleteEvent(eventId).subscribe({
-      next: () => {
-        this.events.update(list => list.filter(e => e.id !== eventId));
-        this.notify.success('Event deleted');
-      },
-      error: () => this.notify.error('Failed to delete event'),
-    });
-  }
 }

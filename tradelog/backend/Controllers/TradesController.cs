@@ -77,20 +77,6 @@ public class TradesController : ControllerBase
             .OrderBy(p => p.Symbol).ThenBy(p => p.Date).ThenBy(p => p.Id)
             .ToListAsync();
 
-        var events = await _context.TradeEvents
-            .Where(e => e.TradeId == id)
-            .OrderBy(e => e.Date)
-            .Select(e => new TradeEventDto
-            {
-                Id = e.Id,
-                TradeId = e.TradeId,
-                Type = e.Type.ToString(),
-                Date = e.Date,
-                Notes = e.Notes,
-                PnlImpact = e.PnlImpact,
-            })
-            .ToListAsync();
-
         return new TradeDetailDto
         {
             Id = trade.Id,
@@ -126,7 +112,6 @@ public class TradesController : ControllerBase
                 .Where(t => t.ParentTradeId == id)
                 .Select(t => t.Id)
                 .ToListAsync(),
-            Events = events,
             OptionPositions = optionPositions
                 .Select(p => OptionPositionDtoMapper.ToDto(p, latestLogs.GetValueOrDefault(p.ContractId)))
                 .ToList(),

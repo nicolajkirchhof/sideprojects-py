@@ -111,6 +111,7 @@ export class StockPositions {
       multiplier: [1],
       bestExitPrice: [null],
       bestExitDate: [null],
+      notes: [''],
     });
     this.load();
 
@@ -168,6 +169,7 @@ export class StockPositions {
       multiplier: row.multiplier,
       bestExitPrice: row.bestExitPrice ?? null,
       bestExitDate: row.bestExitDate ? new Date(row.bestExitDate) : null,
+      notes: row.notes ?? '',
     });
     this.form.disable({ emitEvent: false });
     this.showSidebar.set(true);
@@ -204,6 +206,7 @@ export class StockPositions {
       multiplier: 1,
       bestExitPrice: null,
       bestExitDate: null,
+      notes: '',
     });
     this.showSidebar.set(true);
   }
@@ -231,6 +234,7 @@ export class StockPositions {
       multiplier: Number(v.multiplier ?? 1),
       bestExitPrice: v.bestExitPrice ? Number(v.bestExitPrice) : null,
       bestExitDate: toIsoOrNull(v.bestExitDate),
+      notes: v.notes || null,
     };
 
     const obs = this.isCreating() || !payload.id

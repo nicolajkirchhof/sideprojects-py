@@ -269,23 +269,17 @@ public class AnalyticsController : ControllerBase
             .GroupBy(p => p.TradeId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var eventCounts = await _context.TradeEvents
-            .Where(e => chainTradeIds.Contains(e.TradeId))
-            .GroupBy(e => e.TradeId)
-            .Select(g => new { TradeId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.TradeId, x => x.Count);
-
         var result = new List<ChainSummaryDto>();
 
         foreach (var (root, chainTrades) in chains)
         {
             decimal totalPnl = 0, premiumCollected = 0, premiumLost = 0;
-            int totalEvents = 0;
+
             var hasOpen = false;
 
             foreach (var trade in chainTrades)
             {
-                totalEvents += eventCounts.GetValueOrDefault(trade.Id);
+
 
                 // Option P/L
                 var opts = optionsByTrade.GetValueOrDefault(trade.Id) ?? [];
@@ -328,7 +322,7 @@ public class AnalyticsController : ControllerBase
                 TotalPnl = totalPnl,
                 PremiumCollected = premiumCollected,
                 PremiumLost = premiumLost,
-                EventCount = totalEvents,
+                EventCount = 0,
             });
         }
 

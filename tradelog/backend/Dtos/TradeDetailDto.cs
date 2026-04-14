@@ -38,9 +38,6 @@ public class TradeDetailDto
     // Follow-up chain
     public List<int> ChildTradeIds { get; set; } = [];
 
-    // Trade events
-    public List<TradeEventDto> Events { get; set; } = [];
-
     // Linked positions
     public List<OptionPositionDto> OptionPositions { get; set; } = [];
     public List<StockPositionDto> StockPositions { get; set; } = [];

@@ -21,10 +21,3 @@ public enum CloseReasons
     Other = 32
 }
 
-public enum TradeEventType
-{
-    ScaleIn,
-    ProfitTake,
-    Roll,
-    Stop
-}

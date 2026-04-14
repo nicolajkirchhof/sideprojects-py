@@ -52,6 +52,8 @@ export interface OptionPositionDto {
   /** Cached count of greek log samples recorded since the position was opened. Null = never computed. */
   logCount: number | null;
 
+  notes?: string | null;
+
   /** FK to the linked Trade (null if unlinked). */
   tradeId?: number | null;
 }
@@ -73,6 +75,7 @@ export interface OptionPositionUpsert {
   closeReasons?: number | null;
   bestExitPrice?: number | null;
   bestExitDate?: string | null;
+  notes?: string | null;
 }
 
 export interface OptionPositionsLog {
