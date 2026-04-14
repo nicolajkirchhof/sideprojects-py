@@ -22,7 +22,7 @@ public class TradesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Trade>>> GetAll(
+    public async Task<ActionResult<IEnumerable<TradeListItemDto>>> GetAll(
         [FromQuery] string? symbol,
         [FromQuery] int? budget,
         [FromQuery] int? strategy)
@@ -36,7 +36,77 @@ public class TradesController : ControllerBase
         if (strategy.HasValue)
             query = query.Where(e => e.Strategy == strategy.Value);
 
-        return await query.OrderByDescending(e => e.Date).ToListAsync();
+        var trades = await query.OrderByDescending(e => e.Date).ToListAsync();
+        var tradeIds = trades.Select(t => t.Id).ToList();
+
+        // Compute P&L per trade from linked positions
+        var optionPnl = await ComputeOptionPnlByTrade(tradeIds);
+        var stockPnl = await ComputeStockPnlByTrade(tradeIds);
+
+        return trades.Select(t =>
+        {
+            var optPnl = optionPnl.GetValueOrDefault(t.Id);
+            var stkPnl = stockPnl.GetValueOrDefault(t.Id);
+            var hasPnl = optionPnl.ContainsKey(t.Id) || stockPnl.ContainsKey(t.Id);
+
+            return new TradeListItemDto
+            {
+                Id = t.Id,
+                Symbol = t.Symbol,
+                Date = t.Date,
+                TypeOfTrade = t.TypeOfTrade,
+                Directional = t.Directional,
+                Budget = t.Budget,
+                Strategy = t.Strategy,
+                ManagementRating = t.ManagementRating,
+                Status = t.Status,
+                ParentTradeId = t.ParentTradeId,
+                Pnl = hasPnl ? Math.Round(optPnl + stkPnl, 2) : null,
+            };
+        }).ToList();
+    }
+
+    /// <summary>Computes aggregated option P&L per trade ID (realized + unrealized).</summary>
+    private async Task<Dictionary<int, decimal>> ComputeOptionPnlByTrade(List<int> tradeIds)
+    {
+        var positions = await _context.OptionPositions
+            .Where(p => p.TradeId != null && tradeIds.Contains(p.TradeId.Value))
+            .ToListAsync();
+
+        var contractIds = positions.Select(p => p.ContractId).Distinct().ToList();
+        var latestLogs = await _context.OptionPositionsLogs
+            .Where(l => contractIds.Contains(l.ContractId))
+            .GroupBy(l => l.ContractId)
+            .Select(g => g.OrderByDescending(l => l.DateTime).First())
+            .ToDictionaryAsync(l => l.ContractId);
+
+        return positions
+            .GroupBy(p => p.TradeId!.Value)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(p =>
+                {
+                    var dto = OptionPositionDtoMapper.ToDto(p, latestLogs.GetValueOrDefault(p.ContractId));
+                    return (dto.RealizedPnl ?? 0) + (dto.UnrealizedPnl ?? 0);
+                })
+            );
+    }
+
+    /// <summary>Computes aggregated stock P&L per trade ID.</summary>
+    private async Task<Dictionary<int, decimal>> ComputeStockPnlByTrade(List<int> tradeIds)
+    {
+        var positions = await _context.StockPositions
+            .Where(p => p.TradeId != null && tradeIds.Contains(p.TradeId.Value))
+            .OrderBy(p => p.Symbol).ThenBy(p => p.Date).ThenBy(p => p.Id)
+            .ToListAsync();
+
+        if (positions.Count == 0) return new();
+
+        var dtos = StockPositionComputations.ComputeRunningFields(positions);
+        return dtos
+            .Where(d => d.TradeId.HasValue)
+            .GroupBy(d => d.TradeId!.Value)
+            .ToDictionary(g => g.Key, g => g.Sum(d => d.Pnl));
     }
 
     /// <summary>Resolves lookup value names for a set of IDs. Returns empty string for unknown IDs.</summary>

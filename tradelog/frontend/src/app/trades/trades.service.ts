@@ -30,6 +30,7 @@ export interface Trade {
   learnings?: string | null;
   parentTradeId?: number | null;
   status?: string | null;
+  pnl?: number | null;
 }
 
 export interface TradeDetail extends Trade {

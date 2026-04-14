@@ -259,20 +259,22 @@ quill-editor .ql-editor {
 }
 
 /* ============================================================
-   QUILL READ-ONLY — muted appearance matching Material disabled fields
+   QUILL VIEW CONTENT — renders HTML from Quill in read-only mode
+   Inherits Quill's snow theme typography for visual consistency.
    ============================================================ */
 
-.quill-readonly {
-  pointer-events: none;
-  cursor: default;
-  opacity: 0.6;
-}
-.quill-readonly .ql-container {
-  border-color: transparent !important;
-}
-.quill-readonly .ql-toolbar {
-  display: none !important;
-}
-.quill-readonly .ql-editor {
+.ql-view-content {
+  font-size: 0.875rem;
+  line-height: 1.5;
   color: var(--mat-sys-on-surface-variant);
+  padding: 0.25rem 0;
+}
+.ql-view-content p { margin: 0 0 0.5em; }
+.ql-view-content ul, .ql-view-content ol { padding-left: 1.5em; margin: 0 0 0.5em; }
+.ql-view-content a { color: var(--mat-sys-primary); text-decoration: underline; }
+.ql-view-content blockquote {
+  border-left: 0.25rem solid var(--mat-sys-outline-variant);
+  padding-left: 0.75rem;
+  margin: 0.5em 0;
+  opacity: 0.8;
 }

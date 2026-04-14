@@ -66,7 +66,7 @@ export class Trades {
   loading = signal(false);
 
   dataSource = new MatTableDataSource<Trade>([]);
-  displayedColumns = ['symbol', 'date', 'typeOfTrade', 'directional', 'budget', 'strategy', 'managementRating', 'status'];
+  displayedColumns = ['symbol', 'date', 'typeOfTrade', 'directional', 'budget', 'strategy', 'managementRating', 'pnl', 'status'];
 
   // Symbol autocomplete filter (client-side, on top of server-side budget/strategy)
   filterSymbol = signal('');
@@ -86,6 +86,7 @@ export class Trades {
   // Filter state
   filterBudget = signal<number | null>(null);
   filterStrategy = signal<number | null>(null);
+  filterStatus = signal<string>('Open');
 
   // Follow-up chain
   childTradeIds = signal<number[]>([]);
@@ -123,10 +124,15 @@ export class Trades {
       if (p) this.dataSource.paginator = p;
     });
 
-    // Client-side symbol filter (server-side budget/strategy stays via API params)
+    // Client-side filters: symbol + status (budget/strategy are server-side via API params)
     this.dataSource.filterPredicate = (row: Trade, filter: string) => {
-      if (!filter) return true;
-      return row.symbol.toLowerCase().includes(filter);
+      const f = JSON.parse(filter || '{}');
+      if (f.symbol && !row.symbol.toLowerCase().includes(f.symbol)) return false;
+      if (f.status && f.status !== 'All') {
+        if (f.status === 'Open' && row.status !== 'Open') return false;
+        if (f.status === 'Closed' && row.status !== 'Closed') return false;
+      }
+      return true;
     };
 
     this.form = this.fb.group({
@@ -207,9 +213,10 @@ export class Trades {
     this.service.getAll(filters).subscribe({
       next: (data) => {
         this.dataSource.data = data ?? [];
+        this.applyFilters();
         this.loading.set(false);
-        if (!this.selected() && (data?.length ?? 0) > 0) {
-          this.onRowSelect(data![0]);
+        if (!this.selected() && this.dataSource.filteredData.length > 0) {
+          this.onRowSelect(this.dataSource.filteredData[0]);
         }
       },
       error: () => {
@@ -223,8 +230,11 @@ export class Trades {
     this.load();
   }
 
-  applySymbolFilter(): void {
-    this.dataSource.filter = this.filterSymbol().trim().toLowerCase();
+  applyFilters(): void {
+    this.dataSource.filter = JSON.stringify({
+      symbol: this.filterSymbol().trim().toLowerCase(),
+      status: this.filterStatus(),
+    });
   }
 
   onRowSelect(row: Trade): void {

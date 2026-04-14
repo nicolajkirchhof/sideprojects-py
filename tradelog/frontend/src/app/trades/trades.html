@@ -4,7 +4,12 @@
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
     <!-- Filters + New button -->
-    <div class="flex items-center gap-4 mx-4 mb-2">
+    <div class="flex items-center gap-3 mx-4 mb-2 flex-wrap">
+      <mat-button-toggle-group [value]="filterStatus()" (change)="filterStatus.set($event.value); applyFilters()">
+        <mat-button-toggle value="Open">Open</mat-button-toggle>
+        <mat-button-toggle value="Closed">Closed</mat-button-toggle>
+        <mat-button-toggle value="All">All</mat-button-toggle>
+      </mat-button-toggle-group>
       <mat-form-field appearance="outline" class="w-40" subscriptSizing="dynamic">
         <mat-label>Budget</mat-label>
         <mat-select [value]="filterBudget()" (selectionChange)="filterBudget.set($event.value); onFilterChange()">
@@ -25,9 +30,9 @@
       </mat-form-field>
       <mat-form-field appearance="outline" class="w-28" subscriptSizing="dynamic">
         <mat-label>Symbol</mat-label>
-        <input matInput [ngModel]="filterSymbol()" (ngModelChange)="filterSymbol.set($event); applySymbolFilter()"
+        <input matInput [ngModel]="filterSymbol()" (ngModelChange)="filterSymbol.set($event); applyFilters()"
                [matAutocomplete]="symbolAuto" placeholder="SPY">
-        <mat-autocomplete #symbolAuto="matAutocomplete" (optionSelected)="filterSymbol.set($event.option.value); applySymbolFilter()">
+        <mat-autocomplete #symbolAuto="matAutocomplete" (optionSelected)="filterSymbol.set($event.option.value); applyFilters()">
           @for (s of symbolSuggestions(); track s) {
             <mat-option [value]="s">{{ s }}</mat-option>
           }
@@ -78,6 +83,14 @@
         <ng-container matColumnDef="managementRating">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Rating</th>
           <td mat-cell *matCellDef="let e">{{ lookup.name(e.managementRating) || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="pnl">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header class="text-right">P&L</th>
+          <td mat-cell *matCellDef="let e" class="text-right"
+              [class]="e.pnl > 0 ? 'text-green-400' : (e.pnl < 0 ? 'text-red-400' : 'opacity-40')">
+            {{ e.pnl != null ? (e.pnl | number:'1.0-0') : '—' }}
+          </td>
         </ng-container>
 
         <ng-container matColumnDef="status">
@@ -223,40 +236,60 @@
 
         <!-- Rich text fields -->
         <div class="flex items-center justify-between">
-          <label class="text-sm font-medium">Notes / Thesis</label>
+          <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Notes / Thesis</label>
           @if (editMode()) {
             <button mat-icon-button type="button" class="w-8 h-8 p-0" (click)="toggleQuillToolbar()">
               <mat-icon>{{ showToolbar() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
           }
         </div>
-        <div class="min-h-[120px]" [class.quill-readonly]="!editMode()">
-          @if (showToolbar() && editMode()) {
-            <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="notes" [readOnly]="!editMode()" theme="snow"></quill-editor>
-          } @else {
-            <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notes" [readOnly]="!editMode()" theme="snow"></quill-editor>
-          }
-        </div>
+        @if (editMode()) {
+          <div class="min-h-[120px]">
+            @if (showToolbar()) {
+              <quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="notes" theme="snow"></quill-editor>
+            } @else {
+              <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notes" theme="snow"></quill-editor>
+            }
+          </div>
+        } @else if (form.get('notes')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('notes')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">TA / FA Notes</label>
-        <div class="min-h-[80px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="taFaNotes" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">TA / FA Notes</label>
+        @if (editMode()) {
+          <div class="min-h-[80px]">
+            <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="taFaNotes" theme="snow"></quill-editor>
+          </div>
+        } @else if (form.get('taFaNotes')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('taFaNotes')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Intended Management</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="intendedManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Intended Management</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]">
+            <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="intendedManagement" theme="snow"></quill-editor>
+          </div>
+        } @else if (form.get('intendedManagement')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('intendedManagement')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Actual Management</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="actualManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Actual Management</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]">
+            <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="actualManagement" theme="snow"></quill-editor>
+          </div>
+        } @else if (form.get('actualManagement')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('actualManagement')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Learnings</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Learnings</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]">
+            <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" theme="snow"></quill-editor>
+          </div>
+        } @else if (form.get('learnings')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('learnings')?.value"></div>
+        }
 
         <!-- Chain links (edit mode only) -->
         @if (!isCreating() && selected()) {

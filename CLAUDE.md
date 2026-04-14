@@ -22,6 +22,14 @@ All implementation must follow Test-Driven Development:
 3. **Test frameworks**: `xUnit` for .NET (`tradelog/backend.Tests/`), `pytest` for Python
 4. **Test behavior, not implementation** — assert on observable outcomes, not internal state
 
+## Implementation Tracking
+
+When implementing stories from a backlog (`BACKLOG.md` or `.claude/plans/`):
+
+1. **Check off completed items** — mark implementation steps `[x]` as they're done
+2. **Update story status** — change `Status: Pending` → `Status: Done` when all acceptance criteria are met
+3. **Move to Completed** — when all stories in an epic are done, move the epic to the Completed section
+
 ## Context Rules
 
 Path-specific context loads automatically from `.claude/rules/` when working with files in each workstream. No manual mode switching needed.

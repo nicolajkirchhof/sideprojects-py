@@ -104,45 +104,61 @@
         </mat-form-field>
 
         <!-- Rich text fields -->
-        <label class="text-sm font-medium">Notable Sectors</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notableSectors" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Notable Sectors</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]"><quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="notableSectors" theme="snow"></quill-editor></div>
+        } @else if (form.get('notableSectors')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('notableSectors')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Volatility Notes</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="volatilityNotes" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Volatility Notes</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]"><quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="volatilityNotes" theme="snow"></quill-editor></div>
+        } @else if (form.get('volatilityNotes')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('volatilityNotes')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Open Positions Requiring Management</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="openPositionsRequiringManagement" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Open Positions Requiring Management</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]"><quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="openPositionsRequiringManagement" theme="snow"></quill-editor></div>
+        } @else if (form.get('openPositionsRequiringManagement')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('openPositionsRequiringManagement')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Portfolio Notes</label>
-        <div class="min-h-[80px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="editMode() ? quillModules : quillModulesOff" formControlName="portfolioNotes" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Portfolio Notes</label>
+        @if (editMode()) {
+          <div class="min-h-[80px]"><quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="portfolioNotes" theme="snow"></quill-editor></div>
+        } @else if (form.get('portfolioNotes')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('portfolioNotes')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Watchlist</label>
-        <div class="min-h-[80px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="editMode() ? quillModules : quillModulesOff" formControlName="watchlist" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Watchlist</label>
+        @if (editMode()) {
+          <div class="min-h-[80px]"><quill-editor class="!flex flex-col" [modules]="quillModules" formControlName="watchlist" theme="snow"></quill-editor></div>
+        } @else if (form.get('watchlist')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('watchlist')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Learnings</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Learnings</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]"><quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="learnings" theme="snow"></quill-editor></div>
+        } @else if (form.get('learnings')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('learnings')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">Focus for Improvement</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="focusForImprovement" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">Focus for Improvement</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]"><quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="focusForImprovement" theme="snow"></quill-editor></div>
+        } @else if (form.get('focusForImprovement')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('focusForImprovement')?.value"></div>
+        }
 
-        <label class="text-sm font-medium">External Comments</label>
-        <div class="min-h-[60px]" [class.quill-readonly]="!editMode()">
-          <quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="externalComments" [readOnly]="!editMode()" theme="snow"></quill-editor>
-        </div>
+        <label class="text-sm font-medium" [class.opacity-60]="!editMode()">External Comments</label>
+        @if (editMode()) {
+          <div class="min-h-[60px]"><quill-editor class="!flex flex-col" [modules]="quillModulesOff" formControlName="externalComments" theme="snow"></quill-editor></div>
+        } @else if (form.get('externalComments')?.value) {
+          <div class="ql-view-content" [innerHTML]="form.get('externalComments')?.value"></div>
+        }
 
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">

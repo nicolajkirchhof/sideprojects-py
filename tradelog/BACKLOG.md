@@ -7,169 +7,12 @@
 - ~~E3: Configurable Enums (S1-S4)~~ — shipped (incl. Settings UI)
 - ~~E4: Trade Creation from Positions (S0-S4)~~ — shipped
 - ~~E5-S1: View-Mode Consistency~~ — shipped
+- ~~E6: Position Notes + Remove Trade Events (S1-S4)~~ — shipped
+- ~~E7: Strategy Library (S1-S3)~~ — shipped
 
 ---
 
-## E6: Position Notes + Remove Trade Events
-
-Replace trade events with per-position notes. Unify disabled styling.
-
-### E6-S1: Add Notes field to OptionPosition and StockPosition
-
-**As a** trader,
-**I want** a plain text notes field on each option and stock position,
-**So that** I can journal observations, adjustments, or reminders per position.
-
-**Acceptance criteria:**
-- [ ] `OptionPosition` model gains `Notes` string field (nullable, no length limit)
-- [ ] `StockPosition` model gains `Notes` string field (nullable, no length limit)
-- [ ] `OptionPositionDto` and `StockPositionDto` include `notes` in API responses
-- [ ] EF migration adds the columns
-- [ ] `PUT` endpoints for both position types persist the notes field
-- [ ] Existing positions have `Notes = NULL` after migration
-
-**Affected layers:** Data model, API, EF migration
-**Dependencies:** None
-
----
-
-### E6-S2: Notes input on position detail sidebars
-
-**As a** trader,
-**I want** to view and edit position notes in the option-positions and stock-positions sidebars,
-**So that** I can add notes while reviewing a position.
-
-**Acceptance criteria:**
-- [ ] Option Positions sidebar: plain text `textarea` for Notes, respects view/edit mode
-- [ ] Stock Positions sidebar: same
-- [ ] Notes saved on form submit (existing Save flow)
-- [ ] Empty notes field shows nothing in view mode
-
-**Affected layers:** Frontend (option-positions, stock-positions)
-**Dependencies:** E6-S1
-
----
-
-### E6-S3: Show position notes in trade detail sidebar
-
-**As a** trader,
-**I want** to see notes from linked positions when viewing a trade,
-**So that** I can review position-level observations in the context of the trade thesis.
-
-**Acceptance criteria:**
-- [ ] In the Legs section of the trade sidebar, if a position has notes, show them in a second row below the position's data row
-- [ ] Notes row: smaller font, muted, indented
-- [ ] Only renders when notes is non-null and non-empty
-- [ ] Works for both option legs and stock legs
-- [ ] Notes are read-only in the trade view (editing happens on the position pages)
-
-**Affected layers:** Frontend (trades.html), API (OptionLegDto/StockLegDto must include notes)
-**Dependencies:** E6-S1
-
----
-
-### E6-S4: Remove trade events
-
-**As a** trader,
-**I want** trade events removed from the application,
-**So that** the UI is simpler and I use position notes instead.
-
-**Acceptance criteria:**
-- [ ] `TradeEvents` table dropped via EF migration
-- [ ] `TradeEvent` model, `TradeEventType` enum, `TRADE_EVENT_TYPE_LABELS` removed
-- [ ] `TradeEventsController` (or endpoints) removed
-- [ ] `TradeDetailDto.Events` field removed
-- [ ] Events section removed from trades sidebar (HTML + TS)
-- [ ] `Trade.TradeEvents` navigation property removed
-- [ ] Existing trade event data deleted in migration
-- [ ] Backend tests referencing TradeEvents updated or removed
-
-**Affected layers:** Data model, API, Frontend, EF migration, Tests
-**Dependencies:** None (cleanest to do last to avoid sidebar merge conflicts)
-
----
-
-### E6-S5: Unify disabled/view-mode colors in sidebar
-
-**As a** trader,
-**I want** all read-only content in the detail sidebar to use the same muted color,
-**So that** the visual language is consistent.
-
-**Acceptance criteria:**
-- [ ] In view mode, all field labels use `--mat-sys-on-surface-variant`
-- [ ] All field values (text inputs, selects, checkboxes, Quill content) use the same muted color matching Material's disabled state
-- [ ] Section headers use consistent opacity/color
-- [ ] Applies to all pages with view/edit sidebars
-- [ ] `.quill-readonly` text color matches Material disabled input color exactly
-
-**Affected layers:** Frontend (`styles.css`, templates)
-**Dependencies:** None
-
----
-
-## E7: Strategy Library (replacing Portfolio)
-
-Replace the flat Portfolio allocation page with a Strategy Library — a collection of named markdown documents editable in-app. Uses `ngx-markdown` for rendering + `<textarea>` for editing.
-
-### E7-S1: Document model and API
-
-**As a** trader,
-**I want** named documents stored in the database that I can link to strategies,
-**So that** my trading playbooks are accessible inside the app.
-
-**Acceptance criteria:**
-- [ ] New `Document` model: `Id`, `AccountId`, `Title` (required), `Content` (nvarchar(max), markdown), `UpdatedAt`, optional `LookupValueId` (FK → LookupValues, links to a strategy)
-- [ ] EF migration creates the table
-- [ ] `DocumentsController` with CRUD: `GET /api/documents`, `GET /{id}`, `POST`, `PUT`, `DELETE`
-- [ ] Account-scoped via global query filter
-- [ ] Seed: import existing `.md` files from `investing_framework/` as initial documents, linked to matching strategy names where applicable
-
-**Affected layers:** Data model, API, EF migration
-**Dependencies:** None
-
----
-
-### E7-S2: Strategy Library page with markdown viewer and editor
-
-**As a** trader,
-**I want** a page where I see all my strategy documents and can view/edit them in markdown,
-**So that** I can reference and update my playbooks without leaving the app.
-
-**Acceptance criteria:**
-- [ ] New `/strategy-library` route replacing `/portfolio` in the sidebar
-- [ ] Left panel: list of documents (title + linked strategy name), click to select
-- [ ] Right panel: markdown rendered view (ngx-markdown) in view mode
-- [ ] Edit mode: `<textarea>` with raw markdown, optional live preview
-- [ ] Save via `PUT /api/documents/{id}`
-- [ ] "New Document" button
-- [ ] Title editable inline
-- [ ] Strategy link: dropdown to optionally link to a LookupValue (Strategy)
-- [ ] Install `ngx-markdown` dependency
-
-**Affected layers:** Frontend (new page, new dependency)
-**Dependencies:** E7-S1
-
----
-
-### E7-S3: Remove Portfolio model and page
-
-**As a** trader,
-**I want** the old Portfolio allocation page removed.
-
-**Acceptance criteria:**
-- [ ] `Portfolios` table dropped via EF migration
-- [ ] `Portfolio` model, `PortfolioDto`, `PortfolioController` removed
-- [ ] `PortfolioComponent` + route removed from frontend
-- [ ] Sidebar link changed from "Portfolio" to "Strategy Library"
-- [ ] `PortfolioAggregationService` removed if only used by portfolio
-- [ ] Tests referencing Portfolio updated or removed
-
-**Affected layers:** Data model, API, Frontend, EF migration, Tests
-**Dependencies:** E7-S2 (replacement must exist first)
-
----
-
-### E7-S4: Link strategies to documents
+## E7-S4: Link strategies to documents
 
 **As a** trader,
 **I want** to navigate from a trade's strategy to its playbook document,
@@ -183,14 +26,117 @@ Replace the flat Portfolio allocation page with a Strategy Library — a collect
 
 **Affected layers:** Frontend (trades, strategy-library), API (extend lookups)
 **Dependencies:** E7-S2
+**Status:** Pending
+
+---
+
+## E8: Trades Table Enhancements + View-Mode Fix
+
+### E8-S1: Trade P&L column in trades table
+
+**As a** trader,
+**I want** to see the aggregated P&L for each trade in the trades table,
+**So that** I can scan which trades are profitable without opening each one.
+
+**Acceptance criteria:**
+- [ ] New `pnl` column in the trades table between `managementRating` and `status`
+- [ ] P&L = sum of all linked option position P&L (realized + unrealized) + stock P&L
+- [ ] Green for positive, red for negative, muted for zero/null
+- [ ] Trades with no linked positions show `—`
+- [ ] Sortable via `mat-sort-header`
+- [ ] Computed on backend in GetAll via `TradeListItemDto`
+
+**Affected layers:** API (new DTO, TradesController), Frontend (trades table)
+**Dependencies:** None
+**Status:** Pending
+
+**Implementation:**
+- [x] Create `Dtos/TradeListItemDto.cs`
+- [x] Update `TradesController.GetAll` to return `TradeListItemDto[]` with P&L computation
+- [x] Update `trades.service.ts` Trade interface to include `pnl`
+- [x] Add `'pnl'` to `displayedColumns` in `trades.ts`
+- [x] Add P&L column template in `trades.html`
+
+---
+
+### E8-S2: Status filter on trades table
+
+**As a** trader,
+**I want** to filter the trades table by Open/Closed status,
+**So that** I can focus on active trades or review closed ones.
+
+**Acceptance criteria:**
+- [ ] `mat-button-toggle-group` (Open / Closed / All) in the filter bar
+- [ ] Default: Open
+- [ ] Client-side filter on `MatTableDataSource`
+- [ ] Combines with existing filters (AND logic)
+- [ ] Null status shown only when "All" selected
+
+**Affected layers:** Frontend (trades.ts, trades.html)
+**Dependencies:** None
+**Status:** Pending
+
+**Implementation:**
+- [x] Add `filterStatus` signal to `trades.ts`
+- [x] Extend `filterPredicate` with status check
+- [x] Add toggle group to `trades.html` filter bar
+
+---
+
+### E8-S3: Fix rich text field rendering in view mode
+
+**As a** trader,
+**I want** rich text content visible in view mode without clicking Edit,
+**So that** I can read my trade thesis while reviewing.
+
+**Acceptance criteria:**
+- [ ] View mode: render HTML via `[innerHTML]` instead of Quill
+- [ ] Edit mode: Quill renders as before
+- [ ] Empty fields show nothing in view mode
+- [ ] Applies to 5 trades fields + 8 weekly-prep fields
+
+**Affected layers:** Frontend (trades.html, trades.ts, weekly-prep.html, weekly-prep.ts, styles.css)
+**Dependencies:** None
+**Status:** Pending
+
+**Implementation:**
+- [x] Add `.ql-view-content` CSS class for innerHTML rendering
+- [x] Replace each Quill block with `@if (editMode()) { quill } @else { div [innerHTML] }`
+- [x] Update trades.html (5 fields)
+- [x] Update weekly-prep.html (8 fields)
+- [x] Remove `.quill-readonly` class from styles.css
+- [x] Remove `[readOnly]` bindings from Quill editors
+
+---
+
+### E8-S4: Unify disabled field label colors
+
+**As a** trader,
+**I want** consistent muted styling on all labels in view mode.
+
+**Acceptance criteria:**
+- [ ] Rich text labels use `opacity-60` in view mode, full opacity in edit mode
+- [ ] All sidebar pages are consistent
+- [ ] `.quill-readonly` CSS class removed
+
+**Affected layers:** Frontend (trades.html, weekly-prep.html, styles.css)
+**Dependencies:** E8-S3
+**Status:** Pending
+
+**Implementation:**
+- [x] Add `[class.opacity-60]="!editMode()"` to all rich text labels in trades.html
+- [x] Same for weekly-prep.html
+- [x] Delete `.quill-readonly` block from styles.css
 
 ---
 
 ## Implementation Order
 
 ```
-E6 and E7 are independent — can be interleaved or done in either order.
-
-E6:  S1 → S2 → S3 → S4 → S5
-E7:  S1 → S2 → S3 → S4
+E8-S2  (status filter — quick, independent)
+E8-S1  (trade P&L — backend + frontend)
+E8-S3  (fix rich text rendering)
+E8-S4  (label colors — cleanup after S3)
+  ↓
+E7-S4  (link strategies to documents — deferred)
 ```
