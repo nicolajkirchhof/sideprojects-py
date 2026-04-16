@@ -6,15 +6,12 @@ import matplotlib as mpl
 from datetime import datetime, timedelta
 import dateutil
 from finance import utils
-from finance.utils._dormant import influx
+from finance.utils import timescaledb as tsdb
 
 mpl.use('TkAgg')
 mpl.use('QtAgg')
 %load_ext autoreload
 %autoreload 2
-
-influx.create_databases()
-influx_client_df, influx_client = influx.get_influx_clients()
 
 tws_instance = 'real'
 ib_con = utils.ibkr.connect(tws_instance, 3, 2)
@@ -112,11 +109,11 @@ for contract in contracts:
     if typ == 'OPTION_IMPLIED_VOLATILITY' and contract.symbol in no_ooi_indices \
         or typ == 'HISTORICAL_VOLATILITY' and contract.symbol in no_hv_indices:
       continue
-    field_name = field_name_lu[typ]['close']
-    c_last = influx_client_df.query(f'select last("{field_name}") from {contract_to_fieldname(contract)}',
-                                   database=influx.sec_type_to_database_name(contract.secType))
-    if c_last:
-      current_date = pd.Timestamp(c_last[contract_to_fieldname(contract)].index.values[0]).to_pydatetime()
+    symbol_name = contract_to_fieldname(contract)
+    schema = tsdb.sec_type_to_schema(contract.secType)
+    last_time = tsdb.get_last(symbol_name, schema)
+    if last_time is not None:
+      current_date = last_time.to_pydatetime() if hasattr(last_time, 'to_pydatetime') else last_time
       if current_date.date() > (datetime.now() - timedelta(days=3)).date():
         continue
     else:
@@ -132,6 +129,5 @@ for contract in contracts:
       if not data:
         continue
       dfs_type = ib.util.df(data).rename(columns=field_name_lu[typ]).set_index('date').tz_localize('UTC')
-      influx_client_df.write_points(dfs_type, contract_to_fieldname(contract),
-                                   database=influx.sec_type_to_database_name(contract.secType))
+      tsdb.write_bars(dfs_type, symbol_name, schema)
 

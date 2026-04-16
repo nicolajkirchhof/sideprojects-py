@@ -39,10 +39,10 @@ HK_INDEX = ib.Index('HSI', 'HKFE', 'HKD')
 INDICES = [*EU_INDICES, *US_INDICES, JP_INDEX, FR_INDEX, HK_INDEX]
 
 def cache_path(symbol: str) -> str:
-  """Return the on-disk pickle path used by `daily_w_volatility` for this symbol."""
+  """Return the on-disk parquet path used by `daily_w_volatility` for this symbol."""
   if '.' in symbol:
     symbol = symbol.replace('.', ' ')
-  return f'finance/_data/ibkr/{symbol.replace(" ", "_")}_contract.pkl'
+  return f'finance/_data/ibkr/{symbol.replace(" ", "_")}_contract.parquet'
 
 
 def get_cached_last_bar_date(symbol: str):
@@ -51,7 +51,7 @@ def get_cached_last_bar_date(symbol: str):
   if not os.path.exists(path):
     return None
   try:
-    df = pd.read_pickle(path)
+    df = pd.read_parquet(path)
     if df is None or df.empty:
       return None
     return df.index.max().date()
@@ -92,10 +92,10 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
   #%%
   if '.' in symbol:
     symbol = symbol.replace('.', ' ')
-  contract_filename = f'finance/_data/ibkr/{symbol.replace(" ", "_")}_contract.pkl'
+  contract_filename = f'finance/_data/ibkr/{symbol.replace(" ", "_")}_contract.parquet'
   df_existing = None
   if os.path.exists(contract_filename):
-    df_existing = pd.read_pickle(contract_filename)
+    df_existing = pd.read_parquet(contract_filename)
     df_existing.sort_index(inplace=True)
 
   if df_existing is not None and not df_existing.empty:
@@ -226,7 +226,7 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
     dfs_merged = dfs_merged.loc[~dfs_merged.index.duplicated(keep='last')]
 
     os.makedirs(os.path.dirname(contract_filename), exist_ok=True)
-    dfs_merged.to_pickle(contract_filename)
+    dfs_merged.to_parquet(contract_filename)
 
     if disconnect:
       ib_con.disconnect()

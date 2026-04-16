@@ -346,7 +346,6 @@ Entry: 20–30Δ → Hold: 5–45Δ → Profit close: <10Δ → Hard stop: 50Δ
 |-----------|--------|
 | Reaches 50% profit | Close at next weekly review |
 | Short leg hits 50Δ | Close immediately — hard stop, no exceptions |
-| At 21 DTE, not profitable | Roll entire structure to next 45–60 DTE for a credit |
 | Underlying structurally broken | Take the loss — do not roll a loser |
 | Premise has changed | Close — never adapt a position to justify staying in it |
 

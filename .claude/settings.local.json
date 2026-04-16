@@ -30,7 +30,11 @@
       "Bash(grep -v '^$')",
       "Bash(cat \"E:/sideprojects-py/investing_framework/_research/Books/summaries/\"*.md)",
       "Bash(\"E:/sideprojects-py/investing_framework/_research/_all_book_summaries.txt\")",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(uv run:*)",
+      "Bash(cd:*)",
+      "Bash(npm view:*)",
+      "Bash(npm search:*)"
     ]
   }
 }

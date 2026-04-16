@@ -38,12 +38,16 @@ def load_ticker_earnings_events(symbol: str) -> pd.DataFrame:
     num_cols = df.select_dtypes(include=[np.number]).columns
     df[num_cols] = df[num_cols].replace([np.inf, -np.inf], np.nan)
 
-    df['eps_surprise'] = df['eps'] - df['eps_est'] if {'eps', 'eps_est'} <= set(df.columns) else np.nan
-    df['surprise_dir'] = np.where(
-        df['eps_surprise'].isna(), 'unknown',
-        np.where(df['eps_surprise'] > 0, 'beat',
-                 np.where(df['eps_surprise'] < 0, 'miss', 'inline'))
+    new_cols: dict[str, pd.Series | float] = {}
+    eps_surprise = df['eps'] - df['eps_est'] if {'eps', 'eps_est'} <= set(df.columns) else pd.Series(np.nan, index=df.index)
+    new_cols['eps_surprise'] = eps_surprise
+    new_cols['surprise_dir'] = np.where(
+        eps_surprise.isna(), 'unknown',
+        np.where(eps_surprise > 0, 'beat',
+                 np.where(eps_surprise < 0, 'miss', 'inline'))
     )
+
+    df = pd.concat([df, pd.DataFrame(new_cols, index=df.index)], axis=1)
     return df.sort_values('date').reset_index(drop=True)
 
 
@@ -116,32 +120,41 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
     if "c0" in df.columns:
         df = df.dropna(subset=["c0"])
 
+    # Batch-compute derived columns to avoid DataFrame fragmentation
+    new_cols: dict[str, pd.Series | object] = {}
+
     # event_price
     if "original_price" in df.columns and "c0" in df.columns:
-        df["event_price"] = df["original_price"].where(df["original_price"].notna(), df["c0"])
+        new_cols["event_price"] = df["original_price"].where(df["original_price"].notna(), df["c0"])
     elif "c0" in df.columns:
-        df["event_price"] = df["c0"]
+        new_cols["event_price"] = df["c0"]
     else:
-        df["event_price"] = np.nan
+        new_cols["event_price"] = np.nan
 
     # event_move
     if "cpct0" in df.columns and "atrp200" in df.columns:
-        df["event_move"] = df["cpct0"] / df["atrp200"]
+        new_cols["event_move"] = df["cpct0"] / df["atrp200"]
     else:
-        df["event_move"] = 0.0
+        new_cols["event_move"] = 0.0
 
-    df["direction"] = np.sign(df["event_move"]).replace(0, 1)
+    new_cols["direction"] = np.sign(new_cols["event_move"]).replace(0, 1) if isinstance(new_cols["event_move"], pd.Series) else 1
 
     for c in ("is_earnings", "is_etf", "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch"):
-        df[c] = df[c].fillna(False).astype(bool) if c in df.columns else False
+        new_cols[c] = df[c].fillna(False).astype(bool) if c in df.columns else False
 
     # SPY Context
+    direction = new_cols["direction"]
     if "spy0" in df.columns and "spy5" in df.columns:
         spy_change = df["spy5"] - df["spy0"]
-        aligned_spy = spy_change * df["direction"]
+        aligned_spy = spy_change * direction
         conditions = [aligned_spy > 0.5, aligned_spy < -0.5]
-        df["spy_class"] = np.select(conditions, ["Supporting", "Non-Supporting"], default="Neutral")
+        new_cols["spy_class"] = np.select(conditions, ["Supporting", "Non-Supporting"], default="Neutral")
     else:
-        df["spy_class"] = "Unknown"
+        new_cols["spy_class"] = "Unknown"
+
+    # Drop original boolean columns that are being replaced, then concat all new columns at once
+    bool_cols_to_replace = [c for c in ("is_earnings", "is_etf", "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch") if c in df.columns]
+    df = df.drop(columns=bool_cols_to_replace)
+    df = pd.concat([df, pd.DataFrame(new_cols, index=df.index)], axis=1)
 
     return df

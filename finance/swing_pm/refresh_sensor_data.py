@@ -7,8 +7,9 @@ import pickle
 from time import perf_counter
 from datetime import datetime
 
+from sqlalchemy import text
+
 from finance import utils
-from finance.utils._dormant import underlyings
 
 # %load_ext autoreload
 # %autoreload 2
@@ -19,13 +20,18 @@ from finance.utils._dormant import underlyings
 t0_all = perf_counter()
 print(f"======>>>[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] refresh_sensor_data: start")
 
-df_delisted = pd.read_csv('finance/_data/delisted.csv')
+query_delisted = """
+  select * from symbol
+  where last_seen < date_sub((select max(last_seen) from symbol), interval 3 day)
+"""
+df_delisted = pd.read_sql(text(query_delisted), utils.dolt_data.db_stocks_connection)
+df_delisted.to_csv('finance/_data/delisted.csv', index=False)
 delisted = set(df_delisted['act_symbol'].sort_values().tolist())
 pickle.dump(delisted, open('finance/_data/delisted.pkl', 'wb'))
-print(f"======>>>[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] delisted: {len(df_delisted):,} rows")
+print(f"======>>>[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] delisted: {len(df_delisted):,} rows (from dolt stocks.symbol)")
 
 #%%
-underlyings = underlyings.get_liquid_underlyings()
+underlyings = utils.underlyings.get_liquid_underlyings()
 total = len(underlyings)
 print(f"======>>>[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] underlyings: {total:,}")
 

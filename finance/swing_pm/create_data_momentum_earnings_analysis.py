@@ -447,3 +447,8 @@ for year in range(2010, 2026):
     df_year.to_parquet(filename, index=False)
     print(f"Complete. Saved to {filename}")
     previous_year = year
+
+# Remove the monolithic all.parquet — year files are the source of truth
+if os.path.exists(all_data_filename):
+    os.remove(all_data_filename)
+    print(f"Removed {all_data_filename} (year files are sufficient)")

@@ -140,6 +140,7 @@ tmp/
 _data/
 _backup/
 _analysis/
+_timescale/pgsql/
 
 # Pickle files
 *.pkl
