@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -26,6 +27,7 @@ import { NotificationService } from '../shared/notification.service';
 })
 export class StrategyLibraryComponent {
   private service = inject(DocumentService);
+  private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
 
@@ -49,6 +51,12 @@ export class StrategyLibraryComponent {
       next: (data) => {
         this.documents.set(data ?? []);
         this.loading.set(false);
+        // Auto-select from query param (e.g. /strategy-library?doc=5)
+        const docId = this.route.snapshot.queryParams['doc'];
+        if (docId) {
+          const doc = data?.find(d => d.id === +docId);
+          if (doc) this.onSelect(doc);
+        }
       },
       error: () => {
         this.notify.error('Failed to load documents');

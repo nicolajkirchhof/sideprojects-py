@@ -77,7 +77,14 @@
 
         <ng-container matColumnDef="strategy">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Strategy</th>
-          <td mat-cell *matCellDef="let e">{{ lookup.name(e.strategy) }}</td>
+          <td mat-cell *matCellDef="let e">
+            {{ lookup.name(e.strategy) }}
+            @if (docForStrategy(e.strategy); as docId) {
+              <mat-icon class="!text-sm !w-4 !h-4 ml-1 cursor-pointer opacity-50 hover:opacity-100"
+                        matTooltip="Open playbook"
+                        (click)="openStrategyDoc(docId, $event)">description</mat-icon>
+            }
+          </td>
         </ng-container>
 
         <ng-container matColumnDef="managementRating">

@@ -20,11 +20,12 @@ import { QuillModule } from 'ngx-quill';
 import {
   TradesService, Trade, TradeUpsert, TradeCreatePayload, OptionLegDto, StockLegDto,
 } from './trades.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, Observable } from 'rxjs';
 import { toIsoOrNull } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
 import { LookupService } from '../shared/lookup.service';
+import { DocumentService, DocumentDto } from '../shared/document.service';
 
 @Component({
   selector: 'app-trades',
@@ -56,9 +57,14 @@ import { LookupService } from '../shared/lookup.service';
 export class Trades {
   private service = inject(TradesService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
+  private docService = inject(DocumentService);
   protected lookup = inject(LookupService);
+
+  /** Maps strategyId → first linked documentId (for the link icon in the Strategy column). */
+  protected strategyDocMap = signal<Map<number, number>>(new Map());
 
   sort = viewChild(MatSort);
   paginator = viewChild(MatPaginator);
@@ -116,6 +122,7 @@ export class Trades {
 
   constructor() {
     this.load();
+    this.loadStrategyDocMap();
 
     effect(() => {
       const s = this.sort();
@@ -574,4 +581,28 @@ export class Trades {
     });
   }
 
+  // --- Strategy → Document linking ---
+
+  private loadStrategyDocMap(): void {
+    this.docService.getAll().subscribe({
+      next: (docs) => {
+        const map = new Map<number, number>();
+        for (const doc of docs) {
+          for (const sid of doc.strategyIds) {
+            if (!map.has(sid)) map.set(sid, doc.id);
+          }
+        }
+        this.strategyDocMap.set(map);
+      },
+    });
+  }
+
+  docForStrategy(strategyId: number): number | null {
+    return this.strategyDocMap().get(strategyId) ?? null;
+  }
+
+  openStrategyDoc(docId: number, event: Event): void {
+    event.stopPropagation();
+    void this.router.navigate(['/strategy-library'], { queryParams: { doc: docId } });
+  }
 }
