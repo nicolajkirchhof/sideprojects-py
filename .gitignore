@@ -137,6 +137,8 @@ workspace.xml
 tasks.xml
 
 tmp/
+_staleData/
+_timescale/
 _data/
 _backup/
 _analysis/
