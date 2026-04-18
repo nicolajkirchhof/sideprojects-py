@@ -229,6 +229,18 @@ export class OptionPositions {
     }
   }
 
+  copyTickers(): void {
+    const symbols = [...new Set(this.dataSource.filteredData.map(r => r.symbol))];
+    if (symbols.length === 0) {
+      this.notify.error('No tickers to copy');
+      return;
+    }
+    navigator.clipboard.writeText(symbols.join(',')).then(
+      () => this.notify.success(`Copied ${symbols.length} tickers to clipboard`),
+      () => this.notify.error('Failed to access clipboard'),
+    );
+  }
+
   onNew(): void {
     this.isCreating.set(true);
     this.editMode.set(true);

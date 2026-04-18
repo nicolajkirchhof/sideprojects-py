@@ -9,6 +9,9 @@
         <mat-label>Symbol</mat-label>
         <input matInput [ngModel]="filterSymbol()" (ngModelChange)="filterSymbol.set($event)" (input)="applyFilter()" placeholder="e.g. AAPL">
       </mat-form-field>
+      <button mat-icon-button matTooltip="Copy tickers to clipboard" (click)="copyTickers()" class="opacity-60 hover:opacity-100">
+        <mat-icon>content_copy</mat-icon>
+      </button>
       <span class="flex-1"></span>
       @if (hasUnlinkedSelection()) {
         <button mat-raised-button color="accent" (click)="onCreateTradeFromSelected()">

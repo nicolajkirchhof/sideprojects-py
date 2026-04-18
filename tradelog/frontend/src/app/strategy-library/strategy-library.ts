@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatListModule } from '@angular/material/list';
+import { Observable } from 'rxjs';
 import { DocumentService, DocumentDto, DocumentUpsert } from '../shared/document.service';
 import { NotificationService } from '../shared/notification.service';
 
@@ -105,7 +106,7 @@ export class StrategyLibraryComponent {
     };
 
     const sel = this.selected();
-    const obs = sel
+    const obs: Observable<any> = sel
       ? this.service.update(sel.id, payload)
       : this.service.create(payload);
 

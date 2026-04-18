@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -32,6 +33,7 @@ import { NotificationService } from '../shared/notification.service';
     MatButtonModule,
     MatIconModule,
     MatCheckboxModule,
+    MatTooltipModule,
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressBarModule,
@@ -188,6 +190,18 @@ export class StockPositions {
     }
     const row = this.selected();
     if (row) this.onRowSelect(row);
+  }
+
+  copyTickers(): void {
+    const symbols = [...new Set(this.dataSource.filteredData.map(r => r.symbol))];
+    if (symbols.length === 0) {
+      this.notify.error('No tickers to copy');
+      return;
+    }
+    navigator.clipboard.writeText(symbols.join(',')).then(
+      () => this.notify.success(`Copied ${symbols.length} tickers to clipboard`),
+      () => this.notify.error('Failed to access clipboard'),
+    );
   }
 
   onNew(): void {

@@ -33,3 +33,56 @@
 - [x] In `trades.ts`: add `docForStrategy(strategyId)` method and `openDoc(docId)` navigation
 - [x] In `trades.html`: add link icon next to strategy name in the Strategy column
 - [x] In `strategy-library.ts`: read `doc` query param on init and auto-select the document
+
+---
+
+## E9: Copy Ticker Lists to Clipboard
+
+### E9-S1: Copy option position tickers
+
+**As a** trader,
+**I want to** copy all visible option position symbols as a comma-separated list from the Option Positions page,
+**So that** I can paste them into Barchart to track my option underlyings.
+
+**Acceptance criteria:**
+- [x] Icon button with tooltip in the filter toolbar on Option Positions page
+- [x] Clicking extracts unique symbols from filtered rows
+- [x] Symbols joined with `,` and written to clipboard
+- [x] Snackbar confirms "Copied N tickers to clipboard"
+- [x] Shows error snackbar when no rows
+- [x] Respects all active filters (status, symbol, right, expiry)
+
+**Affected layers:** Frontend only
+**Status:** Done
+
+### E9-S2: Copy stock/futures position tickers
+
+**As a** trader,
+**I want to** copy all visible stock position symbols as a comma-separated list from the Stock Positions page,
+**So that** I can paste them into Barchart to track my stock underlyings.
+
+**Acceptance criteria:**
+- [x] Icon button with tooltip in the filter toolbar on Stock Positions page
+- [x] Clicking extracts unique symbols from filtered rows
+- [x] Symbols joined with `,` and written to clipboard
+- [x] Snackbar confirms "Copied N tickers to clipboard"
+- [x] Shows error snackbar when no rows
+- [x] Respects active symbol filter
+
+**Affected layers:** Frontend only
+**Status:** Done
+
+### E9-S3: Dashboard → Analytics, remove Instrument Summaries
+
+**As a** trader,
+**I want** the Dashboard to show Analytics (equity curves, strategy/budget performance),
+**So that** I see the most important overview when I open the app.
+
+**Acceptance criteria:**
+- [x] `/dashboard` route points to `AnalyticsComponent`
+- [x] Analytics nav link removed (Dashboard replaces it)
+- [x] Instrument Summaries component deleted
+- [x] No broken routes or imports
+
+**Affected layers:** Frontend only (routing, nav, cleanup)
+**Status:** Done

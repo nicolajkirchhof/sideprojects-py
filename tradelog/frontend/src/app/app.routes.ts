@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-import { InstrumentSummaries } from './instrument-summaries/instrument-summaries';
 import { Trades } from './trades/trades';
 import { OptionPositions } from './option-positions/option-positions';
 import { StockPositions } from './stock-positions/stock-positions';
@@ -13,13 +12,12 @@ import { About } from './about/about';
 import { SettingsComponent } from './settings/settings';
 
 export const routes: Routes = [
-    { path: 'dashboard', component: InstrumentSummaries },
+    { path: 'dashboard', component: AnalyticsComponent },
     { path: 'trades', component: Trades },
     { path: 'option-positions', component: OptionPositions },
     { path: 'stock-positions', component: StockPositions },
     { path: 'capital', component: CapitalComponent },
     { path: 'weekly-prep', component: WeeklyPrepComponent },
-    { path: 'analytics', component: AnalyticsComponent },
     { path: 'strategy-library', component: StrategyLibraryComponent },
     { path: 'greeks-history', component: GreeksHistoryComponent },
     { path: 'accounts', component: AccountsComponent },
