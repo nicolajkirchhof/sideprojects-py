@@ -19,18 +19,20 @@ from datetime import date, timedelta
 from pathlib import Path
 from tempfile import mkdtemp
 
-from finance.apps.analyst._claude import analyze_candidates, summarize_market
+from finance.apps.analyst._claude import analyze_candidates, review_compliance, summarize_market
 from finance.apps.analyst._config import AnalystConfig, load_config
 from finance.apps.analyst._enrichment import enrich
 from finance.apps.analyst._gmail import EmailMessage, fetch_and_classify
 from finance.apps.analyst._models import (
+    ComplianceAggregate,
     MarketSummary,
     ScoredCandidate,
+    TradeAnalysisResult,
     TradeRecommendation,
 )
 from finance.apps.analyst._scanner import parse_multiple
 from finance.apps.analyst._scoring import score
-from finance.apps.analyst._tradelog import push_daily_prep
+from finance.apps.analyst._tradelog import fetch_trades_for_review, push_daily_prep, push_trade_analysis
 
 log = logging.getLogger(__name__)
 
@@ -80,7 +82,7 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
                     "Provide --csv-paths, check ~/Downloads, or set up Gmail integration.")
         return
 
-    log.info("Stage 1/5: Parsing %d CSV file(s)...", len(all_csv_paths))
+    log.info("Stage 1/7: Parsing %d CSV file(s)...", len(all_csv_paths))
     candidates = parse_multiple(all_csv_paths, config.scanner)
     log.info("  → %d unique candidates", len(candidates))
 
@@ -89,11 +91,11 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
         return
 
     # Stage 2: Enrich with IBKR data
-    log.info("Stage 2/5: Enriching with IBKR market data...")
+    log.info("Stage 2/7: Enriching with IBKR market data...")
     enriched = enrich(candidates)
 
     # Stage 3: 5-box scoring
-    log.info("Stage 3/5: Scoring against 5-box checklist...")
+    log.info("Stage 3/7: Scoring against 5-box checklist...")
     scored = score(enriched)
 
     # Stage 4: Claude market summary
@@ -102,20 +104,38 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
 
     if not dry_run:
         if market_emails:
-            log.info("Stage 4/5: Claude market summary (%d emails)...", len(market_emails))
+            log.info("Stage 4/7: Claude market summary (%d emails)...", len(market_emails))
             market_summary = summarize_market(market_emails, config.claude)
         else:
-            log.info("Stage 4/5: Skipped (no market commentary emails)")
+            log.info("Stage 4/7: Skipped (no market commentary emails)")
 
         # Stage 5: Claude trade reasoning
-        log.info("Stage 5/5: Claude trade reasoning (%d candidates)...", len(scored))
+        log.info("Stage 5/7: Claude trade reasoning (%d candidates)...", len(scored))
         recommendations = analyze_candidates(scored, market_summary, config.claude)
     else:
-        log.info("Stage 4-5: Skipped (dry run)")
+        log.info("Stage 4-5/7: Skipped (dry run)")
 
-    # Stage 6: Push to Tradelog
+    # Stage 6: Compliance review of closed trades
+    reviews: list[TradeAnalysisResult] = []
+    aggregate: ComplianceAggregate | None = None
+
     if not dry_run:
-        log.info("Stage 6: Pushing results to Tradelog...")
+        log.info("Stage 6/7: Fetching closed trades for compliance review...")
+        trades = fetch_trades_for_review(config.tradelog, status="Closed")
+        # Filter out trades that already have a recent analysis
+        unreviewed = [t for t in trades if not t.get("existingAnalysisDates")]
+        if unreviewed:
+            log.info("  → %d unreviewed trade(s) (of %d closed)", len(unreviewed), len(trades))
+            context = _format_market_context_for_review(market_summary)
+            reviews, aggregate = review_compliance(unreviewed, context, config.claude)
+        else:
+            log.info("  → All %d closed trade(s) already reviewed", len(trades))
+    else:
+        log.info("Stage 6/7: Skipped (dry run)")
+
+    # Stage 7: Push to Tradelog
+    if not dry_run:
+        log.info("Stage 7/7: Pushing results to Tradelog...")
         push_daily_prep(
             config=config.tradelog,
             report_date=_last_trading_day(),
@@ -124,12 +144,19 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
             recommendations=recommendations,
             email_count=len(market_emails),
         )
+        for review in reviews:
+            push_trade_analysis(
+                config=config.tradelog,
+                analysis=review,
+                model=config.claude.model_review,
+            )
     else:
-        log.info("Stage 6: Skipped (dry run)")
+        log.info("Stage 7/7: Skipped (dry run)")
 
     # Output report
-    _print_report(scored, market_emails, market_summary, recommendations)
-    log.info("Pipeline complete. %d candidates scored, %d recommendations.", len(scored), len(recommendations))
+    _print_report(scored, market_emails, market_summary, recommendations, reviews, aggregate)
+    log.info("Pipeline complete. %d candidates scored, %d recommendations, %d trade reviews.",
+             len(scored), len(recommendations), len(reviews))
 
 
 def _resolve_csv_paths(
@@ -172,11 +199,23 @@ def _last_trading_day(reference: date | None = None) -> date:
     return d
 
 
+def _format_market_context_for_review(summary: MarketSummary) -> str:
+    """Format market summary as context for the compliance review prompt."""
+    if not summary.regime:
+        return "No market context available for the review period."
+    lines = [f"Current regime: {summary.regime} — {summary.regime_reasoning}"]
+    if summary.themes:
+        lines.append(f"Active themes: {', '.join(summary.themes)}")
+    return "\n".join(lines)
+
+
 def _print_report(
     scored: list[ScoredCandidate],
     market_emails: list[EmailMessage] | None = None,
     market_summary: MarketSummary | None = None,
     recommendations: list[TradeRecommendation] | None = None,
+    reviews: list[TradeAnalysisResult] | None = None,
+    aggregate: ComplianceAggregate | None = None,
 ) -> None:
     """Print a formatted report to stdout."""
     # Market summary (Claude)
@@ -237,5 +276,30 @@ def _print_report(
             print(f"           Structure: {rec.recommended_structure}")
             if rec.catalyst_assessment:
                 print(f"           Catalyst: {rec.catalyst_assessment}")
+
+    # Compliance reviews
+    if reviews:
+        print("\n" + "=" * 80)
+        print(f"  TRADE COMPLIANCE REVIEWS — {len(reviews)} trade(s)")
+        print("=" * 80)
+
+        for rev in reviews:
+            print(f"\n  Trade #{rev.trade_id} {rev.symbol:<8} Score: {rev.score}/5")
+            if rev.analysis:
+                # Print first 3 lines of analysis as preview
+                preview_lines = rev.analysis.strip().split("\n")[:3]
+                for line in preview_lines:
+                    print(f"    {line}")
+                if len(rev.analysis.strip().split("\n")) > 3:
+                    print("    ...")
+
+        if aggregate:
+            print(f"\n  Average compliance score: {aggregate.avg_score:.1f}/5")
+            if aggregate.top_improvement:
+                print(f"  Top improvement: {aggregate.top_improvement}")
+            if aggregate.patterns:
+                print("  Patterns:")
+                for p in aggregate.patterns:
+                    print(f"    • {p}")
 
     print("\n" + "=" * 80)

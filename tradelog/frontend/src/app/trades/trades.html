@@ -487,6 +487,27 @@
           }
         }
 
+        <!-- Trade Analyses (Claude) -->
+        @if (!isCreating() && tradeAnalyses().length > 0) {
+          <div class="border-t border-white/10 pt-3 mt-2">
+            <span class="text-xs font-medium uppercase tracking-wide opacity-50">Analysis</span>
+            @for (analysis of tradeAnalyses(); track analysis.id) {
+              <div class="mt-2 border border-white/10 rounded p-3 bg-white/5">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-xs opacity-60">{{ analysis.analysisDate | appDate }}</span>
+                  <span class="text-xs font-medium">Score: {{ analysis.score }}/5</span>
+                  @if (analysis.model) {
+                    <span class="text-xs opacity-40 ml-auto">{{ analysis.model }}</span>
+                  }
+                </div>
+                @if (analysis.analysis) {
+                  <div class="text-sm whitespace-pre-wrap opacity-80">{{ analysis.analysis }}</div>
+                }
+              </div>
+            }
+          </div>
+        }
+
         <!-- Actions -->
         <div class="flex gap-2 justify-end mt-2 pb-4">
           @if (editMode()) {

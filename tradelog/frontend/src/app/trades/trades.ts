@@ -27,6 +27,7 @@ import { toIsoOrNull } from '../shared/utils';
 import { NotificationService } from '../shared/notification.service';
 import { LookupService } from '../shared/lookup.service';
 import { DocumentService, DocumentDto } from '../shared/document.service';
+import { DailyPrepService, TradeAnalysisDto } from '../daily-prep/daily-prep.service';
 
 @Component({
   selector: 'app-trades',
@@ -63,6 +64,7 @@ export class Trades {
   private fb = inject(FormBuilder);
   private notify = inject(NotificationService);
   private docService = inject(DocumentService);
+  private dailyPrepService = inject(DailyPrepService);
   protected lookup = inject(LookupService);
 
   /** Maps strategyId → first linked documentId (for the link icon in the Strategy column). */
@@ -102,6 +104,9 @@ export class Trades {
   // Legs (assigned positions)
   optionLegs = signal<OptionLegDto[]>([]);
   stockLegs = signal<StockLegDto[]>([]);
+
+  // Trade analyses (Claude)
+  tradeAnalyses = signal<TradeAnalysisDto[]>([]);
 
   // Leg picker
   showLegPicker = signal(false);
@@ -279,6 +284,7 @@ export class Trades {
     this.showSidebar.set(true);
     this.showLegPicker.set(false);
     this.loadLegs(row.id);
+    this.loadAnalyses(row.id);
   }
 
   onEdit(): void {
@@ -465,6 +471,13 @@ export class Trades {
         this.childTradeIds.set(detail.childTradeIds ?? []);
       },
       error: () => this.notify.error('Failed to load legs'),
+    });
+  }
+
+  loadAnalyses(tradeId: number): void {
+    this.dailyPrepService.getTradeAnalyses(tradeId).subscribe({
+      next: (analyses) => this.tradeAnalyses.set(analyses),
+      error: () => this.tradeAnalyses.set([]),
     });
   }
 
