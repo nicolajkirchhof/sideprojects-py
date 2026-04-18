@@ -73,9 +73,17 @@ class LauncherWindow(QtWidgets.QWidget):
 
     @staticmethod
     def _launch_app(name: str) -> None:
+        mod = importlib.import_module(APPS[name])
+        is_gui = getattr(mod, "APP_GUI", True)
+
+        kwargs = {}
+        if not is_gui and sys.platform == "win32":
+            kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+
         subprocess.Popen(
             [sys.executable, "-m", "finance.apps", name],
-            start_new_session=True,
+            start_new_session=is_gui,
+            **kwargs,
         )
 
 

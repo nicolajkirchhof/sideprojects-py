@@ -357,7 +357,7 @@ Wire everything together as a launchable app with a single-click entry point.
 
 **Affected layers:** Python CLI (`finance/apps/analyst/`)
 **Dependencies:** E1, E2, E3, E4-S1
-**Status:** Pending
+**Status:** Done
 
 ---
 
@@ -376,7 +376,7 @@ Wire everything together as a launchable app with a single-click entry point.
 
 **Affected layers:** Python data pipeline
 **Dependencies:** E5-S1
-**Status:** Pending
+**Status:** Done (shipped with E1)
 
 ---
 
@@ -396,7 +396,7 @@ Wire everything together as a launchable app with a single-click entry point.
 
 **Affected layers:** Python launcher + app registration
 **Dependencies:** E5-S1
-**Status:** Pending
+**Status:** Done
 
 **Notes:**
 

@@ -80,6 +80,29 @@ def _momentum_icon() -> QtGui.QIcon:
     return QtGui.QIcon(pm)
 
 
+def _conditions_icon() -> QtGui.QIcon:
+    """Conditions dashboard: traffic-light (green/amber/red circles)."""
+    pm, p = _make_pixmap()
+
+    # Dark housing
+    p.setPen(QtCore.Qt.PenStyle.NoPen)
+    p.setBrush(QtGui.QColor("#263238"))
+    p.drawRoundedRect(18, 2, 28, 60, 6, 6)
+
+    # Three signal circles
+    lights = [
+        (32, 13, QtGui.QColor("#F44336")),  # red top
+        (32, 31, QtGui.QColor("#FFA726")),  # amber middle
+        (32, 49, QtGui.QColor("#4CAF50")),  # green bottom
+    ]
+    for cx, cy, color in lights:
+        p.setBrush(color)
+        p.drawEllipse(QtCore.QPointF(cx, cy), 8, 8)
+
+    p.end()
+    return QtGui.QIcon(pm)
+
+
 def _generic_icon(letter: str) -> QtGui.QIcon:
     """Fallback: rounded square with first letter."""
     pm, p = _make_pixmap()
@@ -97,10 +120,41 @@ def _generic_icon(letter: str) -> QtGui.QIcon:
     return QtGui.QIcon(pm)
 
 
+def _analyst_icon() -> QtGui.QIcon:
+    """Analyst: magnifying glass over a chart line."""
+    pm, p = _make_pixmap()
+
+    # Chart line
+    pen = QtGui.QPen(QtGui.QColor("#42A5F5"), 2.5)
+    p.setPen(pen)
+    points = [
+        QtCore.QPointF(8, 44),
+        QtCore.QPointF(20, 30),
+        QtCore.QPointF(32, 36),
+        QtCore.QPointF(44, 16),
+    ]
+    for i in range(len(points) - 1):
+        p.drawLine(points[i], points[i + 1])
+
+    # Magnifying glass circle
+    p.setPen(QtGui.QPen(QtGui.QColor("#EEEEEE"), 2.5))
+    p.setBrush(QtGui.QColor(255, 255, 255, 30))
+    p.drawEllipse(QtCore.QPointF(36, 28), 14, 14)
+
+    # Handle
+    p.setPen(QtGui.QPen(QtGui.QColor("#EEEEEE"), 3))
+    p.drawLine(46, 38, 56, 52)
+
+    p.end()
+    return QtGui.QIcon(pm)
+
+
 # Map APP_ICON_ID values to painter functions
 _ICON_REGISTRY: dict[str, callable] = {
     "candlestick": _candlestick_icon,
     "momentum": _momentum_icon,
+    "conditions": _conditions_icon,
+    "analyst": _analyst_icon,
 }
 
 

@@ -10,7 +10,7 @@ Stages:
   3. 5-box checklist scoring
   4. Claude market summary (from emails)
   5. Claude trade reasoning (from scored candidates)
-  6. (future) Claude compliance review + Tradelog push
+  6. Push results to Tradelog API
 """
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ from finance.apps.analyst._models import (
 )
 from finance.apps.analyst._scanner import parse_multiple
 from finance.apps.analyst._scoring import score
+from finance.apps.analyst._tradelog import push_daily_prep
 
 log = logging.getLogger(__name__)
 
@@ -111,6 +112,20 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
         recommendations = analyze_candidates(scored, market_summary, config.claude)
     else:
         log.info("Stage 4-5: Skipped (dry run)")
+
+    # Stage 6: Push to Tradelog
+    if not dry_run:
+        log.info("Stage 6: Pushing results to Tradelog...")
+        push_daily_prep(
+            config=config.tradelog,
+            report_date=_last_trading_day(),
+            market_summary=market_summary,
+            scored=scored,
+            recommendations=recommendations,
+            email_count=len(market_emails),
+        )
+    else:
+        log.info("Stage 6: Skipped (dry run)")
 
     # Output report
     _print_report(scored, market_emails, market_summary, recommendations)
