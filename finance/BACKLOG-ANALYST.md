@@ -132,9 +132,9 @@ Fetch daily market emails from a labeled Gmail folder and extract content + CSV 
 
 **Affected layers:** Python infrastructure
 **Dependencies:** None
-**Status:** Pending
+**Status:** Done
 
-**Notes:** Flag for `/architect` — decide on credential storage approach.
+**Notes:** Credentials stored in `finance/apps/analyst/_credentials/` (private repo). Setup docs at `docs/SETUP-GMAIL-API.md`.
 
 ---
 
@@ -155,9 +155,9 @@ Fetch daily market emails from a labeled Gmail folder and extract content + CSV 
 
 **Affected layers:** Python data pipeline
 **Dependencies:** E2-S1
-**Status:** Pending
+**Status:** Done
 
-**Notes:** Barchart sends scanner results as CSV attachments. Other market emails (newsletters) contain text content for Claude to summarize.
+**Notes:** Uses `_state.json` to track last run date. Idempotent via date-based query (not mark-as-read).
 
 ---
 
@@ -177,9 +177,9 @@ Fetch daily market emails from a labeled Gmail folder and extract content + CSV 
 
 **Affected layers:** Python data pipeline
 **Dependencies:** E2-S2
-**Status:** Pending
+**Status:** Done
 
-**Notes:** Start with simple sender-based rules. Can add Claude-based classification later if needed.
+**Notes:** CSV attachment → scanner, sender pattern match → configured category, body text → market_commentary, else unknown.
 
 ---
 
