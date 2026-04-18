@@ -3,9 +3,14 @@ finance.apps.analyst._pipeline
 =================================
 Pipeline orchestrator — runs stages in order.
 
-Phase 1: Scanner → Enrich → Score → Print report
-Phase 1b: Gmail fetch → extract scanner CSVs + market commentary
-Phase 2 (future): Claude analysis → Tradelog push
+Stages:
+  0. Gmail fetch → extract scanner CSVs + market commentary
+  1. Scanner CSV parsing + deduplication
+  2. IBKR data enrichment
+  3. 5-box checklist scoring
+  4. Claude market summary (from emails)
+  5. Claude trade reasoning (from scored candidates)
+  6. (future) Claude compliance review + Tradelog push
 """
 from __future__ import annotations
 
@@ -14,10 +19,15 @@ from datetime import date, timedelta
 from pathlib import Path
 from tempfile import mkdtemp
 
+from finance.apps.analyst._claude import analyze_candidates, summarize_market
 from finance.apps.analyst._config import AnalystConfig, load_config
 from finance.apps.analyst._enrichment import enrich
 from finance.apps.analyst._gmail import EmailMessage, fetch_and_classify
-from finance.apps.analyst._models import ScoredCandidate
+from finance.apps.analyst._models import (
+    MarketSummary,
+    ScoredCandidate,
+    TradeRecommendation,
+)
 from finance.apps.analyst._scanner import parse_multiple
 from finance.apps.analyst._scoring import score
 
@@ -69,7 +79,7 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
                     "Provide --csv-paths, check ~/Downloads, or set up Gmail integration.")
         return
 
-    log.info("Stage 1/3: Parsing %d CSV file(s)...", len(all_csv_paths))
+    log.info("Stage 1/5: Parsing %d CSV file(s)...", len(all_csv_paths))
     candidates = parse_multiple(all_csv_paths, config.scanner)
     log.info("  → %d unique candidates", len(candidates))
 
@@ -78,16 +88,33 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
         return
 
     # Stage 2: Enrich with IBKR data
-    log.info("Stage 2/3: Enriching with IBKR market data...")
+    log.info("Stage 2/5: Enriching with IBKR market data...")
     enriched = enrich(candidates)
 
     # Stage 3: 5-box scoring
-    log.info("Stage 3/3: Scoring against 5-box checklist...")
+    log.info("Stage 3/5: Scoring against 5-box checklist...")
     scored = score(enriched)
 
+    # Stage 4: Claude market summary
+    market_summary = MarketSummary()
+    recommendations: list[TradeRecommendation] = []
+
+    if not dry_run:
+        if market_emails:
+            log.info("Stage 4/5: Claude market summary (%d emails)...", len(market_emails))
+            market_summary = summarize_market(market_emails, config.claude)
+        else:
+            log.info("Stage 4/5: Skipped (no market commentary emails)")
+
+        # Stage 5: Claude trade reasoning
+        log.info("Stage 5/5: Claude trade reasoning (%d candidates)...", len(scored))
+        recommendations = analyze_candidates(scored, market_summary, config.claude)
+    else:
+        log.info("Stage 4-5: Skipped (dry run)")
+
     # Output report
-    _print_report(scored, market_emails)
-    log.info("Pipeline complete. %d candidates scored.", len(scored))
+    _print_report(scored, market_emails, market_summary, recommendations)
+    log.info("Pipeline complete. %d candidates scored, %d recommendations.", len(scored), len(recommendations))
 
 
 def _resolve_csv_paths(
@@ -133,21 +160,34 @@ def _last_trading_day(reference: date | None = None) -> date:
 def _print_report(
     scored: list[ScoredCandidate],
     market_emails: list[EmailMessage] | None = None,
+    market_summary: MarketSummary | None = None,
+    recommendations: list[TradeRecommendation] | None = None,
 ) -> None:
-    """Print a formatted report of scored candidates to stdout."""
-    # Market commentary summary (if available)
-    if market_emails:
+    """Print a formatted report to stdout."""
+    # Market summary (Claude)
+    if market_summary and market_summary.regime:
+        print("\n" + "=" * 80)
+        print("  MARKET REGIME")
+        print("=" * 80)
+        print(f"\n  Status: {market_summary.regime}")
+        print(f"  Reasoning: {market_summary.regime_reasoning}")
+        if market_summary.themes:
+            print(f"\n  Themes: {', '.join(market_summary.themes)}")
+        if market_summary.risks:
+            print(f"  Risks: {', '.join(market_summary.risks)}")
+        if market_summary.action_items:
+            print("\n  Action Items:")
+            for item in market_summary.action_items:
+                print(f"    • {item}")
+    elif market_emails:
         print("\n" + "=" * 80)
         print(f"  MARKET EMAILS — {len(market_emails)} commentary email(s)")
         print("=" * 80)
         for email in market_emails:
             print(f"\n  From: {email.sender}")
             print(f"  Subject: {email.subject}")
-            preview = email.body_text[:200].replace("\n", " ").strip()
-            if preview:
-                print(f"  Preview: {preview}...")
 
-    # Watchlist
+    # Watchlist (5-box scores)
     print("\n" + "=" * 80)
     print(f"  WATCHLIST — {len(scored)} candidates scored")
     print("=" * 80)
@@ -167,5 +207,20 @@ def _print_report(
         for box in sc.boxes:
             status_icon = {"PASS": "✓", "FAIL": "✗", "MANUAL": "?"}[box.status]
             print(f"    [{status_icon}] Box {box.box} {box.name}: {box.reason}")
+
+    # Trade recommendations (Claude)
+    if recommendations:
+        print("\n" + "=" * 80)
+        print(f"  TRADE RECOMMENDATIONS — {len(recommendations)} candidate(s)")
+        print("=" * 80)
+
+        for rec in recommendations:
+            print(f"\n  {rec.symbol:<8} [{rec.confidence.upper()}] {rec.setup_type} / {rec.profit_mechanism}")
+            print(f"           {rec.thesis}")
+            if rec.entry and rec.stop and rec.target:
+                print(f"           Entry: ${rec.entry:.2f}  Stop: ${rec.stop:.2f}  Target: ${rec.target:.2f}  R:R {rec.risk_reward}")
+            print(f"           Structure: {rec.recommended_structure}")
+            if rec.catalyst_assessment:
+                print(f"           Catalyst: {rec.catalyst_assessment}")
 
     print("\n" + "=" * 80)

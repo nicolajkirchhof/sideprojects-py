@@ -65,3 +65,50 @@ class ScoredCandidate:
     enriched: EnrichedCandidate
     boxes: list[BoxResult] = field(default_factory=list)
     score: int = 0  # count of PASS boxes (0-5)
+
+
+@dataclass
+class MarketSummary:
+    """Claude-generated market context summary."""
+    regime: str = ""           # GO | CAUTION | NO-GO
+    regime_reasoning: str = ""
+    themes: list[str] = field(default_factory=list)
+    movers: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
+    action_items: list[str] = field(default_factory=list)
+    raw_response: str = ""     # full Claude response for audit
+
+
+@dataclass
+class TradeRecommendation:
+    """Claude-generated trade recommendation for a single candidate."""
+    symbol: str = ""
+    setup_type: str = ""       # A | B | C | D | none
+    profit_mechanism: str = "" # PM-01 through PM-05 | none
+    thesis: str = ""
+    catalyst_assessment: str = ""
+    recommended_structure: str = ""
+    entry: float | None = None
+    stop: float | None = None
+    target: float | None = None
+    risk_reward: str = ""
+    confidence: str = ""       # high | medium | low
+    reasoning: str = ""
+
+
+@dataclass
+class TradeAnalysisResult:
+    """Claude-generated compliance analysis for a single closed trade."""
+    trade_id: int = 0
+    symbol: str = ""
+    score: int = 0             # 1-5 compliance score
+    analysis: str = ""         # full markdown analysis
+
+
+@dataclass
+class ComplianceAggregate:
+    """Aggregate insights across all reviewed trades."""
+    avg_score: float = 0
+    patterns: list[str] = field(default_factory=list)
+    top_improvement: str = ""
+    refinements: list[str] = field(default_factory=list)

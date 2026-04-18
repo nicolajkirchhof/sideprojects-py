@@ -205,9 +205,9 @@ and provide coaching insights.
 
 **Affected layers:** Python data pipeline + Claude API
 **Dependencies:** E2-S2
-**Status:** Pending
+**Status:** Done
 
-**Notes:** Prompt must include the playbook's regime rules as system context so Claude evaluates against your framework, not generic market commentary.
+**Notes:** System prompt contains condensed playbook rules (~4K tokens, cached). Prompt templates in `_prompts/`. Uses Sonnet for speed.
 
 ---
 
@@ -228,9 +228,9 @@ and provide coaching insights.
 
 **Affected layers:** Python data pipeline + Claude API
 **Dependencies:** E1-S3, E3-S1 (market context informs candidate reasoning)
-**Status:** Pending
+**Status:** Done
 
-**Notes:** The prompt must include the full setup definitions (Type A/B/C/D) and the options structure selection matrix (by IVR). Claude should reason against these rules, not invent its own.
+**Notes:** Prompt includes setup types A/B/C/D, IVR-based options matrix. Uses Sonnet. Skipped candidates listed with reasons.
 
 ---
 
@@ -252,8 +252,8 @@ and provide coaching insights.
 - [ ] Aggregate insights: patterns across trades (e.g. "You consistently exit too early on Type B setups", "Your Monday entries underperform") — included in the DailyPrep market summary
 
 **Affected layers:** Python data pipeline + Claude API + Tradelog REST API
-**Dependencies:** E1-S2 (market data enrichment)
-**Status:** Pending
+**Dependencies:** E1-S2 (market data enrichment), E4-S1 (trade export + analysis push endpoints)
+**Status:** Partial — Claude client + prompt implemented, pipeline integration pending E4-S1
 
 **Notes:** Highest-value feature for learning. Batch trades (e.g. last 30 days) to manage API costs.
 Cache results to avoid re-analyzing the same trades.
