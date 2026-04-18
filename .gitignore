@@ -168,6 +168,9 @@ bin/
 *.pptx
 *.xlsx
 
+# Analyst pipeline runtime state
+finance/apps/analyst/_state.json
+
 # Research temp files
 investing_framework/_research/**/paper_extracts.txt
 investing_framework/_research/**/book_extracts.txt

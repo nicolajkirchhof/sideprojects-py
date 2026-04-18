@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict
+import re
 from pathlib import Path
 from typing import Any
 
@@ -259,7 +259,6 @@ def _parse_json(text: str) -> Any:
         pass
 
     # Try extracting from ```json ... ``` code fence
-    import re
     match = re.search(r"```(?:json)?\s*\n(.*?)```", text, re.DOTALL)
     if match:
         try:

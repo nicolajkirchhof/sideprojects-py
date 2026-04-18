@@ -19,7 +19,6 @@ import {
   WatchlistCandidate,
 } from './daily-prep.service';
 import { NotificationService } from '../shared/notification.service';
-import { pnlColor } from '../shared/utils';
 
 @Component({
   selector: 'app-daily-prep',
