@@ -55,6 +55,7 @@ export class App {
       startWith(this.router.url),
       map(url => {
         if (url.startsWith('/dashboard')) return 'Dashboard';
+        if (url.startsWith('/daily-prep')) return 'Daily Prep';
         if (url.startsWith('/stock-positions')) return 'Stock Positions';
         if (url.startsWith('/option-positions')) return 'Option Positions';
         if (url.startsWith('/trades')) return 'Trades';

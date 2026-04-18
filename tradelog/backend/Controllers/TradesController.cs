@@ -315,4 +315,61 @@ public class TradesController : ControllerBase
         await _context.SaveChangesAsync();
         return NoContent();
     }
+
+    /// <summary>Bulk export trades for the Python analyst pipeline.</summary>
+    [HttpGet("export")]
+    public async Task<ActionResult<IEnumerable<TradeExportDto>>> Export(
+        [FromQuery] string? status,
+        [FromQuery] DateTime? since)
+    {
+        var query = _context.Trades.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(t => t.Status == status);
+        if (since.HasValue)
+            query = query.Where(t => t.Date >= since.Value);
+
+        var trades = await query.OrderByDescending(t => t.Date).ToListAsync();
+        if (trades.Count == 0) return new List<TradeExportDto>();
+
+        var tradeIds = trades.Select(t => t.Id).ToList();
+        var lookupIds = trades.SelectMany(t => new int?[] {
+            t.TypeOfTrade, t.Strategy, t.Directional, t.Budget
+        }).ToArray();
+        var names = await ResolveLookupNames(lookupIds);
+
+        // Compute P&L
+        var optPnl = await ComputeOptionPnlByTrade(tradeIds);
+        var stkPnl = await ComputeStockPnlByTrade(tradeIds);
+
+        // Get existing analysis dates per trade
+        var analysisDates = await _context.TradeAnalyses
+            .Where(a => tradeIds.Contains(a.TradeId))
+            .GroupBy(a => a.TradeId)
+            .Select(g => new { TradeId = g.Key, Dates = g.Select(a => a.AnalysisDate).ToList() })
+            .ToDictionaryAsync(x => x.TradeId, x => x.Dates);
+
+        return trades.Select(t =>
+        {
+            var hasPnl = optPnl.ContainsKey(t.Id) || stkPnl.ContainsKey(t.Id);
+            return new TradeExportDto
+            {
+                Id = t.Id,
+                Symbol = t.Symbol,
+                Date = t.Date,
+                TypeOfTrade = names.GetValueOrDefault(t.TypeOfTrade, ""),
+                Strategy = t.Strategy > 0 ? names.GetValueOrDefault(t.Strategy, "") : null,
+                Directional = t.Directional.HasValue ? names.GetValueOrDefault(t.Directional.Value) : null,
+                Budget = names.GetValueOrDefault(t.Budget, ""),
+                Status = t.Status,
+                Pnl = hasPnl ? Math.Round(optPnl.GetValueOrDefault(t.Id) + stkPnl.GetValueOrDefault(t.Id), 2) : null,
+                Notes = t.Notes,
+                IntendedManagement = t.IntendedManagement,
+                ActualManagement = t.ActualManagement,
+                ManagementRating = t.ManagementRating,
+                Learnings = t.Learnings,
+                ExistingAnalysisDates = analysisDates.GetValueOrDefault(t.Id, []),
+            };
+        }).ToList();
+    }
 }

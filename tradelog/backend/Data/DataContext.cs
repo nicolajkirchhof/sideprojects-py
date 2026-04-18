@@ -27,6 +27,8 @@ public class DataContext : DbContext
     public DbSet<LookupValue> LookupValues { get; set; }
     public DbSet<Document> Documents { get; set; }
     public DbSet<DocumentStrategyLink> DocumentStrategyLinks { get; set; }
+    public DbSet<DailyPrep> DailyPreps { get; set; }
+    public DbSet<TradeAnalysis> TradeAnalyses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +57,8 @@ public class DataContext : DbContext
         modelBuilder.Entity<WeeklyPrep>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<LookupValue>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
         modelBuilder.Entity<Document>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<DailyPrep>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
+        modelBuilder.Entity<TradeAnalysis>().HasQueryFilter(e => e.AccountId == CurrentAccountId);
 
         // ────────────────────────────────────────────
         // Lookup values — unique name per category per account
@@ -103,6 +107,14 @@ public class DataContext : DbContext
         modelBuilder.Entity<StockPosition>().HasIndex(e => e.ExecutionId);
         modelBuilder.Entity<Account>().HasIndex(e => e.IbkrAccountId).IsUnique();
 
+        modelBuilder.Entity<DailyPrep>()
+            .HasIndex(e => new { e.AccountId, e.Date })
+            .IsUnique();
+
+        modelBuilder.Entity<TradeAnalysis>()
+            .HasIndex(e => new { e.TradeId, e.AnalysisDate })
+            .IsUnique();
+
         // Store CloseReasons bitmask as int
         modelBuilder.Entity<OptionPosition>()
             .Property(e => e.CloseReasons)
@@ -129,6 +141,12 @@ public class DataContext : DbContext
             .WithMany(t => t.StockPositions)
             .HasForeignKey(p => p.TradeId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<TradeAnalysis>()
+            .HasOne(a => a.Trade)
+            .WithMany()
+            .HasForeignKey(a => a.TradeId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override int SaveChanges()

@@ -1,0 +1,172 @@
+<div class="p-4 flex flex-col gap-4 h-full overflow-auto">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  <!-- Date picker + controls -->
+  <div class="flex items-center gap-3">
+    <mat-form-field appearance="outline" class="w-40" subscriptSizing="dynamic">
+      <mat-label>Date</mat-label>
+      <input matInput [matDatepicker]="picker" [ngModel]="selectedDate()" (ngModelChange)="selectedDate.set($event)">
+      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+    <button mat-raised-button (click)="loadByDate()">Load</button>
+    <button mat-button (click)="loadLatest()">Latest</button>
+    @if (report()) {
+      <span class="text-sm opacity-60">
+        {{ report()!.candidateCount }} candidates | {{ report()!.emailCount }} emails
+      </span>
+    }
+  </div>
+
+  @if (!report() && !loading()) {
+    <div class="text-center opacity-50 mt-8">No report available for this date. Run the analyst pipeline first.</div>
+  }
+
+  <!-- Market Regime -->
+  @if (marketSummary(); as ms) {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title class="flex items-center gap-2">
+          Market Regime
+          <span [class]="regimeClass(ms.regime)" class="font-bold">{{ ms.regime }}</span>
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="mt-2">
+        <p class="opacity-80 mb-3">{{ ms.regime_reasoning }}</p>
+
+        @if (ms.themes.length > 0) {
+          <div class="mb-2">
+            <span class="text-xs font-medium opacity-60 mr-2">Themes</span>
+            @for (theme of ms.themes; track theme) {
+              <mat-chip class="mr-1">{{ theme }}</mat-chip>
+            }
+          </div>
+        }
+
+        @if (ms.risks.length > 0) {
+          <div class="mb-2">
+            <span class="text-xs font-medium opacity-60 mr-2">Risks</span>
+            @for (risk of ms.risks; track risk) {
+              <mat-chip color="warn" class="mr-1">{{ risk }}</mat-chip>
+            }
+          </div>
+        }
+
+        @if (ms.action_items.length > 0) {
+          <div class="mt-3">
+            <span class="text-xs font-medium opacity-60">Action Items</span>
+            <ul class="mt-1 ml-4 list-disc opacity-80">
+              @for (item of ms.action_items; track item) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- Watchlist -->
+  @if (watchlist().length > 0) {
+    <div>
+      <h3 class="text-sm font-medium opacity-70 mb-2">Watchlist</h3>
+      <div class="mat-elevation-z8 overflow-auto">
+        <table mat-table [dataSource]="watchlist()" class="w-full whitespace-nowrap">
+          <ng-container matColumnDef="symbol">
+            <th mat-header-cell *matHeaderCellDef>Symbol</th>
+            <td mat-cell *matCellDef="let r" class="font-medium">{{ r.symbol }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="score">
+            <th mat-header-cell *matHeaderCellDef>Score</th>
+            <td mat-cell *matCellDef="let r">{{ r.score }}/5</td>
+          </ng-container>
+
+          <ng-container matColumnDef="price">
+            <th mat-header-cell *matHeaderCellDef>Price</th>
+            <td mat-cell *matCellDef="let r">{{ r.price != null ? (r.price | number:'1.2-2') : '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="change5d">
+            <th mat-header-cell *matHeaderCellDef>5d %</th>
+            <td mat-cell *matCellDef="let r">
+              {{ r.change_5d_pct != null ? (r.change_5d_pct | number:'1.1-1') + '%' : '—' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="change1m">
+            <th mat-header-cell *matHeaderCellDef>1M %</th>
+            <td mat-cell *matCellDef="let r">
+              {{ r.change_1m_pct != null ? (r.change_1m_pct | number:'1.1-1') + '%' : '—' }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="setupType">
+            <th mat-header-cell *matHeaderCellDef>Setup</th>
+            <td mat-cell *matCellDef="let r">{{ r.setup_type || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="confidence">
+            <th mat-header-cell *matHeaderCellDef>Confidence</th>
+            <td mat-cell *matCellDef="let r" [class]="confidenceClass(r.confidence)">
+              {{ r.confidence || '—' }}
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="watchlistColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: watchlistColumns;"
+              (click)="onRowClick(row)"
+              class="cursor-pointer hover:bg-white/5"
+              [class.bg-white/10]="selectedCandidate()?.symbol === row.symbol"></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Selected candidate detail -->
+    @if (selectedCandidate(); as c) {
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>{{ c.symbol }} — {{ c.setup_type || 'No setup' }} / {{ c.profit_mechanism || '—' }}</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="mt-2">
+          @if (c.thesis) {
+            <p class="mb-2"><strong>Thesis:</strong> {{ c.thesis }}</p>
+          }
+          @if (c.recommended_structure) {
+            <p class="mb-2"><strong>Structure:</strong> {{ c.recommended_structure }}</p>
+          }
+          @if (c.entry != null && c.stop != null && c.target != null) {
+            <p class="mb-2">
+              <strong>Entry:</strong> ${{ c.entry | number:'1.2-2' }}
+              | <strong>Stop:</strong> ${{ c.stop | number:'1.2-2' }}
+              | <strong>Target:</strong> ${{ c.target | number:'1.2-2' }}
+            </p>
+          }
+          @if (c.reasoning) {
+            <div class="mt-3 opacity-80">
+              <strong>Reasoning:</strong>
+              <p class="whitespace-pre-wrap mt-1">{{ c.reasoning }}</p>
+            </div>
+          }
+          @if (c.boxes && c.boxes.length > 0) {
+            <div class="mt-3">
+              <strong>5-Box Checklist:</strong>
+              <div class="mt-1 font-mono text-sm">
+                @for (box of c.boxes; track box.box) {
+                  <div class="flex gap-2">
+                    <span [class]="box.status === 'PASS' ? 'text-green-400' : box.status === 'FAIL' ? 'text-red-400' : 'text-yellow-400'">
+                      {{ box.status === 'PASS' ? '✓' : box.status === 'FAIL' ? '✗' : '?' }}
+                    </span>
+                    <span>Box {{ box.box }} {{ box.name }}: {{ box.reason }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</div>

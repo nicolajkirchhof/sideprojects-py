@@ -286,9 +286,9 @@ Push analysis results to the Tradelog web app for persistence and display.
 
 **Affected layers:** .NET data model + API + EF migration
 **Dependencies:** None (can be built in parallel with Python pipeline)
-**Status:** Pending
+**Status:** Done
 
-**Notes:** Store analysis as JSON columns — the structure will evolve. Avoid over-normalizing at this stage.
+**Notes:** DailyPrep + TradeAnalysis entities, DailyPrepController, TradeAnalysisController, trade export endpoint. EF migration created.
 
 ---
 
@@ -310,9 +310,9 @@ Push analysis results to the Tradelog web app for persistence and display.
 
 **Affected layers:** Angular frontend
 **Dependencies:** E4-S1
-**Status:** Pending
+**Status:** Done
 
-**Notes:** Flag for `/architect` — decide on detail panel layout. Render Claude's reasoning as markdown → HTML.
+**Notes:** Market regime card with themes/risks chips, watchlist table with click-to-expand detail card, date picker navigation.
 
 ---
 
