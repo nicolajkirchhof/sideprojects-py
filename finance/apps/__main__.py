@@ -28,6 +28,18 @@ def main() -> None:
         default=None,
         help="Start year for data loading (app-specific).",
     )
+    parser.add_argument(
+        "--csv-paths",
+        nargs="+",
+        default=None,
+        help="CSV file paths for the analyst pipeline.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Skip Claude API calls and Tradelog push (analyst only).",
+    )
 
     args, remaining = parser.parse_known_args()
 
@@ -41,6 +53,10 @@ def main() -> None:
     kwargs = {}
     if args.start_year is not None:
         kwargs["start_year"] = args.start_year
+    if args.csv_paths is not None:
+        kwargs["csv_paths"] = args.csv_paths
+    if args.dry_run:
+        kwargs["dry_run"] = args.dry_run
 
     app_module.launch(**kwargs)
 

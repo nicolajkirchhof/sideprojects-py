@@ -22,6 +22,13 @@ Angular 21 frontend + .NET 10 backend REST API with SQL Server.
 - DTOs for API responses, Models for DB entities
 - Decimal precision: 18,6 for all financial values
 
+**API Design — Unversioned, backward-compatible JSON:**
+- No `/v1/`, `/v2/` prefixes — endpoints are never versioned
+- Adding fields to responses or optional query parameters: always safe
+- Removing fields: deprecate first (return null), then remove
+- Changing field types or semantics: never — add a new field instead
+- New endpoints: always safe
+
 **Frontend (Angular):**
 - Standalone components, lazy-loaded routes
 - PrimeNG component library + Tailwind for layout

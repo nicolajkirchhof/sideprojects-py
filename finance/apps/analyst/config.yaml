@@ -1,0 +1,45 @@
+# Trade Analyst — Default Configuration
+
+scanner:
+  # Directory to scan for CSV files (default: ~/Downloads)
+  csv_directory: "~/Downloads"
+  # Filename pattern: screener-{name}_{MM-DD-YYYY}.csv
+  filename_prefix: "screener-"
+
+  # Barchart CSV column mapping: barchart_column_name -> internal_field_name
+  # Adjust these when you change your Barchart scanner configuration
+  column_mapping:
+    Symbol: symbol
+    Last: price
+    Volume: volume
+    "5 Day % Chg": change_5d_pct
+    "1 Month % Chg": change_1m_pct
+    "% Off High": high_52w_distance_pct
+    Sector: sector
+
+  # Columns where '%' suffix should be stripped and values parsed as floats
+  percent_columns:
+    - change_5d_pct
+    - change_1m_pct
+    - high_52w_distance_pct
+
+gmail:
+  label: market
+  # Email classification rules: sender pattern -> category
+  # Categories: scanner (has CSV), market_commentary (newsletter), research (other)
+  classification:
+    - sender: "@barchart.com"
+      category: scanner
+    # Add your newsletter senders here:
+    # - sender: "@briefing.com"
+    #   category: market_commentary
+
+claude:
+  model_scanner: claude-sonnet-4-6
+  model_review: claude-opus-4-6
+  max_candidates: 10
+  max_trade_reviews: 5
+
+tradelog:
+  api_url: "http://localhost:5286"
+  account_id: 1
