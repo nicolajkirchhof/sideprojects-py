@@ -122,6 +122,37 @@ Applied to ALL screeners. Match the playbook minimums.
 
 ---
 
+### 8. Intraday RVOL Spike *(manual — run during execution windows only)*
+
+**Purpose:** Catch ignition events in real-time — volume spikes happening NOW. Finds Type A
+Episodic Pivots and surprise movers not on last night's watchlist.
+
+| Filter | Value |
+|--------|-------|
+| 20D RelVol | > 2.0 |
+| %Change | > 2% |
+| Base filters | Price > $3, Vol > 1M, MktCap > $300M |
+
+**When to run (manually on Barchart website):**
+- **9:45** — after first 15min candle closes, scan for morning ORB candidates
+- **15:00** — before last-hour window, scan for late-day accumulation
+
+**NOT an email scanner.** Run manually during execution windows only. End-of-day scanners
+capture settled data; this captures live ignition.
+
+**Quick evaluation (< 30 seconds per stock):**
+1. Already on watchlist? → skip (already evaluated)
+2. Earnings today/tomorrow? → skip
+3. Above 50D SMA? → if no, skip (no longs in downtrend)
+4. Clear catalyst visible? (gap, news, sector move) → if no, skip
+5. ORB candle clean? (not choppy inside bar) → if yes, set buy stop above 15/30min candle
+
+**Maps to:** Type A (EP on gap + volume), Type C (reclaim with volume confirmation)
+
+**What to avoid:** Stocks already up 10%+ and extended from all SMAs — that's FOMO, not a setup.
+
+---
+
 ## Column View (All Screeners)
 
 Single column layout shared across all screeners. Provides everything for the 5-box
@@ -195,15 +226,37 @@ column_mapping:
 
 ---
 
-## Scanning Process (Daily)
+## Daily Schedule
 
-1. **Barchart sends** screener emails automatically (end of day)
-2. **Gmail filter** labels them `TradeAnalyst`
-3. **Run pipeline:** `uv run python -m finance.apps analyst`
-4. Pipeline fetches emails → parses CSVs → enriches with IBKR data → 5-box scores → Claude analysis
-5. Results pushed to Tradelog → view at `/daily-prep`
+| Time | Action | Scanners |
+|------|--------|----------|
+| **After 16:00** | Run pipeline | All 7 email scanners (automated) |
+| **Evening / pre-market** | Review Daily Prep | None — review `/daily-prep`, set ORB alerts, remove earnings |
+| **9:45** | Manual scan | Intraday RVOL Spike (#8) — morning ORB candidates |
+| **10:15–15:00** | Dead zone | No scanning, no entries |
+| **15:00** | Manual scan | Intraday RVOL Spike (#8) — last-hour candidates |
+| **15:15–15:45** | Execute | Last-hour ORB entries from watchlist + RVOL scan |
 
-Manual scanning (when pipeline is unavailable):
+**Email scanners** (1–7) are configured for end-of-day delivery → pipeline runs once daily.
+**Intraday RVOL** (8) is manual on Barchart website — run only during execution windows.
+
+---
+
+## Pipeline Integration
+
+The email scanners are configured to send daily summaries to Gmail.
+
+**Gmail filter:**
+- From: `noreply@barchart.com`
+- Action: Apply label `TradeAnalyst`, skip inbox
+
+**Pipeline run:**
+1. `uv run python -m finance.apps analyst`
+2. Fetches emails from `TradeAnalyst` label → downloads CSV attachments
+3. Parses all CSVs → enriches with IBKR data → 5-box scores → Claude analysis
+4. Pushes results to Tradelog → view at `/daily-prep`
+
+**Manual fallback** (when pipeline is unavailable):
 1. Run each screener on Barchart
-2. Apply 5-box checklist mentally using the column view
+2. Apply 5-box checklist using the column view
 3. Add passing stocks to watchlist — max 20 names, prioritize top 5
