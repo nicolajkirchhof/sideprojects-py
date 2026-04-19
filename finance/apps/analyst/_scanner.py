@@ -43,23 +43,30 @@ def parse_csv(path: Path, config: ScannerConfig) -> list[Candidate]:
         log.warning("No symbol column mapped in %s", path.name)
         return []
 
+    # Determine which Candidate fields are str vs numeric
+    import dataclasses
+    str_fields = {f.name for f in dataclasses.fields(Candidate)
+                  if f.type in ("str | None", "str")} - {"symbol"}
+    skip_fields = {"symbol"}
+
     candidates: list[Candidate] = []
     for _, row in df.iterrows():
         symbol = str(row[reverse_map["symbol"]]).strip().upper()
         if not symbol or symbol == "NAN":
             continue
 
-        candidates.append(Candidate(
-            symbol=symbol,
-            price=_parse_float(row, reverse_map, "price"),
-            volume=_parse_float(row, reverse_map, "volume"),
-            change_5d_pct=_parse_percent(row, reverse_map, "change_5d_pct", config),
-            change_1m_pct=_parse_percent(row, reverse_map, "change_1m_pct", config),
-            high_52w_distance_pct=_parse_percent(
-                row, reverse_map, "high_52w_distance_pct", config,
-            ),
-            sector=_parse_str(row, reverse_map, "sector"),
-        ))
+        kwargs: dict = {"symbol": symbol}
+        for field_name in reverse_map:
+            if field_name in skip_fields:
+                continue
+            if field_name in str_fields:
+                kwargs[field_name] = _parse_str(row, reverse_map, field_name)
+            elif field_name in config.percent_columns:
+                kwargs[field_name] = _parse_percent(row, reverse_map, field_name, config)
+            else:
+                kwargs[field_name] = _parse_float(row, reverse_map, field_name)
+
+        candidates.append(Candidate(**kwargs))
 
     log.info("Parsed %d candidates from %s", len(candidates), path.name)
     return candidates
@@ -90,6 +97,8 @@ def _parse_float(
     if field not in mapping:
         return None
     val = row[mapping[field]]
+    if isinstance(val, str):
+        val = val.replace(",", "").strip()
     try:
         return float(val)
     except (ValueError, TypeError):

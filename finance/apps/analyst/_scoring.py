@@ -15,6 +15,7 @@ import logging
 
 from finance.apps.analyst._models import (
     BoxResult,
+    Candidate,
     EnrichedCandidate,
     ScoredCandidate,
     TechnicalData,
@@ -46,32 +47,39 @@ def _score_one(ec: EnrichedCandidate) -> ScoredCandidate:
         ]
         return ScoredCandidate(enriched=ec, boxes=boxes, score=0)
 
+    c = ec.candidate
     boxes = [
-        _box1_trend_template(t, ec.candidate.price),
+        _box1_trend_template(t, c),
         _box2_relative_strength(t),
-        _box3_base_quality(t),
-        _box4_catalyst(),
-        _box5_risk(t, ec.candidate.price),
+        _box3_base_quality(t, c),
+        _box4_catalyst(c),
+        _box5_risk(t, c),
     ]
     passed = sum(1 for b in boxes if b.status == "PASS")
     return ScoredCandidate(enriched=ec, boxes=boxes, score=passed)
 
 
-def _box1_trend_template(t: TechnicalData, price: float | None) -> BoxResult:
+def _box1_trend_template(t: TechnicalData, c: Candidate) -> BoxResult:
     """Minervini Trend Template: Price > 20 SMA > 50 SMA, 50 SMA rising,
     within 25% of 52W high, positive 12-month return."""
-    if price is None or price <= 0:
+    p = c.price
+    if p is None or p <= 0:
         return BoxResult(1, "Trend Template", "MANUAL", "Price not available")
 
     reasons: list[str] = []
     fails: list[str] = []
 
-    p = price
+    # SMA stack check (IBKR data, fallback to scanner % from 50D SMA)
     if t.sma_20 is not None and t.sma_50 is not None:
         if p > t.sma_20 > t.sma_50:
             reasons.append(f"Price {p:.2f} > 20 SMA {t.sma_20:.2f} > 50 SMA {t.sma_50:.2f}")
         else:
             fails.append(f"SMA stack broken: Price {p:.2f}, 20 SMA {t.sma_20:.2f}, 50 SMA {t.sma_50:.2f}")
+    elif c.pct_from_50d_sma is not None:
+        if c.pct_from_50d_sma > 0:
+            reasons.append(f"Price {c.pct_from_50d_sma:+.1f}% above 50D SMA (scanner)")
+        else:
+            fails.append(f"Price {c.pct_from_50d_sma:.1f}% below 50D SMA (scanner)")
     else:
         fails.append("SMA data insufficient")
 
@@ -80,18 +88,27 @@ def _box1_trend_template(t: TechnicalData, price: float | None) -> BoxResult:
     elif t.sma_50_slope is not None:
         fails.append(f"50 SMA {t.sma_50_slope}")
 
+    # 52W high distance (IBKR, fallback to scanner)
     if t.high_52w is not None and p > 0:
         distance = (t.high_52w - p) / t.high_52w * 100
         if distance <= MAX_52W_DISTANCE:
             reasons.append(f"Within {distance:.1f}% of 52W high")
         else:
             fails.append(f"{distance:.1f}% below 52W high (max {MAX_52W_DISTANCE}%)")
-
-    if t.return_12m is not None:
-        if t.return_12m > 0:
-            reasons.append(f"12M return +{t.return_12m:.1f}%")
+    elif c.high_52w_distance_pct is not None:
+        dist = abs(c.high_52w_distance_pct)
+        if dist <= MAX_52W_DISTANCE:
+            reasons.append(f"Within {dist:.1f}% of 52W high (scanner)")
         else:
-            fails.append(f"12M return {t.return_12m:.1f}% (negative)")
+            fails.append(f"{dist:.1f}% below 52W high (max {MAX_52W_DISTANCE}%, scanner)")
+
+    # 12-month return / century momentum (IBKR, fallback to scanner 52W %Chg)
+    return_12m = t.return_12m if t.return_12m is not None else c.change_52w_pct
+    if return_12m is not None:
+        if return_12m > 0:
+            reasons.append(f"12M return +{return_12m:.1f}%")
+        else:
+            fails.append(f"12M return {return_12m:.1f}% (negative)")
 
     if fails:
         return BoxResult(1, "Trend Template", "FAIL", "; ".join(fails))
@@ -116,7 +133,7 @@ def _box2_relative_strength(t: TechnicalData) -> BoxResult:
     )
 
 
-def _box3_base_quality(t: TechnicalData) -> BoxResult:
+def _box3_base_quality(t: TechnicalData, c: Candidate) -> BoxResult:
     """BB squeeze, volume contracting, SMA stack intact."""
     reasons: list[str] = []
     fails: list[str] = []
@@ -131,12 +148,15 @@ def _box3_base_quality(t: TechnicalData) -> BoxResult:
     else:
         fails.append("SMA data insufficient for stack check")
 
-    # Bollinger Band squeeze
+    # Bollinger Band squeeze (IBKR, fallback to scanner BB%)
     if t.bb_width is not None and t.bb_width_avg_20 is not None:
         if t.bb_width < t.bb_width_avg_20:
             reasons.append(f"BB squeeze ({t.bb_width:.4f} < avg {t.bb_width_avg_20:.4f})")
         else:
             fails.append(f"No BB squeeze ({t.bb_width:.4f} >= avg {t.bb_width_avg_20:.4f})")
+    elif c.bb_pct is not None:
+        # BB% near 50 = middle of band, >100 = above upper, <0 = below lower
+        reasons.append(f"BB% {c.bb_pct:.0f}% (scanner)")
 
     # Volume contraction (VDU)
     if t.volume_contracting is True:
@@ -151,20 +171,46 @@ def _box3_base_quality(t: TechnicalData) -> BoxResult:
     return BoxResult(3, "Base Quality", "PASS", "; ".join(reasons))
 
 
-def _box4_catalyst() -> BoxResult:
-    """Catalyst evaluation requires qualitative assessment — always MANUAL.
-    Will be evaluated by Claude in E3-S2."""
-    return BoxResult(4, "Catalyst", "MANUAL", "Requires qualitative assessment (news, earnings, sector theme)")
+def _box4_catalyst(c: Candidate) -> BoxResult:
+    """Catalyst evaluation — partially automated with scanner data, rest for Claude."""
+    hints: list[str] = []
+
+    # Options flow signals (PM-04)
+    if c.put_call_vol_5d is not None:
+        if c.put_call_vol_5d < 0.5:
+            hints.append(f"Call-dominant flow (P/C {c.put_call_vol_5d:.2f})")
+        elif c.put_call_vol_5d > 1.5:
+            hints.append(f"Put-heavy flow (P/C {c.put_call_vol_5d:.2f}) — potential squeeze")
+
+    # Earnings proximity
+    if c.latest_earnings:
+        hints.append(f"Next earnings: {c.latest_earnings}")
+
+    # Short squeeze potential
+    if c.days_to_cover is not None and c.days_to_cover > 5:
+        hints.append(f"Days to cover: {c.days_to_cover:.1f} (squeeze potential)")
+
+    if hints:
+        return BoxResult(4, "Catalyst", "MANUAL", "; ".join(hints) + " — needs qualitative review")
+    return BoxResult(4, "Catalyst", "MANUAL", "No signals — needs qualitative review (news, earnings, sector theme)")
 
 
-def _box5_risk(t: TechnicalData, price: float | None) -> BoxResult:
+def _box5_risk(t: TechnicalData, c: Candidate) -> BoxResult:
     """Stop distance ≤ 7% from entry, position size at 0.5% risk."""
+    price = c.price
     if price is None or price <= 0:
         return BoxResult(5, "Risk", "MANUAL", "Price not available")
 
     # Stop at 20 SMA (most conservative reference)
     stop_ref = t.sma_20
     if stop_ref is None:
+        # Fallback: use ATR% from scanner for rough stop estimate
+        if c.atr_pct_20d is not None:
+            if c.atr_pct_20d <= MAX_STOP_PCT:
+                return BoxResult(5, "Risk", "PASS",
+                    f"ATR {c.atr_pct_20d:.1f}% within {MAX_STOP_PCT}% limit (scanner, no SMA data)")
+            return BoxResult(5, "Risk", "FAIL",
+                f"ATR {c.atr_pct_20d:.1f}% exceeds {MAX_STOP_PCT}% limit (scanner, no SMA data)")
         return BoxResult(5, "Risk", "MANUAL", "20 SMA not available for stop calculation")
 
     stop_distance_pct = (price - stop_ref) / price * 100

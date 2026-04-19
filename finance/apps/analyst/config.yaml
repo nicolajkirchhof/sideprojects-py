@@ -4,21 +4,43 @@ scanner:
   # CSV files come from Gmail attachments (primary) or --csv-paths (manual override)
 
   # Barchart CSV column mapping: barchart_column_name -> internal_field_name
-  # Adjust these when you change your Barchart scanner configuration
   column_mapping:
     Symbol: symbol
     Latest: price
+    "%Change": change_pct
     Volume: volume
     "5D %Chg": change_5d_pct
     "1M %Chg": change_1m_pct
+    "3M %Chg": change_3m_pct
+    "6M %Chg": change_6m_pct
+    "52W %Chg": change_52w_pct
     "52W %/High": high_52w_distance_pct
+    "20D RelVol": rvol_20d
+    "20D ATRP": atr_pct_20d
+    "% 50D MA": pct_from_50d_sma
+    "BB%": bb_pct
+    "5D P/C Vol": put_call_vol_5d
+    "IV Pctl": iv_percentile
+    "Short Int %Chg": short_interest_chg_pct
+    "Days2Cover": days_to_cover
+    "Market Cap, $K": market_cap_k
+    "Latest Earnings": latest_earnings
     Sector: sector
 
   # Columns where '%' suffix should be stripped and values parsed as floats
   percent_columns:
+    - change_pct
     - change_5d_pct
     - change_1m_pct
+    - change_3m_pct
+    - change_6m_pct
+    - change_52w_pct
     - high_52w_distance_pct
+    - atr_pct_20d
+    - pct_from_50d_sma
+    - bb_pct
+    - short_interest_chg_pct
+    - iv_percentile
 
 gmail:
   label: TradeAnalyst

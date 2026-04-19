@@ -330,10 +330,20 @@ def _format_candidates(scored: list[ScoredCandidate]) -> str:
             lines.append(f"Price: ${c.price:.2f}")
         if c.sector:
             lines.append(f"Sector: {c.sector}")
+        if c.change_pct is not None:
+            lines.append(f"Today: {c.change_pct:+.1f}%")
         if c.change_5d_pct is not None:
             lines.append(f"5d Change: {c.change_5d_pct:+.1f}%")
         if c.change_1m_pct is not None:
             lines.append(f"1M Change: {c.change_1m_pct:+.1f}%")
+        if c.change_52w_pct is not None:
+            lines.append(f"52W Change: {c.change_52w_pct:+.1f}%")
+        if c.iv_percentile is not None:
+            lines.append(f"IV Percentile: {c.iv_percentile:.0f}%")
+        if c.put_call_vol_5d is not None:
+            lines.append(f"5D Put/Call: {c.put_call_vol_5d:.2f}")
+        if c.latest_earnings:
+            lines.append(f"Next Earnings: {c.latest_earnings}")
 
         if t:
             if t.sma_20 is not None:

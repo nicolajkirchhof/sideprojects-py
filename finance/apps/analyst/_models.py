@@ -13,10 +13,24 @@ class Candidate:
     """Raw scanner candidate after CSV parsing and deduplication."""
     symbol: str
     price: float | None = None
+    change_pct: float | None = None          # today's % change
     volume: float | None = None
     change_5d_pct: float | None = None
     change_1m_pct: float | None = None
+    change_3m_pct: float | None = None
+    change_6m_pct: float | None = None
+    change_52w_pct: float | None = None      # 12-month return (century momentum)
     high_52w_distance_pct: float | None = None
+    rvol_20d: float | None = None            # 20D relative volume
+    atr_pct_20d: float | None = None         # 20D ATR as % of price
+    pct_from_50d_sma: float | None = None    # distance from 50D SMA
+    bb_pct: float | None = None              # Bollinger Band %
+    put_call_vol_5d: float | None = None     # 5-day put/call volume ratio
+    iv_percentile: float | None = None       # IV percentile (for options structure)
+    short_interest_chg_pct: float | None = None
+    days_to_cover: float | None = None
+    market_cap_k: float | None = None        # market cap in thousands
+    latest_earnings: str | None = None       # next earnings date
     sector: str | None = None
 
 
