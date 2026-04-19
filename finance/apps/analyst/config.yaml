@@ -24,7 +24,7 @@ scanner:
     - high_52w_distance_pct
 
 gmail:
-  label: market
+  label: TradeAnalyst
   # Email classification rules: sender pattern -> category
   # Categories: scanner (has CSV), market_commentary (newsletter), research (other)
   classification:

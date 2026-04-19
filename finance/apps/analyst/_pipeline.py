@@ -59,7 +59,7 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
     log.info("=== Trade Analyst Pipeline ===")
     config = load_config()
 
-    # Stage 0: Fetch emails from Gmail
+    # Stage 0: Fetch emails from Gmail (primary data source)
     email_csv_paths: list[Path] = []
     market_emails: list[EmailMessage] = []
 
@@ -77,15 +77,21 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
             if market_emails:
                 log.info("Stage 0: Found %d market commentary email(s)", len(market_emails))
         except Exception:
-            log.warning("Gmail fetch failed — continuing with local CSVs only", exc_info=True)
+            log.warning("Gmail fetch failed — falling back to local CSVs", exc_info=True)
 
-    # Stage 1: Parse scanner CSVs (local + email attachments)
-    local_paths = _resolve_csv_paths(csv_paths, config)
-    all_csv_paths = local_paths + email_csv_paths
+    # Stage 1: Parse scanner CSVs
+    # Priority: explicit --csv-paths > Gmail attachments > local ~/Downloads
+    if csv_paths:
+        all_csv_paths = _resolve_csv_paths(csv_paths, config)
+    elif email_csv_paths:
+        all_csv_paths = email_csv_paths
+    else:
+        all_csv_paths = _resolve_csv_paths(None, config)
 
     if not all_csv_paths:
-        log.warning("No CSV files found (local or Gmail). "
-                    "Provide --csv-paths, check ~/Downloads, or set up Gmail integration.")
+        log.warning("No CSV files found. Check Gmail label '%s', "
+                    "provide --csv-paths, or check ~/Downloads.",
+                    config.gmail.label)
         return
 
     log.info("Stage 1/7: Parsing %d CSV file(s)...", len(all_csv_paths))
