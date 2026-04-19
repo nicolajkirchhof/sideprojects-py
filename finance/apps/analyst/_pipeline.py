@@ -44,6 +44,12 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
         dry_run: If True, skip Claude API calls and Tradelog push.
         csv_paths: Explicit CSV file paths. If None, auto-discovers from Downloads + Gmail.
     """
+    import sys
+    import io
+    # Ensure UTF-8 output on Windows (cp1252 can't handle Unicode symbols)
+    if sys.stdout.encoding != "utf-8":
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",

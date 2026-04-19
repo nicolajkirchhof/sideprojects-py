@@ -10,11 +10,11 @@ scanner:
   # Adjust these when you change your Barchart scanner configuration
   column_mapping:
     Symbol: symbol
-    Last: price
+    Latest: price
     Volume: volume
-    "5 Day % Chg": change_5d_pct
-    "1 Month % Chg": change_1m_pct
-    "% Off High": high_52w_distance_pct
+    "5D %Chg": change_5d_pct
+    "1M %Chg": change_1m_pct
+    "52W %/High": high_52w_distance_pct
     Sector: sector
 
   # Columns where '%' suffix should be stripped and values parsed as floats
