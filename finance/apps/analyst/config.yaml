@@ -1,10 +1,7 @@
 # Trade Analyst — Default Configuration
 
 scanner:
-  # Directory to scan for CSV files (default: ~/Downloads)
-  csv_directory: "~/Downloads"
-  # Filename pattern: screener-{name}_{MM-DD-YYYY}.csv
-  filename_prefix: "screener-"
+  # CSV files come from Gmail attachments (primary) or --csv-paths (manual override)
 
   # Barchart CSV column mapping: barchart_column_name -> internal_field_name
   # Adjust these when you change your Barchart scanner configuration

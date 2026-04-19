@@ -90,18 +90,14 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
         except Exception:
             log.warning("Web source fetch failed — continuing without", exc_info=True)
 
-    # Stage 1: Parse scanner CSVs
-    # Priority: explicit --csv-paths > Gmail attachments > local ~/Downloads
+    # Stage 1: Parse scanner CSVs (Gmail attachments or explicit --csv-paths)
     if csv_paths:
-        all_csv_paths = _resolve_csv_paths(csv_paths, config)
-    elif email_csv_paths:
-        all_csv_paths = email_csv_paths
+        all_csv_paths = [Path(p) for p in csv_paths if Path(p).exists()]
     else:
-        all_csv_paths = _resolve_csv_paths(None, config)
+        all_csv_paths = email_csv_paths
 
     if not all_csv_paths:
-        log.warning("No CSV files found. Check Gmail label '%s', "
-                    "provide --csv-paths, or check ~/Downloads.",
+        log.warning("No CSV files found. Check Gmail label '%s' or provide --csv-paths.",
                     config.gmail.label)
         return
 
@@ -182,37 +178,6 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
     log.info("Pipeline complete. %d candidates scored, %d recommendations, %d trade reviews.",
              len(scored), len(recommendations), len(reviews))
 
-
-def _resolve_csv_paths(
-    explicit_paths: list[str] | None, config: AnalystConfig,
-) -> list[Path]:
-    """Resolve CSV file paths from explicit args or config directory.
-
-    When no explicit paths are given, scans the configured directory
-    for screener CSVs from the last trading day (skips weekends).
-    Pattern: screener-{name}_{MM-DD-YYYY}.csv
-    """
-    if explicit_paths:
-        return [Path(p) for p in explicit_paths if Path(p).exists()]
-
-    csv_dir = Path(config.scanner.csv_directory).expanduser()
-    if not csv_dir.is_dir():
-        log.warning("Scanner CSV directory does not exist: %s", csv_dir)
-        return []
-
-    target_date = _last_trading_day()
-    date_suffix = target_date.strftime("%m-%d-%Y")
-    prefix = config.scanner.filename_prefix
-
-    pattern = f"{prefix}*_{date_suffix}.csv"
-    matches = sorted(csv_dir.glob(pattern))
-
-    if matches:
-        log.info("Found %d screener CSV(s) for %s in %s", len(matches), target_date, csv_dir)
-    else:
-        log.info("No screener CSVs matching '%s' in %s", pattern, csv_dir)
-
-    return matches
 
 
 def _last_trading_day(reference: date | None = None) -> date:

@@ -16,8 +16,6 @@ _DEFAULT_CONFIG = Path(__file__).parent / "config.yaml"
 
 @dataclass
 class ScannerConfig:
-    csv_directory: str = "~/Downloads"
-    filename_prefix: str = "screener-"
     column_mapping: dict[str, str] = field(default_factory=dict)
     percent_columns: list[str] = field(default_factory=list)
 
@@ -85,8 +83,6 @@ def _parse(raw: dict[str, Any]) -> AnalystConfig:
     return AnalystConfig(
         web_sources=raw.get("web_sources", []),
         scanner=ScannerConfig(
-            csv_directory=scanner_raw.get("csv_directory", "~/Downloads"),
-            filename_prefix=scanner_raw.get("filename_prefix", "screener-"),
             column_mapping=scanner_raw.get("column_mapping", {}),
             percent_columns=scanner_raw.get("percent_columns", []),
         ),
