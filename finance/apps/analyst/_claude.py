@@ -18,6 +18,7 @@ from typing import Any
 
 from finance.apps.analyst._config import ClaudeConfig
 from finance.apps.analyst._gmail import EmailMessage
+from finance.apps.analyst._web import WebArticle
 from finance.apps.analyst._models import (
     ComplianceAggregate,
     MarketSummary,
@@ -34,14 +35,25 @@ _PROMPTS_DIR = Path(__file__).parent / "_prompts"
 def summarize_market(
     emails: list[EmailMessage],
     config: ClaudeConfig,
+    web_articles: list[WebArticle] | None = None,
 ) -> MarketSummary:
-    """Summarize market emails into a structured brief (E3-S1)."""
-    if not emails:
+    """Summarize market emails and web articles into a structured brief (E3-S1)."""
+    if not emails and not web_articles:
         return MarketSummary()
 
-    email_text = _format_emails(emails)
+    email_text = _format_emails(emails) if emails else ""
+    articles_text = _format_web_articles(web_articles) if web_articles else ""
+
+    all_content = ""
+    if email_text:
+        all_content += email_text
+    if articles_text:
+        if all_content:
+            all_content += "\n\n---\n\n"
+        all_content += articles_text
+
     prompt_template = _load_prompt("market_summary.md")
-    user_prompt = prompt_template.replace("{emails}", email_text)
+    user_prompt = prompt_template.replace("{emails}", all_content)
 
     raw = _call_claude(
         user_prompt=user_prompt,
@@ -287,6 +299,15 @@ def _parse_json(text: str) -> Any:
 
 
 # --- Formatting helpers ---
+
+def _format_web_articles(articles: list[WebArticle]) -> str:
+    """Format web articles for the prompt."""
+    parts = []
+    for a in articles:
+        content = a.content[:2000]
+        parts.append(f"## {a.title} (via {a.source})\nURL: {a.url}\n\n{content}")
+    return "\n\n---\n\n".join(parts)
+
 
 def _format_emails(emails: list[EmailMessage]) -> str:
     """Format emails for the prompt."""

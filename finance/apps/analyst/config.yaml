@@ -34,6 +34,11 @@ gmail:
     # - sender: "@briefing.com"
     #   category: market_commentary
 
+web_sources:
+  - name: "Brooks Trading Course"
+    url: "https://www.brookstradingcourse.com/price-action-trading-blog/"
+    max_articles: 5
+
 claude:
   model_scanner: claude-sonnet-4-6
   model_review: claude-opus-4-6

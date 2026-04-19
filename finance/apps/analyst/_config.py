@@ -46,6 +46,7 @@ class TradelogConfig:
 class AnalystConfig:
     scanner: ScannerConfig = field(default_factory=ScannerConfig)
     gmail: GmailConfig = field(default_factory=GmailConfig)
+    web_sources: list[dict] = field(default_factory=list)
     claude: ClaudeConfig = field(default_factory=ClaudeConfig)
     tradelog: TradelogConfig = field(default_factory=TradelogConfig)
 
@@ -82,6 +83,7 @@ def _parse(raw: dict[str, Any]) -> AnalystConfig:
     tradelog_raw = raw.get("tradelog", {})
 
     return AnalystConfig(
+        web_sources=raw.get("web_sources", []),
         scanner=ScannerConfig(
             csv_directory=scanner_raw.get("csv_directory", "~/Downloads"),
             filename_prefix=scanner_raw.get("filename_prefix", "screener-"),

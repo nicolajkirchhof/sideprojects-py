@@ -33,6 +33,7 @@ from finance.apps.analyst._models import (
 from finance.apps.analyst._scanner import parse_multiple
 from finance.apps.analyst._scoring import score
 from finance.apps.analyst._tradelog import fetch_trades_for_review, push_daily_prep, push_trade_analysis
+from finance.apps.analyst._web import WebArticle, fetch_web_sources
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +80,16 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
         except Exception:
             log.warning("Gmail fetch failed — falling back to local CSVs", exc_info=True)
 
+    # Stage 0b: Fetch web sources (Brooks blog, etc.)
+    web_articles: list[WebArticle] = []
+    if config.web_sources:
+        try:
+            web_articles = fetch_web_sources(config.web_sources)
+            if web_articles:
+                log.info("Stage 0: Fetched %d web article(s)", len(web_articles))
+        except Exception:
+            log.warning("Web source fetch failed — continuing without", exc_info=True)
+
     # Stage 1: Parse scanner CSVs
     # Priority: explicit --csv-paths > Gmail attachments > local ~/Downloads
     if csv_paths:
@@ -115,11 +126,12 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
     recommendations: list[TradeRecommendation] = []
 
     if not dry_run:
-        if market_emails:
-            log.info("Stage 4/7: Claude market summary (%d emails)...", len(market_emails))
-            market_summary = summarize_market(market_emails, config.claude)
+        if market_emails or web_articles:
+            log.info("Stage 4/7: Claude market summary (%d emails, %d web articles)...",
+                     len(market_emails), len(web_articles))
+            market_summary = summarize_market(market_emails, config.claude, web_articles)
         else:
-            log.info("Stage 4/7: Skipped (no market commentary emails)")
+            log.info("Stage 4/7: Skipped (no market commentary)")
 
         # Stage 5: Claude trade reasoning
         log.info("Stage 5/7: Claude trade reasoning (%d candidates)...", len(scored))
