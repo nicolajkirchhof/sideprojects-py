@@ -31,7 +31,8 @@ from finance.apps.analyst._models import (
     TradeAnalysisResult,
     TradeRecommendation,
 )
-from finance.apps.analyst._scanner import parse_multiple
+from finance.apps.analyst._models import UoaSignal
+from finance.apps.analyst._scanner import aggregate_uoa, parse_multiple, parse_options_csv
 from finance.apps.analyst._scoring import score
 from finance.apps.analyst._tradelog import fetch_trades_for_review, push_daily_prep, push_trade_analysis
 from finance.apps.analyst._web import WebArticle, fetch_web_sources
@@ -63,6 +64,7 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
 
     # Stage 0: Fetch emails from Gmail (primary data source)
     email_csv_paths: list[Path] = []
+    options_csv_paths: list[Path] = []
     market_emails: list[EmailMessage] = []
 
     if not csv_paths:
@@ -71,11 +73,17 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
             emails = fetch_and_classify(config.gmail, staging_dir)
             for email in emails:
                 if email.category == "scanner":
-                    email_csv_paths.extend(email.attachments)
+                    for att in email.attachments:
+                        if _is_options_csv(att):
+                            options_csv_paths.append(att)
+                        else:
+                            email_csv_paths.append(att)
                 elif email.category == "market_commentary":
                     market_emails.append(email)
             if email_csv_paths:
-                log.info("Stage 0: Extracted %d scanner CSV(s) from Gmail", len(email_csv_paths))
+                log.info("Stage 0: Extracted %d stock scanner CSV(s) from Gmail", len(email_csv_paths))
+            if options_csv_paths:
+                log.info("Stage 0: Extracted %d options scanner CSV(s) from Gmail", len(options_csv_paths))
             if market_emails:
                 log.info("Stage 0: Found %d market commentary email(s)", len(market_emails))
         except Exception:
@@ -114,9 +122,21 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
     log.info("Stage 2/7: Enriching with IBKR market data...")
     enriched = enrich(candidates)
 
+    # Stage 2b: Parse options screener CSVs for UOA signals
+    uoa_signals: dict[str, UoaSignal] = {}
+    if options_csv_paths:
+        options_mapping = config.scanner.options_column_mapping
+        all_contracts = []
+        for path in options_csv_paths:
+            all_contracts.extend(parse_options_csv(path, options_mapping))
+        if all_contracts:
+            uoa_signals = aggregate_uoa(all_contracts)
+            log.info("Stage 2b: %d UOA signals from %d option contracts",
+                     len(uoa_signals), len(all_contracts))
+
     # Stage 3: 5-box scoring
     log.info("Stage 3/7: Scoring against 5-box checklist...")
-    scored = score(enriched)
+    scored = score(enriched, uoa_signals)
 
     # Stage 3b: Economic calendar — macro risk check
     macro_risks: list[str] = []
@@ -192,6 +212,19 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
     log.info("Pipeline complete. %d candidates scored, %d recommendations, %d trade reviews.",
              len(scored), len(recommendations), len(reviews))
 
+
+
+def _is_options_csv(path: Path) -> bool:
+    """Detect if a CSV is from the options screener (vs stock screener).
+
+    Checks for options-specific columns in the header row.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            header = f.readline().lower()
+        return "strike" in header and "delta" in header and "vol/oi" in header
+    except Exception:
+        return False
 
 
 def _last_trading_day(reference: date | None = None) -> date:

@@ -153,7 +153,98 @@ capture settled data; this captures live ignition.
 
 ---
 
-## Column View (All Screeners)
+## Options Screener: Unusual Options Activity (UOA)
+
+Separate from the stock screeners above. Returns individual option contracts, not
+underlyings. The pipeline aggregates by underlying symbol and feeds into Box 4 scoring.
+
+**Purpose:** Detect informed directional bets — someone opened a large new position today
+on a specific strike/expiry. Predicts stock returns over 1–4 weeks (Pan & Poteshman 2006,
+Ge et al. 2016). Confirmation signal for PM-04 (OTM Informed Flow).
+
+### Filters
+
+| Filter | Value | Reason |
+|--------|-------|--------|
+| Probability of Profit | 10%–75% | Exclude deep ITM (hedging) and far OTM (lottery) |
+| Next Earnings Date | Exclude within 7 days | Avoid earnings-driven vol, want directional signal |
+| Volume/OI Ratio | > 2.0 | Today's volume exceeds existing positions — new bets |
+| 1M Avg Options Volume | > 5,000 | Liquid options chain |
+| 1M Avg Open Interest | > 5,000 | Established market, not thin |
+| Delta | -0.4 to 0.4 | OTM focus — where informed flow concentrates |
+| Days to Expiration | < 35 | Near-term = conviction. Longer DTE = hedging noise |
+| Expirations | Monthly + Weekly | Include all liquid expirations |
+| Today's Option Volume | > 1,000 | Meaningful size |
+| Option Open Interest | > 500 | Existing liquidity |
+
+### Recommended additions
+
+| Filter | Value | Reason |
+|--------|-------|--------|
+| Underlying Price | > $3 | Match stock screener base filter |
+| Underlying Avg Volume | > 1M | Match stock screener liquidity filter |
+
+### Column View (Options Screener)
+
+| Column | Use |
+|--------|-----|
+| Symbol | Underlying ticker + contract info |
+| Price~ | Underlying price |
+| 1 Std~ | 1 standard deviation move — context for strike selection |
+| IV Pctl | IV Percentile — options structure decision |
+| Imp Vol | Implied volatility of this contract |
+| 1D IV Chg | IV change today — spiking IV = demand |
+| 5D IV Chg | IV trend over week |
+| Type | Call or Put — determines directional bias |
+| Strike | Strike price |
+| IV %Chg | IV percentage change on this contract |
+| Exp Date | Expiration date |
+| Delta | Delta value — distance from ATM |
+| Moneyness | ITM/ATM/OTM classification |
+| ITM Prob | Probability of being in the money at expiry |
+| Vol/OI | Volume to open interest ratio — the core UOA signal |
+| Bid / Ask | Spread — liquidity quality |
+| Volume | Today's volume on this contract |
+| Vol %Chg | Volume change vs average |
+| Open Int | Existing open interest |
+| OI %Chg | OI change — positive = new positions being opened |
+| Theta | Time decay — context for holding period |
+| Exp B4 Earnings | Whether this contract expires before next earnings |
+| Links | Barchart detail links |
+
+### Key columns for the pipeline
+
+The pipeline aggregates option contracts to underlying-level signals:
+
+| Aggregated Metric | How | Box 4 Interpretation |
+|---|---|---|
+| UOA Call Count | Count of unusual call contracts per underlying | Bullish informed flow |
+| UOA Put Count | Count of unusual put contracts per underlying | Bearish or squeeze signal |
+| Max Vol/OI | Highest vol/OI ratio among contracts | Conviction strength |
+| Avg Delta (calls) | Average delta of unusual call contracts | How OTM = how leveraged the bet |
+| Net Call/Put | UOA calls minus UOA puts per underlying | Directional bias |
+| IV Percentile | From underlying | Options structure selection |
+
+### How to evaluate
+
+**Strong bullish signal (upgrades Box 4):**
+- Multiple unusual CALL contracts on same underlying
+- Stock already passes Boxes 1–3 (trend, RS, base)
+- Vol/OI > 5 on any single contract
+- Delta 0.2–0.4 (slightly OTM, not lottery tickets)
+- OI %Chg positive (new positions, not closing)
+
+**Ignore:**
+- UOA on stocks with earnings within 7 days (already filtered, but double-check)
+- Single contract with Vol/OI barely above 2 — could be one retail trader
+- UOA puts on strong RS stocks — likely hedging, not bearish signal
+- Wide bid/ask spread — illiquid contract, noisy signal
+
+**Maps to:** Box 4 (Catalyst — informed flow), PM-04 (OTM Informed Flow)
+
+---
+
+## Column View (Stock Screeners)
 
 Single column layout shared across all screeners. Provides everything for the 5-box
 checklist at a glance.

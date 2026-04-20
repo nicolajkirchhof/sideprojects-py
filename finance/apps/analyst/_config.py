@@ -18,6 +18,7 @@ _DEFAULT_CONFIG = Path(__file__).parent / "config.yaml"
 class ScannerConfig:
     column_mapping: dict[str, str] = field(default_factory=dict)
     percent_columns: list[str] = field(default_factory=list)
+    options_column_mapping: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -85,6 +86,7 @@ def _parse(raw: dict[str, Any]) -> AnalystConfig:
         scanner=ScannerConfig(
             column_mapping=scanner_raw.get("column_mapping", {}),
             percent_columns=scanner_raw.get("percent_columns", []),
+            options_column_mapping=scanner_raw.get("options_column_mapping", {}),
         ),
         gmail=GmailConfig(
             label=gmail_raw.get("label", "market"),

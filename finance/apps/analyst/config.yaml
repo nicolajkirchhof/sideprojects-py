@@ -42,6 +42,28 @@ scanner:
     - short_interest_chg_pct
     - iv_percentile
 
+  # Options screener CSV column mapping (separate from stock screener)
+  # These CSVs contain individual option contracts, aggregated by underlying in the pipeline
+  options_column_mapping:
+    Symbol: symbol
+    "Price~": underlying_price
+    "IV Pctl": iv_percentile
+    "Imp Vol": implied_vol
+    "1D IV Chg": iv_chg_1d
+    "5D IV Chg": iv_chg_5d
+    Type: option_type
+    Strike: strike
+    "Exp Date": expiration
+    Delta: delta
+    Moneyness: moneyness
+    "Vol/OI": vol_oi_ratio
+    Volume: volume
+    "Vol %Chg": vol_pct_chg
+    "Open Int": open_interest
+    "OI %Chg": oi_pct_chg
+    Theta: theta
+    "Exp B4 Earnings": expires_before_earnings
+
 gmail:
   label: TradeAnalyst
   # Email classification rules: sender pattern -> category

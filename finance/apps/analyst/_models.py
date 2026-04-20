@@ -35,6 +35,49 @@ class Candidate:
 
 
 @dataclass
+class OptionsContract:
+    """A single unusual options activity contract from the options screener."""
+    symbol: str                          # underlying symbol
+    underlying_price: float | None = None
+    iv_percentile: float | None = None
+    implied_vol: float | None = None
+    iv_chg_1d: float | None = None
+    iv_chg_5d: float | None = None
+    option_type: str = ""                # "Call" or "Put"
+    strike: float | None = None
+    expiration: str | None = None
+    delta: float | None = None
+    moneyness: str | None = None         # "ITM", "ATM", "OTM"
+    vol_oi_ratio: float | None = None
+    volume: float | None = None
+    vol_pct_chg: float | None = None
+    open_interest: float | None = None
+    oi_pct_chg: float | None = None
+    theta: float | None = None
+    expires_before_earnings: str | None = None
+
+
+@dataclass
+class UoaSignal:
+    """Aggregated unusual options activity signal per underlying."""
+    symbol: str
+    call_count: int = 0
+    put_count: int = 0
+    max_vol_oi: float = 0
+    avg_delta_calls: float | None = None
+    iv_percentile: float | None = None
+    contracts: list[OptionsContract] = field(default_factory=list)
+
+    @property
+    def net_direction(self) -> str:
+        if self.call_count > self.put_count:
+            return "bullish"
+        elif self.put_count > self.call_count:
+            return "bearish"
+        return "neutral"
+
+
+@dataclass
 class TechnicalData:
     """Technical indicators computed from IBKR daily data."""
     sma_5: float | None = None

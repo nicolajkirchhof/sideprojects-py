@@ -20,6 +20,7 @@ from finance.apps.analyst._models import (
     EnrichedCandidate,
     ScoredCandidate,
     TechnicalData,
+    UoaSignal,
 )
 
 log = logging.getLogger(__name__)
@@ -29,14 +30,18 @@ MAX_52W_DISTANCE = 25.0  # Price within 25% of 52W high
 EARNINGS_BLACKOUT_DAYS = 5  # No entries within 5 days of earnings
 
 
-def score(candidates: list[EnrichedCandidate]) -> list[ScoredCandidate]:
+def score(
+    candidates: list[EnrichedCandidate],
+    uoa_signals: dict[str, UoaSignal] | None = None,
+) -> list[ScoredCandidate]:
     """Score all candidates against the 5-box checklist, sorted by score then RS."""
-    results = [_score_one(c) for c in candidates]
+    uoa = uoa_signals or {}
+    results = [_score_one(c, uoa.get(c.candidate.symbol)) for c in candidates]
     results.sort(key=_sort_key, reverse=True)
     return results
 
 
-def _score_one(ec: EnrichedCandidate) -> ScoredCandidate:
+def _score_one(ec: EnrichedCandidate, uoa: UoaSignal | None = None) -> ScoredCandidate:
     """Score a single candidate against all 5 boxes."""
     t = ec.technicals
     if not ec.data_available or t is None:
@@ -54,7 +59,7 @@ def _score_one(ec: EnrichedCandidate) -> ScoredCandidate:
         _box1_trend_template(t, c),
         _box2_relative_strength(t),
         _box3_base_quality(t, c),
-        _box4_catalyst(c),
+        _box4_catalyst(c, uoa),
         _box5_risk(t, c),
     ]
     passed = sum(1 for b in boxes if b.status == "PASS")
@@ -173,7 +178,7 @@ def _box3_base_quality(t: TechnicalData, c: Candidate) -> BoxResult:
     return BoxResult(3, "Base Quality", "PASS", "; ".join(reasons))
 
 
-def _box4_catalyst(c: Candidate) -> BoxResult:
+def _box4_catalyst(c: Candidate, uoa: UoaSignal | None = None) -> BoxResult:
     """Catalyst evaluation — auto-fail on imminent earnings, otherwise MANUAL with hints."""
     # Earnings blackout: auto-fail if earnings within 5 trading days
     if c.latest_earnings:
@@ -184,7 +189,20 @@ def _box4_catalyst(c: Candidate) -> BoxResult:
 
     hints: list[str] = []
 
-    # Options flow signals (PM-04)
+    # Unusual options activity (PM-04 — strongest signal)
+    if uoa is not None:
+        direction = uoa.net_direction
+        if direction == "bullish" and uoa.call_count >= 2:
+            hints.append(f"UOA: {uoa.call_count} unusual CALL contracts "
+                         f"(max vol/OI {uoa.max_vol_oi:.1f}x, {direction})")
+        elif direction == "bearish" and uoa.put_count >= 2:
+            hints.append(f"UOA: {uoa.put_count} unusual PUT contracts "
+                         f"(max vol/OI {uoa.max_vol_oi:.1f}x, {direction})")
+        elif uoa.call_count + uoa.put_count > 0:
+            hints.append(f"UOA: {uoa.call_count}C/{uoa.put_count}P "
+                         f"(max vol/OI {uoa.max_vol_oi:.1f}x, {direction})")
+
+    # Aggregate options flow signals from stock screener (PM-04)
     if c.put_call_vol_5d is not None:
         if c.put_call_vol_5d < 0.5:
             hints.append(f"Call-dominant flow (P/C {c.put_call_vol_5d:.2f})")
