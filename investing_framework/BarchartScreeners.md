@@ -10,16 +10,23 @@ attachments that the pipeline parses automatically.
 
 ## Global Base Filters
 
-Applied to ALL screeners. Match the playbook minimums.
+Applied to ALL screeners unless noted otherwise.
 
-| Filter | Value | Playbook Rule |
-|--------|-------|---------------|
-| Last Price | > $3 | Avoid penny stocks, options liquidity |
-| 20D Avg Volume | > 1,000,000 | Options must be tradeable |
-| Market Cap | > $300M | Reduce noise from micro-caps |
+| Filter | Value | Reasoning |
+|--------|-------|-----------|
+| Last Price | > $5 | ORB execution quality — $3–5 stocks have wide % spreads and noisy ticks. Kullamägi floor is $5; options on sub-$5 names have 1.5–3% bid/ask spreads |
+| 20D Avg Volume | > 1,000,000 | ORB entries demand real intraday liquidity in the first 15/30 min. 500K avg volume stocks often have dead first-hour action |
+| Market Cap | > $200M | Keep small-cap PEAD plays (strongest drift in research) while filtering micro-cap noise. Volume filter handles quality — any stock at 1M vol + $200M cap has institutional interest |
+| Next Earnings | Exclude within 5 days | Playbook Box 4 rule — no binary events on entries. Filter upfront to reduce scanner noise instead of scoring then failing |
 
-> **Note:** Current base uses Price > $1 and Volume > 500K. Tighten to match the playbook
-> when scanner results are too noisy.
+**Long-only scanners** (52W High, Momentum, Sustained Strength, RVOL, Trend Seeker) add:
+
+| Filter | Value | Reasoning |
+|--------|-------|-----------|
+| % 50D MA | > 0% | Eliminate Stage 4 downtrends. Box 1 requires Price > 50D SMA. Reduces noise by ~40% |
+
+**Do NOT add % 50D MA to:** High Put Ratio (intentionally finds weak stocks for squeeze plays)
+and High Call Ratio (may find beaten-down names with informed call buying).
 
 ---
 
@@ -33,6 +40,7 @@ Applied to ALL screeners. Match the playbook minimums.
 |--------|-------|
 | 52W %/High | Within 5% |
 | 20D RelVol | > 1.0 |
+| % 50D MA | > 0% |
 
 **Maps to:** Box 1 (Trend Template), Type B (VCP near highs)
 
@@ -46,6 +54,7 @@ Applied to ALL screeners. Match the playbook minimums.
 |--------|-------|
 | 5D %Chg | > 5% |
 | 20D RelVol | > 1.0 |
+| % 50D MA | > 0% |
 
 **Maps to:** PM-01 (Breakout Momentum), PM-02 (PEAD), Type A (Episodic Pivot)
 
@@ -58,10 +67,14 @@ Applied to ALL screeners. Match the playbook minimums.
 | Filter | Value |
 |--------|-------|
 | 1M %Chg | > 10% |
-| Price | > 50D SMA |
-| 50D SMA | > 200D SMA |
+| % 50D MA | > 0% |
+| 52W %Chg | > 0% |
 
 **Maps to:** Box 1+2 (Trend Template + RS), Type B (VCP), Type C (SMA Reclaim)
+
+> The old filter "50D SMA > 200D SMA" is ideal but may not be available as a Barchart filter.
+> `% 50D MA > 0%` + `52W %Chg > 0%` achieves a similar effect (price above 50D + positive
+> 12-month return = century momentum filter).
 
 ---
 
@@ -72,6 +85,7 @@ Applied to ALL screeners. Match the playbook minimums.
 | Filter | Value |
 |--------|-------|
 | 20D RelVol | > 1.75 |
+| % 50D MA | > 0% |
 
 **Maps to:** All setup types (volume confirmation), Type A (EP requires 5-10× volume)
 
@@ -86,6 +100,7 @@ Applied to ALL screeners. Match the playbook minimums.
 | Signal | New Buy or Sell |
 | Strength | Strong or Maximum |
 | Direction | Strengthening or Strongest |
+| % 50D MA | > 0% |
 
 **Maps to:** Supplementary — confirms momentum direction, not a standalone entry signal.
 
@@ -101,6 +116,9 @@ Applied to ALL screeners. Match the playbook minimums.
 | Put/Call Volume Ratio | > 1.0 |
 | 1M Avg Options Volume | > 5,000 |
 
+**No % 50D MA filter** — intentionally includes weak stocks (squeeze candidates where heavy
+put buying on a beaten-down name can fuel a reversal).
+
 **Maps to:** Box 4 (Catalyst — squeeze potential), PM-04 (Informed Flow)
 
 ---
@@ -111,14 +129,18 @@ Applied to ALL screeners. Match the playbook minimums.
 
 | Filter | Value |
 |--------|-------|
-| 5D Avg Put/Call Volume Ratio | < 0.25 |
-| Put/Call Volume Ratio | < 0.25 |
+| 5D Avg Put/Call Volume Ratio | < 0.5 |
+| Put/Call Volume Ratio | < 0.5 |
 | 1M Avg Options Volume | > 5,000 |
+
+**No % 50D MA filter** — informed call buying sometimes appears on names that haven't
+broken above the 50D yet (anticipating the move).
 
 **Maps to:** Box 4 (Catalyst — informed call buying), PM-04 (OTM Informed Flow)
 
-> **Consider widening to P/C < 0.5** for a broader net. Keep P/C < 0.25 as an aggressive
-> sub-scan if desired.
+> Widened from P/C < 0.25 to P/C < 0.5 for a broader net. The 0.25 threshold was too
+> aggressive — missed names with 2:1 call/put ratio that still represent strong directional
+> conviction.
 
 ---
 
@@ -131,7 +153,8 @@ Episodic Pivots and surprise movers not on last night's watchlist.
 |--------|-------|
 | 20D RelVol | > 2.0 |
 | %Change | > 2% |
-| Base filters | Price > $3, Vol > 1M, MktCap > $300M |
+| % 50D MA | > 0% |
+| Base filters | Price > $5, Vol > 1M, MktCap > $200M |
 
 **When to run (manually on Barchart website):**
 - **9:45** — after first 15min candle closes, scan for morning ORB candidates
@@ -181,7 +204,7 @@ Ge et al. 2016). Confirmation signal for PM-04 (OTM Informed Flow).
 
 | Filter | Value | Reason |
 |--------|-------|--------|
-| Underlying Price | > $3 | Match stock screener base filter |
+| Underlying Price | > $5 | Match stock screener base filter |
 | Underlying Avg Volume | > 1M | Match stock screener liquidity filter |
 
 ### Column View (Options Screener)
