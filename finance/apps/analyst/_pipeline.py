@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from tempfile import mkdtemp
 
+from finance.apps.analyst._calendar import check_macro_risk, fetch_upcoming_events
 from finance.apps.analyst._claude import analyze_candidates, review_compliance, summarize_market
 from finance.apps.analyst._config import AnalystConfig, load_config
 from finance.apps.analyst._enrichment import enrich
@@ -117,6 +118,19 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
     log.info("Stage 3/7: Scoring against 5-box checklist...")
     scored = score(enriched)
 
+    # Stage 3b: Economic calendar — macro risk check
+    macro_risks: list[str] = []
+    try:
+        events = fetch_upcoming_events(days_ahead=5, impact_filter="High")
+        has_risk, macro_risks = check_macro_risk(events)
+        if has_risk:
+            for risk in macro_risks:
+                log.warning("  ⚠ %s", risk)
+        else:
+            log.info("  No high-impact macro events within 48h")
+    except Exception:
+        log.warning("Economic calendar fetch failed — continuing", exc_info=True)
+
     # Stage 4: Claude market summary
     market_summary = MarketSummary()
     recommendations: list[TradeRecommendation] = []
@@ -174,7 +188,7 @@ def run(*, dry_run: bool = False, csv_paths: list[str] | None = None, **_kwargs)
         log.info("Stage 7/7: Skipped (dry run)")
 
     # Output report
-    _print_report(scored, market_emails, market_summary, recommendations, reviews, aggregate)
+    _print_report(scored, market_emails, market_summary, recommendations, reviews, aggregate, macro_risks)
     log.info("Pipeline complete. %d candidates scored, %d recommendations, %d trade reviews.",
              len(scored), len(recommendations), len(reviews))
 
@@ -205,8 +219,17 @@ def _print_report(
     recommendations: list[TradeRecommendation] | None = None,
     reviews: list[TradeAnalysisResult] | None = None,
     aggregate: ComplianceAggregate | None = None,
+    macro_risks: list[str] | None = None,
 ) -> None:
     """Print a formatted report to stdout."""
+    # Macro risk warnings
+    if macro_risks:
+        print("\n" + "=" * 80)
+        print("  MACRO RISK EVENTS")
+        print("=" * 80)
+        for risk in macro_risks:
+            print(f"  {risk}")
+
     # Market summary (Claude)
     if market_summary and market_summary.regime:
         print("\n" + "=" * 80)

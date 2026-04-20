@@ -12,6 +12,7 @@ Box 5: Risk Parameters
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime
 
 from finance.apps.analyst._models import (
     BoxResult,
@@ -25,6 +26,7 @@ log = logging.getLogger(__name__)
 
 MAX_STOP_PCT = 7.0       # Minervini hard limit: stop ≤ 7% from entry
 MAX_52W_DISTANCE = 25.0  # Price within 25% of 52W high
+EARNINGS_BLACKOUT_DAYS = 5  # No entries within 5 days of earnings
 
 
 def score(candidates: list[EnrichedCandidate]) -> list[ScoredCandidate]:
@@ -172,7 +174,14 @@ def _box3_base_quality(t: TechnicalData, c: Candidate) -> BoxResult:
 
 
 def _box4_catalyst(c: Candidate) -> BoxResult:
-    """Catalyst evaluation — partially automated with scanner data, rest for Claude."""
+    """Catalyst evaluation — auto-fail on imminent earnings, otherwise MANUAL with hints."""
+    # Earnings blackout: auto-fail if earnings within 5 trading days
+    if c.latest_earnings:
+        earnings_days = _days_until_earnings(c.latest_earnings)
+        if earnings_days is not None and 0 <= earnings_days <= EARNINGS_BLACKOUT_DAYS:
+            return BoxResult(4, "Catalyst", "FAIL",
+                f"Earnings in {earnings_days}d ({c.latest_earnings}) — no entries within {EARNINGS_BLACKOUT_DAYS}d")
+
     hints: list[str] = []
 
     # Options flow signals (PM-04)
@@ -182,7 +191,7 @@ def _box4_catalyst(c: Candidate) -> BoxResult:
         elif c.put_call_vol_5d > 1.5:
             hints.append(f"Put-heavy flow (P/C {c.put_call_vol_5d:.2f}) — potential squeeze")
 
-    # Earnings proximity
+    # Earnings date (outside blackout — note for awareness)
     if c.latest_earnings:
         hints.append(f"Next earnings: {c.latest_earnings}")
 
@@ -193,6 +202,18 @@ def _box4_catalyst(c: Candidate) -> BoxResult:
     if hints:
         return BoxResult(4, "Catalyst", "MANUAL", "; ".join(hints) + " — needs qualitative review")
     return BoxResult(4, "Catalyst", "MANUAL", "No signals — needs qualitative review (news, earnings, sector theme)")
+
+
+def _days_until_earnings(earnings_str: str) -> int | None:
+    """Parse earnings date string (MM/DD/YY or MM/DD/YYYY) and return days until."""
+    today = date.today()
+    for fmt in ("%m/%d/%y", "%m/%d/%Y", "%m/%d/%y %H:%M"):
+        try:
+            earnings_date = datetime.strptime(earnings_str.strip(), fmt).date()
+            return (earnings_date - today).days
+        except ValueError:
+            continue
+    return None
 
 
 def _box5_risk(t: TechnicalData, c: Candidate) -> BoxResult:
