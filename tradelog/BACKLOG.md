@@ -26,7 +26,7 @@
 
 **Affected layers:** Frontend only (trades, strategy-library)
 **Dependencies:** None (Document model + API already exist)
-**Status:** Pending
+**Status:** Done
 
 **Implementation:**
 - [x] In `trades.ts`: inject `DocumentService`, load documents on init, build `strategyDocMap: Map<number, number>` (strategyId → first documentId)

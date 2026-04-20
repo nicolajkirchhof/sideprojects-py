@@ -493,15 +493,46 @@
             <span class="text-xs font-medium uppercase tracking-wide opacity-50">Analysis</span>
             @for (analysis of tradeAnalyses(); track analysis.id) {
               <div class="mt-2 border border-white/10 rounded p-3 bg-white/5">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-xs opacity-60">{{ analysis.analysisDate | appDate }}</span>
-                  <span class="text-xs font-medium">Score: {{ analysis.score }}/5</span>
-                  @if (analysis.model) {
-                    <span class="text-xs opacity-40 ml-auto">{{ analysis.model }}</span>
+                @if (editingAnalysisId() === analysis.id) {
+                  <!-- Edit mode -->
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs opacity-60">{{ analysis.analysisDate | appDate }}</span>
+                    <mat-form-field appearance="outline" class="w-20" subscriptSizing="dynamic">
+                      <mat-label>Score</mat-label>
+                      <input matInput type="number" min="1" max="5"
+                             [ngModel]="editingAnalysisScore()" (ngModelChange)="editingAnalysisScore.set($event)">
+                    </mat-form-field>
+                    @if (analysis.model) {
+                      <span class="text-xs opacity-40 ml-auto">{{ analysis.model }}</span>
+                    }
+                  </div>
+                  <div class="min-h-[120px]">
+                    <quill-editor class="!flex flex-col" [modules]="quillModulesOff"
+                                  [ngModel]="editingAnalysisText()" (ngModelChange)="editingAnalysisText.set($event)"
+                                  theme="snow"></quill-editor>
+                  </div>
+                  <div class="flex gap-2 justify-end mt-2">
+                    <button mat-stroked-button type="button" class="!text-xs !min-h-[28px] !h-7"
+                            (click)="onCancelAnalysisEdit()">Cancel</button>
+                    <button mat-flat-button color="primary" type="button" class="!text-xs !min-h-[28px] !h-7"
+                            (click)="onSaveAnalysis(analysis)">Save</button>
+                  </div>
+                } @else {
+                  <!-- View mode -->
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs opacity-60">{{ analysis.analysisDate | appDate }}</span>
+                    <span class="text-xs font-medium">Score: {{ analysis.score }}/5</span>
+                    @if (analysis.model) {
+                      <span class="text-xs opacity-40 ml-auto">{{ analysis.model }}</span>
+                    }
+                    <button mat-icon-button type="button" class="!w-6 !h-6 !p-0" matTooltip="Edit analysis"
+                            (click)="onEditAnalysis(analysis)">
+                      <mat-icon class="!text-sm !w-4 !h-4 opacity-40">edit</mat-icon>
+                    </button>
+                  </div>
+                  @if (analysis.analysis) {
+                    <div class="text-sm whitespace-pre-wrap opacity-80">{{ analysis.analysis }}</div>
                   }
-                </div>
-                @if (analysis.analysis) {
-                  <div class="text-sm whitespace-pre-wrap opacity-80">{{ analysis.analysis }}</div>
                 }
               </div>
             }

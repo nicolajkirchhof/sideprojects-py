@@ -107,6 +107,9 @@ export class Trades {
 
   // Trade analyses (Claude)
   tradeAnalyses = signal<TradeAnalysisDto[]>([]);
+  editingAnalysisId = signal<number | null>(null);
+  editingAnalysisScore = signal(0);
+  editingAnalysisText = signal('');
 
   // Leg picker
   showLegPicker = signal(false);
@@ -478,6 +481,30 @@ export class Trades {
     this.dailyPrepService.getTradeAnalyses(tradeId).subscribe({
       next: (analyses) => this.tradeAnalyses.set(analyses),
       error: () => this.tradeAnalyses.set([]),
+    });
+  }
+
+  onEditAnalysis(analysis: TradeAnalysisDto): void {
+    this.editingAnalysisId.set(analysis.id);
+    this.editingAnalysisScore.set(analysis.score);
+    this.editingAnalysisText.set(analysis.analysis ?? '');
+  }
+
+  onCancelAnalysisEdit(): void {
+    this.editingAnalysisId.set(null);
+  }
+
+  onSaveAnalysis(analysis: TradeAnalysisDto): void {
+    this.dailyPrepService.updateTradeAnalysis(analysis.tradeId, analysis.id, {
+      score: this.editingAnalysisScore(),
+      analysis: this.editingAnalysisText(),
+    }).subscribe({
+      next: () => {
+        this.notify.success('Analysis updated');
+        this.editingAnalysisId.set(null);
+        this.loadAnalyses(analysis.tradeId);
+      },
+      error: () => this.notify.error('Failed to update analysis'),
     });
   }
 

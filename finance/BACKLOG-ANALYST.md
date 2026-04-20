@@ -333,7 +333,7 @@ Push analysis results to the Tradelog web app for persistence and display.
 
 **Affected layers:** Angular frontend + API (PUT endpoint for edits)
 **Dependencies:** E4-S1, E3-S3
-**Status:** Partial — read-only display done, edit mode deferred
+**Status:** Done
 
 ---
 
