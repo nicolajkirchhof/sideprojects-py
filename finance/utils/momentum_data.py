@@ -1,7 +1,8 @@
 """
 finance.utils.momentum_data
 =============================
-Data loading and preparation for the momentum/earnings analysis dashboard.
+Data loading and preparation for the momentum/earnings analysis dashboard
+and swing trading backtests (PEAD, ATRP, EMA reclaim, etc.).
 """
 from __future__ import annotations
 
@@ -11,17 +12,78 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq  # type: ignore
 
+# ---------------------------------------------------------------------------
+# Constants — match the data generation script offsets
+# ---------------------------------------------------------------------------
+DAILY_FORWARD_DAYS = 60
+WEEKLY_FORWARD_WEEKS = 12
+
+_DATASET_DIR = "finance/_data/research/swing/momentum_earnings"
+_TICKER_DIR = f"{_DATASET_DIR}/ticker"
+
+# ---------------------------------------------------------------------------
+# Column registry
+# ---------------------------------------------------------------------------
+
+def _required_columns() -> list[str]:
+    """
+    Return the sorted list of columns that load_and_prep_data will attempt
+    to read from the yearly parquet files.
+
+    Exposed at module level so backtests and tests can inspect the schema.
+    """
+    cols: set[str] = {
+        # core
+        "date", "original_price", "c0", "cpct0", "atrp200", "is_earnings", "is_etf",
+        "spy0", "spy5", "market_cap_class",
+        # event types
+        "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch",
+        "evt_episodic_pivot", "evt_pre_earnings", "evt_ema_reclaim", "evt_selloff",
+        # earnings / PEAD columns
+        "sue", "surprise_dir", "close_in_range", "consecutive_beats",
+        "gappct", "eps", "eps_est",
+        # momentum filters
+        "1M_chg", "3M_chg", "6M_chg", "12M_chg",
+        "ma10_dist0", "ma20_dist0", "ma50_dist0", "ma100_dist0", "ma200_dist0",
+        "spy_ma10_dist0", "spy_ma20_dist0", "spy_ma50_dist0", "spy_ma100_dist0", "spy_ma200_dist0",
+    }
+
+    # Trajectory / dist / cond filter — daily (1..60) + weekly (1..12)
+    for i in range(1, DAILY_FORWARD_DAYS + 1):
+        cols.add(f"cpct{i}")
+        cols.add(f"ma5_dist{i}")
+        cols.add(f"ma10_dist{i}")
+        cols.add(f"ma20_dist{i}")
+        cols.add(f"ma50_dist{i}")
+    for i in range(1, WEEKLY_FORWARD_WEEKS + 1):
+        cols.add(f"w_cpct{i}")
+        cols.add(f"w_ma5_dist{i}")
+        cols.add(f"w_ma10_dist{i}")
+        cols.add(f"w_ma20_dist{i}")
+        cols.add(f"w_ma50_dist{i}")
+
+    # Distribution-over-time options — daily (1..60) + weekly (1..12)
+    dist_metrics = ["ma5_slope", "ma10_slope", "ma20_slope", "ma50_slope",
+                    "rvol20", "hv20", "atrp20"]
+    for m in dist_metrics:
+        for i in range(1, DAILY_FORWARD_DAYS + 1):
+            cols.add(f"{m}{i}")
+        for i in range(1, WEEKLY_FORWARD_WEEKS + 1):
+            cols.add(f"w_{m}{i}")
+
+    return sorted(cols)
+
 
 def load_ticker_earnings_events(symbol: str) -> pd.DataFrame:
     """
     Load per-ticker earnings events from the momentum_earnings dataset.
 
-    Returns a DataFrame with one row per earnings event and the cpct[-25..25]
+    Returns a DataFrame with one row per earnings event and the cpct[-60..60]
     forward/backward return columns. Adds an `eps_surprise` column
     (eps - eps_est) and a `surprise_dir` column ('beat' / 'miss' / 'unknown').
     Returns an empty DataFrame if the ticker parquet is missing.
     """
-    path = f"finance/_data/momentum_earnings/ticker/{symbol.upper()}.parquet"
+    path = f"{_TICKER_DIR}/{symbol.upper()}.parquet"
     if not os.path.exists(path):
         return pd.DataFrame()
 
@@ -53,50 +115,13 @@ def load_ticker_earnings_events(symbol: str) -> pd.DataFrame:
 
 def load_and_prep_data(years: range) -> pd.DataFrame:
     """
-    Loads and standardizes the momentum/earnings dataset for the dashboard.
+    Loads and standardizes the momentum/earnings dataset for the dashboard
+    and backtests.
     """
-
-    def _required_columns() -> list[str]:
-        cols: set[str] = {
-            # core
-            "date", "original_price", "c0", "cpct0", "atrp200", "is_earnings", "is_etf",
-            "spy0", "spy5", "market_cap_class",
-            # event types (new tracking)
-            "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch",
-            # filters
-            "1M_chg", "3M_chg", "6M_chg", "12M_chg",
-            "ma10_dist0", "ma20_dist0", "ma50_dist0", "ma100_dist0", "ma200_dist0",
-            "spy_ma10_dist0", "spy_ma20_dist0", "spy_ma50_dist0", "spy_ma100_dist0", "spy_ma200_dist0",
-        }
-
-        # Trajectory / dist / cond filter (daily + weekly)
-        for i in range(1, 25):
-            cols.add(f"cpct{i}")
-            cols.add(f"ma5_dist{i}")
-            cols.add(f"ma10_dist{i}")
-            cols.add(f"ma20_dist{i}")
-            cols.add(f"ma50_dist{i}")
-        for i in range(1, 9):
-            cols.add(f"w_cpct{i}")
-            cols.add(f"w_ma5_dist{i}")
-            cols.add(f"w_ma10_dist{i}")
-            cols.add(f"w_ma20_dist{i}")
-            cols.add(f"w_ma50_dist{i}")
-
-        # Distribution-over-time options (daily + weekly)
-        dist_metrics = ["ma5_slope", "ma10_slope", "ma20_slope", "ma50_slope", "rvol20", "hv20", "atrp20"]
-        for m in dist_metrics:
-            for i in range(1, 25):
-                cols.add(f"{m}{i}")
-            for i in range(1, 9):
-                cols.add(f"w_{m}{i}")
-
-        return sorted(cols)
-
     required_cols = _required_columns()
     dfs: list[pd.DataFrame] = []
     for year in years:
-        path = f"finance/_data/momentum_earnings/all_{year}.parquet"
+        path = f"{_DATASET_DIR}/all_{year}.parquet"
         if not os.path.exists(path):
             continue
         available = set(pq.ParquetFile(path).schema.names)
@@ -139,7 +164,13 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
 
     new_cols["direction"] = np.sign(new_cols["event_move"]).replace(0, 1) if isinstance(new_cols["event_move"], pd.Series) else 1
 
-    for c in ("is_earnings", "is_etf", "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch"):
+    # Boolean event flags — original + new
+    _event_flags = (
+        "is_earnings", "is_etf",
+        "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch",
+        "evt_episodic_pivot", "evt_pre_earnings", "evt_ema_reclaim", "evt_selloff",
+    )
+    for c in _event_flags:
         new_cols[c] = df[c].fillna(False).astype(bool) if c in df.columns else False
 
     # SPY Context
@@ -153,8 +184,49 @@ def load_and_prep_data(years: range) -> pd.DataFrame:
         new_cols["spy_class"] = "Unknown"
 
     # Drop original boolean columns that are being replaced, then concat all new columns at once
-    bool_cols_to_replace = [c for c in ("is_earnings", "is_etf", "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch") if c in df.columns]
+    bool_cols_to_replace = [c for c in _event_flags if c in df.columns]
     df = df.drop(columns=bool_cols_to_replace)
     df = pd.concat([df, pd.DataFrame(new_cols, index=df.index)], axis=1)
 
     return df
+
+
+def load_earnings_events(
+    years: range,
+    *,
+    min_sue: float | None = None,
+    max_sue: float | None = None,
+    direction: str | None = None,
+) -> pd.DataFrame:
+    """
+    Load dataset filtered to earnings events only, with optional SUE filters.
+
+    Parameters
+    ----------
+    years:
+        Year range to load (e.g. range(2016, 2026)).
+    min_sue:
+        Minimum SUE (inclusive). Use for beat filtering (e.g. min_sue=0).
+    max_sue:
+        Maximum SUE (inclusive). Use for miss filtering (e.g. max_sue=0).
+    direction:
+        'beat', 'miss', or None for all.
+
+    Returns DataFrame with only earnings events and all forward return columns.
+    """
+    df = load_and_prep_data(years)
+    if df.empty:
+        return df
+
+    mask = df["is_earnings"].fillna(False).astype(bool)
+
+    if "sue" in df.columns:
+        if min_sue is not None:
+            mask &= df["sue"] >= min_sue
+        if max_sue is not None:
+            mask &= df["sue"] <= max_sue
+
+    if direction is not None and "surprise_dir" in df.columns:
+        mask &= df["surprise_dir"] == direction
+
+    return df.loc[mask].reset_index(drop=True)
