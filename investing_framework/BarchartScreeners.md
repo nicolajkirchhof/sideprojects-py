@@ -568,13 +568,23 @@ The pipeline aggregates option contracts to underlying-level signals:
 
 ## View-to-Screener Map
 
-| View | Screeners | Email / Manual |
-|------|-----------|----------------|
-| Standard | 1, 2, 3, 4, 5, 10 | Email |
-| PEAD/EP | 9, 11, 13 | Email |
-| Options/Flow | 6, 7, 12, 14 | Email |
-| Intraday | 8 | Manual (Barchart website) |
-| UOA (options) | UOA | Email |
+| Scanner | Name | View | Email/Manual | Strategy | Mechanism | Setup Type |
+|---------|------|------|--------------|----------|-----------|------------|
+| #1 | 52-Week High | Standard | Email | Swing Long | PM-01 Breakout | Type B (VCP near highs) |
+| #2 | 5-Day Momentum | Standard | Email | Swing Long | PM-01 / PM-02 | Type A (EP) |
+| #3 | 1-Month Strength | Standard | Email | Swing Long | PM-01 | Type B / C |
+| #4 | Volume Spike | Standard | Email | Swing Long | PM-01 | All types |
+| #5 | Trend Seeker | Standard | Email | Swing Long | Supplementary | Confirmation |
+| #6 | High Put Ratio | Options/Flow | Email | Both | PM-04 / PM-11 | Squeeze / Flow |
+| #7 | High Call Ratio | Options/Flow | Email | Swing Long | PM-04 | Flow confirmation |
+| #8 | Intraday RVOL | Intraday | Manual | Swing Long | PM-01 | Type A / C |
+| #9 | PEAD Candidates | PEAD/EP | Email | Swing Long | PM-02 | Type A (EP on earnings) |
+| #10 | TTM Squeeze | Standard | Email | Swing Long | PM-01 / PM-09 | Type B / C |
+| #11 | EP Gap Scanner | PEAD/EP | Email | Swing Long | PM-01 / PM-02 | Type A |
+| #12 | Short Squeeze | Options/Flow | Email | Swing Long | PM-11 | Watchlist |
+| #13 | Negative PEAD | PEAD/EP | Email | **Swing Short** | PM-02 (short) | Type D |
+| #14 | RW Breakdown | Options/Flow | Email | **Swing Short** | PM-05 (short) | Type D |
+| UOA | Unusual Options | UOA | Email | Both | PM-04 | Flow confirmation |
 
 ---
 

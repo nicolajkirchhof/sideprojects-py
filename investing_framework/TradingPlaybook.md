@@ -9,7 +9,7 @@ Relative strength momentum trading — 5–50 days — stocks and options.
 | Direction | Long AND short — RS/RW vs SPY in both directions |
 | Execution windows | First hour (9:30–10:15) and last hour (15:15–15:45) only |
 | Charting | 5, 10, 20, 50 SMA · Bollinger Bands · Put/Call volume ratio |
-| Instruments | Stocks and options on liquid names (Vol > 1M, Price > $3) |
+| Instruments | Stocks and options on liquid names (Vol > 1M, Price > $5) |
 
 ---
 
@@ -124,111 +124,41 @@ These are not standalone trades but are embedded in scanning, selection, or regi
 | — | Sentiment-Conditional TA | Technical signals work better in high-sentiment regimes. Use sentiment (VIX, put/call ratio, breadth) as a GO/NO-GO overlay for technical entries. *(Sentiment & TA, Hedge Fund Industry study)* | Embedded in regime |
 | — | Option Momentum | Options with high recent returns continue outperforming for up to 5 years without reversal. Favour names where recent option returns were positive when selecting structures. *(Option Momentum, cross-sectional study)* | Embedded in structure |
 
-### New Mechanism Candidates (from research library)
-
-These mechanisms have strong academic backing and fit the 5–50 day swing timeframe. Each needs validation through the 4-step Outlier framework before activation.
-
-#### PM-06 — News-Driven Drift *(Grade B · RESEARCH)*
-
-> News-driven price moves show strong continuation. No-news extreme moves tend to reverse. The distinction between the two is the highest-value filter for multi-day holds.
-
-| Attribute | Detail |
-|-----------|--------|
-| Market effect | Price continuation for days-weeks after identified news events; reversal on no-news moves |
-| Why it works | Information diffuses slowly; complex or nuanced news takes longer to price (Boudoukh et al., 2013) |
-| Academic basis | Boudoukh, Feldman, Kogan, Richardson 2013: variance ratios 120% higher on news days. LLM-based sentiment extends this (SSRN 2024). |
-| Timeframe | 5–20 days post-news |
-| Signals | Large move (>3%) WITH identified catalyst = continuation. Large move WITHOUT catalyst = fade candidate. |
-| Structure | Long call / stock on news-driven RS breakouts. Fade (short / put) on no-news spikes in RW stocks. |
-| Invalidation | Move reverses within 2 days despite clear catalyst. |
-| Research gap | Build a systematic news-vs-no-news classifier. Backtest continuation vs reversal rates on your watchlist. |
-
-#### PM-07 — Retail Attention Contrarian *(Grade B · RESEARCH)*
-
-> Stocks with extreme retail buying frenzies are systematically overpriced. Fade the herding.
-
-| Attribute | Detail |
-|-----------|--------|
-| Market effect | Intense retail buying (attention-driven) predicts –4.7% abnormal returns over 20 days |
-| Why it works | Retail buys on attention/salience, not fundamentals. Price overshoots, then mean-reverts. (Barber, Huang, Odean, Schwarz 2021) |
-| Academic basis | Robinhood herding study; Boehmer et al. 2021 retail flow tracking; Kaniel et al. 2008 contrarian retail flow |
-| Timeframe | 5–20 days after the attention spike |
-| Signals | Extreme RVOL + social media spike + retail platform herding (visible in options flow: call buying > 5× OI) WITHOUT fundamental catalyst |
-| Structure | Short stock or bear put spread 30–45 DTE after the initial frenzy fades (day 2–3, not day 1) |
-| Invalidation | Stock holds gains for 5+ days with institutional follow-through (not just retail) |
-| Research gap | Define "extreme retail attention" quantitatively. Backtest 20-day returns on top Robinhood movers with no earnings catalyst. |
-
-#### PM-08 — Overnight Reversal *(REJECTED — April 2026)*
-
-> ~~Sell-offs create robust positive overnight returns.~~ **Backtest rejected.** 33,935 selloff events (pct<-2%, RVOL>1.5, Stage 2 uptrend) show no edge at any horizon: 1d -0.83%, 5d -0.12%, 10d +0.15%, 60d -0.28%. Win rate 46.8%, Sharpe -0.011. The academic effect (Boyarchenko 2023) does not survive in individual stocks filtered for RS/momentum.
-
-| Attribute | Detail |
-|-----------|--------|
-| **Backtest** | N=33,935 · 2016–2026 · Price>$5, Vol>1M, Stage 2 |
-| **Result** | No edge. Mean return indistinguishable from zero at all horizons. |
-| **Status** | **Rejected.** Do not trade. Remove from scanning. |
+### Validated Supplementary Mechanisms
 
 #### PM-09 — Mean Reversion to Trend *(Grade A · ACTIVE — validated April 2026)*
 
-> Stocks oscillate around their trend. Oversold pullbacks within an uptrend revert to the moving average. The Bollinger lower band touch is a quantifiable entry signal.
+> Oversold pullbacks within an uptrend revert to the moving average. The Bollinger lower band touch is a quantifiable confirmation signal for Type C entries.
 
 | Attribute | Detail |
 |-----------|--------|
-| **Market effect** | De-trended price residuals behave as mean-reverting process with exploitable periodicity |
-| **Why it works** | Institutional rebalancing creates oscillations around equilibrium. Overreaction to short-term news + institutional buying on dips. (Nassar & Ephrem 2020) |
-| **Backtest** | N=53,400 BB lower touch events (low <= BB lower, ma50_slope>0, ma200_dist>0). 2016–2026. |
-| **Results** | 10d: +1.18% (53.8% WR). 20d: +1.70% (54.5%). 60d: +2.25% (55.1%, Sharpe 0.115). |
-| **Timeframe** | 5–20 days (confirmed by backtest — most of the edge captured by day 20) |
-| **Signals** | Price touches lower Bollinger Band while 50 SMA is rising and price above 200 SMA. Volume declining on pullback. RS intact vs SPY. |
-| **Structure** | This IS the Type C (SMA Reclaim) setup. Long call 30–45 DTE or stock + hard stop. |
-| **Role** | **Supplementary signal.** Confirms pullback is within trend. EMA Reclaim (Type C) produces better returns from the same setup — use BB touch as a confirmation layer, not standalone entry. |
-| **Invalidation** | Close below 50 SMA. RS flips negative. Volume expands on pullback (distribution). |
-| **Status** | Validated. Use as confirmation for Type C entries. |
-
-#### PM-10 — Insider & Corporate Action Drift *(Grade B · RESEARCH)*
-
-> Insider buying and share buybacks predict positive returns. These are the strongest fundamental confirmation signals.
-
-| Attribute | Detail |
-|-----------|--------|
-| Market effect | Insider purchases predict positive returns over 3–12 months. Buyback announcements show 3–5% drift over 1–2 months. |
-| Why it works | Insiders have information advantage. Buybacks signal undervaluation. Both reduce float, supporting price. (Ikenberry et al. 1995; Handbook of Equity Market Anomalies) |
-| Timeframe | 20–50 days post-announcement (buyback) or post-filing (insider buy) |
-| Signals | SEC Form 4 insider purchase > $100k by C-suite. Board-authorized buyback > 5% of float. Stock already in Stage 2 / RS positive. |
-| Structure | Stock + hard stop or long call 45–60 DTE. The drift is steady, not explosive — debit spreads work well. |
-| Invalidation | Insider buy is a routine auto-purchase (stock comp plan). Buyback not followed by actual repurchase activity. |
-| Research gap | Build SEC Form 4 screen. Backtest: do insider buys on RS stocks with VCP bases produce better outcomes than VCP alone? |
-
-#### PM-11 — Short Squeeze Setup *(Grade B · RESEARCH)*
-
-> Extreme short interest + catalyst + dealer gamma exposure = forced covering cascade.
-
-| Attribute | Detail |
-|-----------|--------|
-| Market effect | Short covering amplified by dealer gamma hedging creates violent multi-day rallies |
-| Why it works | Shorts are forced to buy to cover. Dealers hedging short gamma positions must also buy. Both amplify the move. (GameStop study; SqueezeMetrics GEX research) |
-| Timeframe | 3–10 days (squeeze is fast and violent) |
-| Signals | Short interest > 20% of float · days-to-cover > 5 · RS turning positive · catalyst (earnings beat, news) · dealer GEX negative on the name |
-| Structure | Long stock or long call 30 DTE (capture the squeeze, not the drift). Take profits aggressively — squeezes reverse fast. |
-| Invalidation | Short interest declining before entry (shorts already covering). No catalyst — squeeze without a trigger is just hope. |
-| Research gap | Quantify: what short interest % + days-to-cover combination produces the most reliable squeeze outcomes? |
+| **Backtest** | N=53,400 BB lower touch events (2016–2026). 10d: +1.18% (53.8% WR). 20d: +1.70%. 60d: +2.25% (Sharpe 0.115). |
+| **Signals** | Price touches lower BB while 50 SMA rising and price above 200 SMA. Volume declining. RS intact. |
+| **Role** | **Confirmation layer for Type C entries.** BB touch validates the pullback is within trend. |
+| **Scanner** | #10 (TTM Squeeze) |
 
 ### Research Pipeline
 
-All mechanisms below are being evaluated. Do not trade until all 4 steps of the Outlier framework are complete.
+Mechanisms under evaluation. Full cards and assessments in `StrategyIdeasAssessment.md`.
 
-| # | Mechanism | Cluster | Grade | Status | Notes |
-|---|-----------|---------|-------|--------|-------|
-| 06 | News-Driven Drift | Drift | B | Research | Build news-vs-no-news classifier |
-| 07 | Retail Attention Contrarian | Institution | B | Research | Define "extreme attention" quantitatively |
-| 08 | Earnings Volatility Crush | Fear | A | Research | Backtest: which underlyings stay within expected move? |
-| 09 | ~~Overnight Reversal~~ | ~~Drift~~ | ~~B~~ | **Rejected** | No edge — 33,935 events, Sharpe -0.011. Removed. |
-| 10 | ~~Mean Reversion to Trend~~ | ~~Drift~~ | ~~B~~ | **Promoted → PM-09 Active** | Validated: +2.25%/60d, 55.1% WR. Supplementary to Type C. |
-| 11 | Insider & Corporate Action | Drift | B | Research | Build SEC Form 4 screen |
-| 12 | Short Squeeze | Institution | B | Research | Quantify SI% + DTC thresholds |
-| 14 | Gamma-Induced Pinning | Institution | B | Research | Can max pain predict 5d directional trades? |
-| 20 | End of Month / Turn of Month | Regime | B | Research | Pension fund flow on RS stocks |
-| 29 | VTS Slope Alpha | Fear | B | Research | IV term structure as screening filter |
+| # | Mechanism | Grade | Status | Notes |
+|---|-----------|-------|--------|-------|
+| 06 | News-Driven Drift | B | Research | Build news-vs-no-news classifier |
+| 07 | Retail Attention Contrarian | B | Research | Define "extreme attention" quantitatively |
+| 08 | Earnings Volatility Crush | A | Research | Backtest: which underlyings stay within expected move? |
+| 10 | Insider & Corporate Action | B | Research | Build SEC Form 4 screen |
+| 11 | Short Squeeze | B | Research | Quantify SI% + DTC thresholds |
+
+### Rejected Mechanisms
+
+| # | Mechanism | Result | Date |
+|---|-----------|--------|------|
+| PM-08 | Overnight Reversal | No edge — 33,935 events, Sharpe -0.011 | April 2026 |
+
+<!-- PM-06 through PM-11 full cards moved to StrategyIdeasAssessment.md -->
+<!-- PM-08 Overnight Reversal rejected April 2026: 33,935 events, no edge at any horizon -->
+<!-- PM-09 Mean Reversion promoted to Active (above) April 2026 -->
+
 
 ---
 
@@ -417,6 +347,48 @@ All 5 must pass. One fail = skip.
 - **Entry:** ORB below 30min candle low on breakdown day
 - **Stop:** Above the breakdown candle high or 20 SMA
 
+### Short Framework — Signal Layers (Type D)
+
+> Always have long AND short exposure. The short book operates independently — it captures the downside of the same academic edges.
+
+**Structure:** Put debit spreads (not short stock). Defined max loss eliminates overnight gap risk and borrow problems. Sizing: 0.5% portfolio max loss = debit paid.
+
+**Layer 1 — Universe Filter (always on):**
+
+| Filter | Rule |
+|--------|------|
+| Trend | Price < declining 50D SMA |
+| Short interest | < 20% of float (above 20% = squeeze risk) |
+| Liquidity | Vol > 500K |
+| Binary events | No earnings/FDA/M&A within 10 days |
+
+**Layer 2 — Primary Trigger (at least one required):**
+
+| Trigger | Signal | Hold | Backtest |
+|---------|--------|------|----------|
+| **Negative PEAD** (primary) | EPS miss (bottom 25% SUE) + close bottom 25% of range | 10–20d general, 40–60d strong | Strong: -12%/60d, 76.8% WR. General: -2.2%/10d then fades. |
+| **RW Breakdown** | RW line at new lows vs SPY + sector Stage 3/4 | 5–30d | Scanner #14 |
+| **Scanners:** #13 (Negative PEAD), #14 (RW Breakdown) | | | |
+
+**Layer 3 — Conviction Upgraders (not standalone):**
+
+| Signal | Rule | Finding |
+|--------|------|---------|
+| Accruals (Sloan 1996) | Top quartile accruals ratio | +3.38%/year L-S spread. Annual signal. |
+| F-Score (Piotroski 2000) | F-Score <= 3 | Quality filter. ~0.5%/quarter. |
+| 1st miss is strongest | Focus on first-miss quality, not consecutive count | Consecutive misses show *weaker* drift. |
+
+**Key insight from backtest:** General misses drift -2.2% to day 10 then mean-revert. Only strong filtered signals (miss + gap<=-5% + bottom 25% close) persist to 60 days. Use 10–20d hold for general shorts, 40–60d only for strong.
+
+### ATR Extension Table
+
+| ATR Range | Stage | Action |
+|-----------|-------|--------|
+| 0–3 ATR | Early / Stable Trend | Sweet spot. Sustainable entry. |
+| 3–6 ATR | Established Trend | Strong momentum. Diminishing R:R. |
+| 7–10 ATR | Extended Trend | Climax risk. Only partial entries. |
+| > 10 ATR | Parabolic / Exhausted | High reversion risk. Avoid entries. |
+
 ### Setup Priority
 
 | Regime | Priority |
@@ -424,6 +396,19 @@ All 5 must pass. One fail = skip.
 | Strong bull (SPY > 20 + 50, breadth expanding) | A > B > C. No shorts. |
 | Moderate bull (SPY > 50, 20 flattening) | B > C > A. Selective shorts (Type D) on extreme RW. |
 | Correction / bear (SPY < 50) | D only. No longs. Spreads only for options. |
+
+### Scanner Cross-Reference
+
+| Setup | Primary Scanners | View |
+|-------|-----------------|------|
+| Type A (EP) | #9 PEAD, #11 EP Gap, #2 5-Day Momentum | PEAD/EP |
+| Type B (VCP) | #1 52W High, #3 1M Strength, #10 TTM Squeeze | Standard |
+| Type C (Reclaim) | #3 1M Strength, #10 TTM Squeeze, #4 Volume | Standard |
+| Type D (Short) | #13 Neg PEAD, #14 RW Breakdown | PEAD/EP, Options/Flow |
+| Confirmation | #6 High Put, #7 High Call, UOA | Options/Flow |
+| Intraday | #8 RVOL Spike (manual) | Intraday |
+
+Full scanner configuration: `BarchartScreeners.md`
 
 ---
 
