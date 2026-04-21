@@ -34,7 +34,7 @@ def _required_columns() -> list[str]:
     """
     cols: set[str] = {
         # core
-        "date", "original_price", "c0", "cpct0", "atrp200", "is_earnings", "is_etf",
+        "symbol", "date", "original_price", "c0", "cpct0", "atrp200", "is_earnings", "is_etf",
         "spy0", "spy5", "market_cap_class",
         # event types
         "evt_atrp_breakout", "evt_green_line_breakout", "evt_bb_lower_touch",
