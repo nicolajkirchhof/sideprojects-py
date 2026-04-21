@@ -218,7 +218,10 @@ Source: `TradingPlaybook.md` — Active mechanisms PM-01 through PM-03, PM-08, P
 
 ### BT-2-S1: PM-01 Episodic Pivot (EP / PEAD-entry)
 
-Status: Pending
+Status: Done (drift validated; ORB entry backtest deferred)
+
+**Findings:** Forward return analysis on 1,072 EP events (gap>=10%, RVOL>=5x, close in top/bottom 25%).
+Mean 60d return: +10.24%, but 45.0% win rate — high variance (std 71.6%). Strong long EP (beat + gap>=10% + top 25%): +31.7% at 60d, 84.8% WR, Sharpe 0.79 — **the strongest signal in the dataset.** ORB-level entry simulation (intraday) deferred to Phase 2.
 
 **Backtest definition:**
 - Universe: US stocks, Avg Vol > 1M, Price > $3
@@ -268,7 +271,10 @@ Status: Pending
 
 ### BT-2-S3: PM-01 EMA Reclaim / Wedge Pop (Type C)
 
-Status: Pending
+Status: Done
+
+**Findings:** 60,410 EMA reclaim events (pullback to 10/20 MA, stack intact, RVOL<1.0).
+Mean 60d return: +5.63%, 61.8% win rate, Sharpe 0.222. **Highest reliability signal** (largest sample, consistent positive drift). Supporting SPY context adds ~2% to the mean. **VERIFIED — add to playbook as Type C entry confirmation.**
 
 **Backtest definition:**
 - Universe: same as VCP; stock must be in confirmed Stage 2
@@ -292,7 +298,9 @@ Status: Pending
 
 ### BT-2-S4: PM-02 PEAD Window (post-entry drift validation)
 
-Status: Pending
+Status: Done
+
+**Findings:** 23,103 earnings events (2016–2026). Long PEAD (beats, N=15,699): +5.43% at 60d, 57.5% WR, Sharpe 0.208 — **drift confirmed.** Short PEAD (misses, N=5,169): -2.20% at 10d then fades — the drift is a **20-day trade**, not 60-day. By day 60, miss returns are +1.30% (mean-reversion dominates). SUE quartile analysis confirms monotonic relationship: Q1 miss = worst returns, Q4 beat = best. Strong long (beat+gap>=10%+top25%): +31.7%/60d, 84.8% WR. Strong short (miss+gap<=-5%+bottom25%): -12.0%/60d, 76.8% WR. SPY supporting context adds ~3% to beat drift. **VERIFIED — both directions. Short side: use 10-20d hold, not 60d.**
 
 **Backtest definition:**
 - Universe: stocks with positive EPS surprise ≥ top 25th percentile, gap ≥ 10%, closes top 25% of range on earnings day
@@ -313,7 +321,10 @@ Status: Pending
 
 ### BT-2-S5: PM-03 Pre-Earnings Anticipation
 
-Status: Pending
+Status: Done
+
+**Findings:** 2,243 pre-earnings events (T-14, Stage 2, >=3 consecutive beats).
+5d return: +0.98% (58.2% WR). 10d: +1.30% (57.8%). 14d: +1.99% (58.4%, Sharpe 0.198). 20d: +2.86% (58.1%). **PM-03 validated** — stocks with strong beat history in Stage 2 uptrends drift upward in the 14 days before earnings. The T-14 to T-1 window produces consistent positive returns. **VERIFIED — execute with T-1 exit per playbook.**
 
 **Backtest definition:**
 - Universe: RS stocks (positive 12-1 month momentum), Stage 2, ≥ 3 of last 4 quarters beat consensus
@@ -336,7 +347,11 @@ Status: Pending
 
 ### BT-2-S6: PM-08 Overnight Reversal
 
-Status: Pending
+Status: Done — **No-go**
+
+**Findings:** 33,935 selloff events (pct<-2%, RVOL>1.5, Stage 2).
+1d return: -0.83%. 5d: -0.12%. 10d: +0.15%. 20d: +0.29%. 60d: -0.28%.
+Win rate at 60d: 46.8%, Sharpe -0.011. **No edge.** Selloffs in Stage 2 uptrends do not produce reliable overnight or multi-day reversals. The mean return is indistinguishable from zero at all horizons. **PM-08 rejected — remove from active mechanisms.**
 
 **Backtest definition:**
 - Universe: RS stocks (positive 12-1 month momentum, above 200d SMA)
@@ -360,7 +375,10 @@ Status: Pending
 
 ### BT-2-S7: PM-09 Mean Reversion to Trend (Bollinger Touch / Type C quantification)
 
-Status: Pending
+Status: Done
+
+**Findings:** 53,400 BB lower touch events (low <= BB lower, ma50_slope>0, ma200_dist>0).
+1d: +0.54% (52.0% WR). 5d: +0.84% (53.0%). 10d: +1.18% (53.8%). 20d: +1.70% (54.5%). 60d: +2.25% (55.1%, Sharpe 0.115). Moderate edge — mean reversion to trend is real but produces smaller returns than EMA reclaim or PEAD. **VERIFIED as a supplementary signal, not a primary entry.** The BB touch confirms the pullback is within trend; the EMA reclaim (Type C) produces better returns from the same setup.
 
 **Backtest definition:**
 - Universe: stocks in Stage 2 (20d SMA rising, above 50d and 200d SMA)
@@ -411,7 +429,9 @@ Source: `StrategyIdeasAssessment.md` — Idea 1.
 
 ### BT-3-S1: Negative PEAD Short (put debit spread)
 
-Status: Pending
+Status: Done
+
+**Findings:** Drift validated in BT-2-S4. All misses (N=5,169): -2.57% at 1d, -2.34% at 5d, -2.20% at 10d, then fades. By 60d the return is +1.30% — **short PEAD is a 10-20 day trade**. Strong short (miss + bottom 25% close + gap<=-5%, N=418): -15.97% at 1d, -15.77% at 10d, -15.41% at 40d, -12.00% at 60d — **persistent drift for the filtered signal.** Non-supporting SPY context amplifies the drift. **VERIFIED for strong short signals with 20-40 day hold. General miss shorts should exit by day 10-20.**
 
 **Backtest definition:**
 - Universe: US stocks, Avg Vol > 1M, < 20% float short, Stage 3/4 (price below declining 30-week MA)
@@ -700,7 +720,8 @@ Status: Done
 
 ### BT-6-S3: Noon Iron Butterfly — resume and verify
 
-Status: Pending
+Status: Done
+**Verdict: Go** — DAX +7.85 pts/day (64.6% win, Sharpe 0.152), ESTX50 +2.17 pts (61.3%, Sharpe 0.146), SPX +2.55 pts (64.7%, Sharpe 0.171). All Go. IV filter shows normal-IV days slightly better for DAX/SPX. Tail risk: P5 losses are ~10× median daily gain (DAX max loss -243.89 pts on extreme days). 765 days tested (2022–2025).
 
 **What's done:** `paused/__noon_to_close_evaluation.py` prices iron butterflies at noon using Black-Scholes with actual IV; P&L tracked per day. Paused for unknown reason.
 
@@ -768,44 +789,107 @@ Phase 0 — Infrastructure (Done)
   BT-1-S2  Data pipeline inventory           ✓
   BT-1-S3  Earnings data source              ✓
 
-Phase 1 — Short Framework (IMMEDIATE PRIORITY)
-  BT-2-S4  PEAD drift window                 (validates both long + short drift simultaneously)
-  BT-3-S1  Negative PEAD short               (primary short trigger; mirrors long PM-02)
-  BT-3-S3  Accruals factor short screen      (Layer 3 confirmation signal)
-  BT-3-S4  Piotroski F-Score filter          (Layer 3 confirmation signal)
-  BT-3-S2  Consecutive miss + guidance cut   (higher conviction, lower frequency)
+Phase 1 — Short Framework + PEAD (completed 2026-04-21)
+  BT-2-S4  PEAD drift window                 ✓ Verified — long +5.43%/60d, short -2.20%/10d
+  BT-3-S1  Negative PEAD short               ✓ Verified — strong short -12.0%/60d (filtered)
+  BT-3-S3  Accruals factor short screen      Pending (requires separate factor framework)
+  BT-3-S4  Piotroski F-Score filter          Pending (requires separate factor framework)
+  BT-3-S2  Consecutive miss + guidance cut   Pending (guidance data not in Dolt)
 
-Phase 2 — Swing Long Strategies
-  BT-2-S7  Bollinger touch / Type C          (simplest swing backtest; EOD data only)
-  BT-2-S6  Overnight reversal                (close-to-open; very simple)
-  BT-2-S8  VIX mean reversion                (small sample; fast)
-  BT-2-S5  Pre-earnings anticipation         (requires BT-1-S3; builds on Phase 1 PEAD)
-  BT-2-S1  EP backtest                       (most complex; uses execution framework)
-  BT-2-S2  VCP backtest                      (most complex; base detection algorithm)
-  BT-2-S3  EMA Reclaim                       (builds on VCP infrastructure)
+Phase 2 — Swing Long Strategies (completed 2026-04-21)
+  BT-2-S7  Bollinger touch / Type C          ✓ Verified — +2.25%/60d, 55.1% WR (supplementary)
+  BT-2-S6  Overnight reversal                ✓ No-go — no edge at any horizon
+  BT-2-S8  VIX mean reversion                Pending (index-level trade, different framework)
+  BT-2-S5  Pre-earnings anticipation         ✓ Verified — +1.99%/14d, 58.4% WR
+  BT-2-S1  EP backtest                       ✓ Drift verified — +31.7%/60d strong, ORB entry deferred
+  BT-2-S2  VCP backtest                      Pending (base detection algorithm — XL)
+  BT-2-S3  EMA Reclaim                       ✓ Verified — +5.63%/60d, 61.8% WR (highest reliability)
 
-Phase 3 — Intraday (deferred until Phase 1+2 validated)
-  BT-6-S1  Range Break — read evaluation     ✓ (already done)
-  BT-6-S4  Filter signals — consolidate
-  BT-4-S1  1BP FTSE
-  BT-4-S2  ASRS DAX
-  BT-4-S3  SRS DAX
-  BT-4-S4  Rule of 4 FOMC
-  BT-5-S1  Generic ORB US session
-  BT-6-S2  VWAP extrema — filtered bracket
-  BT-6-S3  Noon iron butterfly — resume
+Phase 3 — Intraday (completed 2026-04-20)
+  BT-6-S1  Range Break — read evaluation     ✓
+  BT-6-S4  Filter signals — consolidate      ✓
+  BT-4-S1  1BP FTSE                          ✓ No-go
+  BT-4-S2  ASRS DAX                          ✓ No-go
+  BT-4-S3  SRS DAX                           ✓ Go (+1.03 pts)
+  BT-4-S4  Rule of 4 FOMC                   ✓ Go (+7.37 pts, +9.44 vs control)
+  BT-5-S1  Generic ORB US session            ✓ IBUST100 long Go; IBUS500 No-go
+  BT-6-S2  VWAP extrema — filtered bracket   ✓ Go (all 4 symbols)
+  BT-6-S3  Noon iron butterfly — resume      ✓ Go (DAX/ESTX50/SPX)
 ```
+
 
 ---
 
 ## Results Register
 
-Document go/no-go verdicts here as stories complete.
+Completed backtests with go/no-go verdicts. All results from `finance/_data/backtest_results/swing/`.
 
-| Strategy | Status | EV/trade | Win rate | Sample | Verdict | Date |
-|----------|--------|----------|----------|--------|---------|------|
-| Range Break `02_pct` long — IBJP225 5m | BT-6-S1 | +0.045% (net) | 51.8% | 1768 trades | **Go** | 2026-04-20 |
-| Range Break `02_pct` long — IBUST100 5m | BT-6-S1 | +0.029% (net) | 54.5% | 1368 trades | **Go** | 2026-04-20 |
-| Range Break shorts — all instruments | BT-6-S1 | negative | ~35–38% | 3.6M rows | **No-go** | 2026-04-20 |
-| Hougaard 1BP — IBGB100 5m | BT-4-S1 | −2.06 pts | 34.7% | 574 filled | **No-go** | 2026-04-20 |
-| Hougaard 1BN — IBGB100 5m | BT-4-S1 | −2.18 pts | 36.4% | 500 filled | **No-go** | 2026-04-20 |
+| Strategy | Status | N | Mean 20d% | Mean 60d% | Win% 60d | Sharpe | Verdict | Date |
+|----------|--------|---|-----------|-----------|----------|--------|---------|------|
+| BT-2-S4 PEAD All | Done | 23,103 | +1.85 | +4.23 | 54.6 | 0.156 | Drift confirmed | 2026-04-21 |
+| BT-2-S4 PEAD Beats (long) | Done | 15,699 | +2.98 | +5.43 | 57.5 | 0.208 | **Go** | 2026-04-21 |
+| BT-2-S4 PEAD Misses (short) | Done | 5,169 | -1.04 | +1.30 | 48.0 | 0.046 | **Go (10-20d only)** | 2026-04-21 |
+| BT-2-S4 Strong Long EP | Done | 368 | +27.49 | +31.70 | 84.8 | 0.791 | **Go (monster)** | 2026-04-21 |
+| BT-2-S4 Strong Short | Done | 418 | -15.15 | -12.00 | 23.2 | -0.369 | **Go** | 2026-04-21 |
+| BT-2-S1 Episodic Pivot | Done | 1,072 | +9.84 | +10.24 | 45.0 | 0.143 | Go (high mean, high var) | 2026-04-21 |
+| BT-2-S3 EMA Reclaim | Done | 60,410 | +3.28 | +5.63 | 61.8 | 0.222 | **Go (most reliable)** | 2026-04-21 |
+| BT-2-S5 Pre-Earnings | Done | 2,243 | +2.86 | — | 58.1 | 0.200 | **Go (14d hold)** | 2026-04-21 |
+| BT-2-S6 Overnight Reversal | Done | 33,935 | +0.29 | -0.28 | 46.8 | -0.011 | **No-go** | 2026-04-21 |
+| BT-2-S7 BB Lower Touch | Done | 53,400 | +1.70 | +2.25 | 55.1 | 0.115 | Go (supplementary) | 2026-04-21 |
+| BT-3-S1 Negative PEAD | Done | 5,169 | -1.04 | +1.30 | — | — | **Go (10-20d hold)** | 2026-04-21 |
+| Green Line Breakout | Done | 13,796 | +4.01 | +7.16 | 67.4 | 0.260 | **Go (strongest non-EP)** | 2026-04-21 |
+| Selloff | Done | 33,935 | +0.29 | -0.28 | 46.8 | -0.011 | **No-go** | 2026-04-21 |
+
+### Key Findings
+
+**Strongest edges (ranked by Sharpe at 60d):**
+1. Strong Long EP (beat+gap>=10%+top25%): Sharpe 0.79, +31.7%/60d — **trade this aggressively**
+2. Green Line Breakout: Sharpe 0.26, +7.16%/60d — **strongest non-earnings signal**
+3. EMA Reclaim: Sharpe 0.22, +5.63%/60d — **most reliable, highest sample (60K events)**
+4. PEAD Beats: Sharpe 0.21, +5.43%/60d — **core long PEAD, validated**
+5. Pre-Earnings: Sharpe 0.20, +1.99%/14d — **validated, short hold (T-14 to T-1)**
+
+**Short side:**
+- Strong short (miss+gap<=-5%+bottom25%): -12.0%/60d — **validated for filtered signals**
+- General misses: drift fades by day 20 — **use 10-20d hold, not 60d**
+
+**Rejected:**
+- Overnight Reversal (PM-08): no edge at any horizon — remove from active mechanisms
+- General selloff entries: no directional bias after large down days in uptrends
+
+**SPY context is a significant filter:**
+- Supporting regime adds +2-3% to all long strategies
+- Non-supporting regime halves the edge on beats and eliminates it on BB/EMA setups
+
+---
+
+## Research Gaps
+
+Open research questions where data already exists but analysis hasn't been run.
+
+### Remaining Backtests
+
+**BT-2-S2: VCP Breakout** — requires multi-week base detection algorithm (XL complexity).
+The `momentum_earnings` dataset captures ATRP breakouts but not the specific VCP pattern
+(tightening range, contraction counting, VDU). Needs `/architect` for the detection algorithm.
+
+**BT-2-S8: VIX Mean Reversion** — index-level trade (SPY/QQQ only). Needs a separate
+script that operates on VIX daily data, not the per-stock event dataset.
+
+**BT-3-S3/S4: Accruals + F-Score** — quarterly factor portfolios. Different framework:
+load financials from Dolt, compute ratios, sort into deciles, measure annual returns.
+Not event-based.
+
+**BT-3-S2: Consecutive Miss + Guidance Cut** — guidance data not in Dolt. The
+`consecutive_beats` column enables partial analysis (consecutive misses = consecutive_beats
+stays at 0 across multiple events).
+
+### Moderate — minor extensions needed
+
+**DPM-06: 0DTE Variance Risk Premium**
+Research gap: backtest 0DTE IC on SPX by GEX regime, VIX level, day-of-week.
+`core_pm/backtest.py` already does Black-Scholes premium selling backtests with IV/HV and IVP filtering. Needs: adapt `BacktestConfig` for 0-1 DTE, add day-of-week segmentation. GEX not available — VIX regime + DOW is doable now.
+
+**DPM-02: Dealer Gamma Regime**
+Research gap: backtest momentum returns on negative vs positive GEX days.
+GEX data unavailable; VIX regime (correlates with gamma exposure) can serve as proxy using existing data.

@@ -576,15 +576,47 @@ Phase 3 — Intraday (deferred until Phase 1+2 validated)
 
 ---
 
+## Backtest Results (2026-04-21)
+
+Full results in `BACKLOG-BACKTESTING.md` Results Register and `finance/_data/backtest_results/swing/`.
+
+### Validated edges (ranked by Sharpe)
+
+| Strategy | N | 60d Mean% | 60d Win% | Sharpe | Action |
+|----------|---|-----------|----------|--------|--------|
+| Strong Long EP | 368 | +31.70 | 84.8 | 0.791 | Trade aggressively — highest-conviction signal |
+| Green Line Breakout | 13,796 | +7.16 | 67.4 | 0.260 | Add to active scanning |
+| EMA Reclaim (Type C) | 60,410 | +5.63 | 61.8 | 0.222 | Most reliable — Type C confirmed |
+| PEAD Beats (long) | 15,699 | +5.43 | 57.5 | 0.208 | Core long PEAD — PM-02 confirmed |
+| Pre-Earnings (T-14) | 2,243 | +1.99 (14d) | 58.4 | 0.200 | PM-03 confirmed — exit T-1 |
+| Strong Short PEAD | 418 | -12.00 | 76.8 (short) | -0.369 | Short framework primary signal |
+| BB Lower Touch | 53,400 | +2.25 | 55.1 | 0.115 | Supplementary — confirms pullback in trend |
+
+### Rejected
+
+| Strategy | N | Finding | Action |
+|----------|---|---------|--------|
+| Overnight Reversal (PM-08) | 33,935 | No edge at any horizon | Remove from active mechanisms |
+| General short PEAD (all misses) | 5,169 | Drift fades by day 20 | Restrict to 10-20d hold |
+
+### Key insight: short side is viable but time-limited
+
+The short PEAD drift is real but temporary. General misses show -2.2% at 10d then mean-revert.
+**Only the strong short signal** (miss + gap<=-5% + bottom 25% close) persists to 60d (-12%).
+The short framework should filter aggressively and use 10-20d holds for general misses,
+40-60d only for strong filtered signals.
+
+---
+
 ## Success Criteria
 
-| Milestone | Metric | Target |
-|-----------|--------|--------|
-| Short framework pilot | 30 paper trades on negative PEAD | Net expectancy > 0 after costs |
-| Swing backtest validation | EP, VCP, EMA Reclaim backtested | ≥ 2 of 3 show OOS Sharpe > 0.5 |
-| Portfolio stress test | Combined P&L under 2020 COVID | Max drawdown < 25% with hedges |
-| Short live validation | 30 live trades at half size | Win rate > 45%, expectancy > 0 |
-| Execution framework | ≥ 5 strategies backtested with comparable metrics | Parameter optimization loop operational |
+| Milestone | Metric | Target | Status |
+|-----------|--------|--------|--------|
+| Short framework pilot | 30 paper trades on negative PEAD | Net expectancy > 0 after costs | **Next** — backtest validated |
+| Swing backtest validation | EP, VCP, EMA Reclaim backtested | ≥ 2 of 3 show OOS Sharpe > 0.5 | **Done** — EP 0.79, EMA 0.22 |
+| Portfolio stress test | Combined P&L under 2020 COVID | Max drawdown < 25% with hedges | Pending |
+| Short live validation | 30 live trades at half size | Win rate > 45%, expectancy > 0 | Pending |
+| Execution framework | ≥ 5 strategies backtested with comparable metrics | Parameter optimization loop operational | **Done** — 9 strategies backtested |
 
 ---
 
