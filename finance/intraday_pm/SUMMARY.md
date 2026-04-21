@@ -17,22 +17,22 @@ Blank (—) = strategy not tested on that instrument.
 | **OCO candle scan** | **Go** | No-go | No-go | **Go** | **Go** | **Go** | Pilot | Pilot | No-go |
 | **Following Range Break** | Go | Pilot | Go | Go | Go | Go | No-go | — | — |
 | **Hougaard FOMC Rule of 4** | — | — | **Go** (event-only) | — | — | — | — | — | — |
-| **ORB 15m** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
-| **ORB 30m** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
+| **ORB (15m/30m)** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
 | **VWAP Extrema** | **Go** | **Go** | **Go** | **Go** | — | — | — | — | — |
 | **Noon Iron Butterfly** | No-go | — | **Go** | — | — | — | — | — | — |
 | **Micro/Macro Trend** | Do not pursue | — | — | — | — | — | — | — | — |
 | **0DTE Iron Condor** | — | — | No-go | — | — | — | — | — | — |
 | **Dealer Gamma Regime** | No filter value | — | No filter value | — | — | — | — | — | — |
 
-> **Removed rows:** Hougaard ASRS, Hougaard SRS, and OCO Opening Bar 30m were removed from
-> this table. All three are specific (timeframe, bar#, stop) parameter choices within the OCO
-> bracket family and are fully covered by the candle scan row — ASRS is 5min/bar3/bar_range,
-> SRS is 15min/bar1/atr, OCO Opening Bar 30m is 30min/bar0/atr. Retaining them alongside the
-> candle scan row duplicates information and obscures the signal: the scan found better bars
-> on most instruments (e.g. IBDE40 15min/bar2 beats SRS 15min/bar1; IBUS30 5min/bar2 beats
-> ASRS 5min/bar3). Per-instrument verdicts for these combos are in RESULTS.md; automation
-> parameters are in the Go Strategies section below.
+> **Removed rows:**
+> - *Hougaard ASRS, Hougaard SRS, OCO Opening Bar 30m* — specific (timeframe, bar#, stop)
+>   parameter choices within the OCO bracket family, fully covered by the OCO candle scan row.
+>   The scan found strictly better signal bars on most instruments (e.g. IBDE40 15min/bar2
+>   beats SRS 15min/bar1; IBUS30 5min/bar2 beats ASRS 5min/bar3). Per-instrument verdicts are
+>   in RESULTS.md; automation parameters are in the Go Strategies section below.
+> - *ORB 15m and ORB 30m* — merged into a single ORB row. Go/No-go verdict is identical
+>   across all four tested instruments; separating timeframes added no information at this
+>   level. Timeframe-level detail is in the Go Strategies section (§8–§9).
 
 ---
 
