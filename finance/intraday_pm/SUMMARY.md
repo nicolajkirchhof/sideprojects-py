@@ -18,7 +18,7 @@ Blank (—) = strategy not tested on that instrument.
 | **OCO fixed_2r** | **Go** | No-go | No-go | No-go | Pilot | **Go** | No-go | No-go | No-go |
 | **Following Range Break** | Go | Pilot | Go | Go | Go | Go | No-go | — | — |
 | **Hougaard FOMC Rule of 4** | — | — | **Go** (event-only) | — | — | — | — | — | — |
-| **VWAP Extrema** | **Go** | **Go** | **Go** | **Go** | — | — | — | — | — |
+| **VWAP Extrema** | **Go** | **Go** | **Go** | **Go** | **Go** | **Go** | **Go** | **Go** | Go · Go · Go · No-go · Pilot |
 
 > **Removed rows:**
 > - *Hougaard ASRS, Hougaard SRS, OCO Opening Bar 30m* — specific (timeframe, bar#, stop)
@@ -160,19 +160,28 @@ alternatives at the same time. Not a new automation target.
 ## Go Strategies — Key Parameters
 
 ### 1. VWAP Extrema (BT-6-S2)
-**Instruments:** IBDE40, IBGB100, IBUS500, IBUST100
+**Instruments:** IBUS30, IBJP225, IBUST100, IBES35, IBCH20, IBDE40, IBFR40, IBGB100, IBEU50, IBAU200, IBUS500 (Go); USGOLD (Pilot); IBNL25 (No-go)
 **Edge:** VWAP trend continuation — bracket placed in trend direction at extrema
-**Filter:** High-edge time slots (success rate ≥ 60%, EV > 2 pts)
+**Filter:** High-edge time slots (success rate ≥ 60%, EV > 2 pts after 2-pt round-trip cost)
 
-| Instrument | N trades/yr | EV (pts) | Sharpe | Key slots |
-|------------|-------------|----------|--------|-----------|
-| IBDE40 | ~15,000 | +49.77 | +0.524 | 08:00-09:30 Frankfurt, 14:30-17:30 |
-| IBGB100 | ~17,500 | +17.58 | +0.495 | 07:00-08:30 London |
-| IBUS500 | ~13,500 | +11.37 | +0.444 | 08:30-09:05 ET |
-| IBUST100 | ~11,000 | +57.61 | +0.520 | 08:30-09:05 ET |
+| Instrument | N trades/yr | EV (pts) | Sharpe | Key slots (UTC) |
+|------------|-------------|----------|--------|-----------------|
+| IBUS30 | ~12,300 | +88.26 | +0.528 | 14:00-14:50 (pre-market ET) |
+| IBJP225 | ~11,300 | +88.35 | +0.524 | 00:00-00:45 (Tokyo open) |
+| IBUST100 | ~10,600 | +52.47 | +0.517 | 14:00-14:50 (pre-market ET) |
+| IBES35 | ~13,800 | +29.03 | +0.507 | 07:00-08:00 (Madrid open) |
+| IBCH20 | ~16,500 | +25.35 | +0.505 | 07:00-07:55 (Zurich open) |
+| IBDE40 | ~13,500 | +44.66 | +0.498 | 07:00-08:40 (Frankfurt open) |
+| IBFR40 | ~13,300 | +17.13 | +0.488 | 07:00-08:05 (Paris open) |
+| IBGB100 | ~14,900 | +15.93 | +0.477 | 07:00-07:45 (London open) |
+| IBEU50 | ~20,200 | +10.78 | +0.469 | 07:00-07:45 (European open) |
+| IBAU200 | ~13,700 | +10.56 | +0.451 | 00:00-00:45 (Sydney open) |
+| IBUS500 | ~12,600 | +10.20 | +0.439 | 14:00-14:50 (pre-market ET) |
+| USGOLD | ~1,800 | +6.31 | +0.257 | 13:30-15:00 (NY open pilot) |
 
 > Note: EV figures are in CFD points and depend on lot size for absolute P&L.
 > High signal count — requires automated execution; manual monitoring not viable.
+> IBNL25: 0 high-edge slots (EV +0.04 all-slots) — point range too small for 2-pt cost structure.
 
 ---
 
@@ -375,6 +384,8 @@ Edge is event-specific. Calendar-driven — low frequency, requires FOMC date fe
 | OCO bracket (any bar) | IBCH20 | best: +2.08 (fixed_2r) | +0.043 | Edge too weak; fixed_2r improves on trailing but remains marginal |
 | OCO bracket (any bar) | IBNL25 | best: -1.94 | -0.652 | AEX point range too small; 2-pt offset is disproportionate |
 | OCO bracket (any bar) | USGOLD | best: -2.29 | -0.268 | No directional opening breakout edge on gold |
+| VWAP Extrema | IBNL25 | +0.04 (all-slots) | +0.012 | 0 high-edge slots; point range too small for 2-pt cost |
+| VWAP Extrema | USGOLD | +6.31 (7 slots) | +0.257 | Pilot only — low slot count, low win-rate on non-selected slots |
 | ORB 15m/30m | IBGB100 | -2.88 to -3.73 | -0.074 to -0.108 | Structurally no edge |
 | ORB 15m/30m | IBUS500 | -1.18 to -2.25 | -0.054 to -0.115 | Fill rate high, edge absent |
 | Micro/Macro Trend | IBDE40 | +3.07 | +0.512 | Low Sharpe; full-session monitoring; costs erode edge |
@@ -430,9 +441,11 @@ Signal bars marked † reflect candle scan upgrades.
 
 | Strategy | Instrument | Micro future | Signal time | Sharpe | Frequency |
 |----------|------------|-------------|-------------|--------|-----------|
-| VWAP Extrema (high-edge slots) | IBDE40 | FDXS | Frankfurt open + close | +0.524 | ~15,000/yr |
-| VWAP Extrema (high-edge slots) | IBUST100 | MNQ | Pre-market + open | +0.520 | ~11,000/yr |
-| VWAP Extrema (high-edge slots) | IBUS500 | MES | Pre-market + open | +0.444 | ~13,500/yr |
+| VWAP Extrema (high-edge slots) | IBUS30 | MYM | 09:00-09:50 ET (pre-market) | +0.528 | ~12,300/yr |
+| VWAP Extrema (high-edge slots) | IBJP225 | FN225M† | 09:00-09:45 Tokyo (session open) | +0.524 | ~11,300/yr |
+| VWAP Extrema (high-edge slots) | IBUST100 | MNQ | Pre-market + open ET | +0.517 | ~10,600/yr |
+| VWAP Extrema (high-edge slots) | IBDE40 | FDXS | Frankfurt open (07:00-08:40 UTC) | +0.498 | ~13,500/yr |
+| VWAP Extrema (high-edge slots) | IBUS500 | MES | Pre-market + open ET | +0.439 | ~12,600/yr |
 | OCO Early Session Break | IBUS30 | MYM | 09:45 ET (bar closes; 3rd 5m bar) | +0.098 | ~250/yr |
 | OCO Opening Bar 30m | IBJP225 | FN225M† | 10:00 Tokyo (2nd 30m bar closes) | +0.075 | ~250/yr |
 | OCO fixed_2r | IBDE40 | FDXS | 10:00 Frankfurt (2nd 30m bar closes) | +0.062 | ~250/yr |

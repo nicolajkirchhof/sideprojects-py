@@ -19,13 +19,13 @@ Applied to ALL screeners unless noted otherwise.
 | Market Cap | > $200M | Keep small-cap PEAD plays (strongest drift in research) while filtering micro-cap noise. Volume filter handles quality — any stock at 1M vol + $200M cap has institutional interest |
 | Next Earnings | Exclude within 5 days | Playbook Box 4 rule — no binary events on entries. Filter upfront to reduce scanner noise instead of scoring then failing |
 
-**Long-only scanners** (1–5, 10, 11) add:
+**Long-only scanners** (Long Universe, 11) add:
 
 | Filter | Value | Reasoning |
 |--------|-------|-----------|
 | % 50D MA | > 0% | Eliminate Stage 4 downtrends. Box 1 requires Price > 50D SMA. Reduces noise ~40% |
 | Slope of 50D SMA | Rising | Box 1 requires 50D SMA rising — more precise than just % from SMA |
-| 200D MA Direction | Up | Completes Trend Template — 200D must be sloping upward for Stage 2 confirmation. Without this, stocks in late Stage 3 tops pass the 50D filter |
+| Slope of 200D SMA | > 0 | Completes Trend Template — 200D must be sloping upward for Stage 2 confirmation. Numeric field (positive = rising); replaces the categorical "200D MA Direction" which is an opaque proprietary signal |
 | 20D ADR% | > 3% | Box 3 requires sufficient daily range for 2R+ within the 5–50 day timeframe. Stocks with ADR < 3% can't deliver ORB entries with tight stops |
 | Weighted Alpha | > 0 | 12-month momentum weighted to recent activity — better century momentum proxy than raw 52W %Chg |
 
@@ -36,76 +36,30 @@ intentionally scan across all trend states. UOA scanner has its own filters.
 
 ## Screener Definitions
 
-### 1. 52-Week High
+### Long Universe (replaces scanners #1–#5, #10)
 
-**Purpose:** Stage 2 uptrend candidates near ATH — no overhead supply (Box 1).
+**Purpose:** Single consolidated scanner for all long-only swing candidates. Returns ~150
+stocks with the long-only base filters. The pipeline applies scanner-specific thresholds
+post-hoc and tags each stock with the labels it qualifies for.
+
 **View:** Standard
+**Filters:** Global base + long-only base filters only (no additional filters).
 
-| Filter | Value | Reasoning |
-|--------|-------|-----------|
-| 52W %/High | Within 5% | Near all-time high = clean breakout territory |
-| 20D RelVol | > 1.0 | Volume interest confirms the move |
-| TTM Squeeze | On | Bollinger/Keltner squeeze = volatility contraction before breakout (Box 3) |
+With ~150 results vs the 1,000-row Barchart limit, all five original scanner populations
+are captured in one pass. The pipeline tags stocks using returned data columns:
 
-**Maps to:** Box 1 (Trend Template), Box 3 (Base Quality), Type B (VCP near highs)
+| Tag | Condition (applied by pipeline) | Origin |
+|-----|--------------------------------|--------|
+| `52w-high` | 52W %/High < 5% AND TTM Squeeze = On AND RVOL > 1.0 | Old #1 |
+| `5d-momentum` | 5D %Chg > 5% AND RVOL > 1.0 AND Perf vs Market 5D > 0% | Old #2 |
+| `1m-strength` | 1M %Chg > 10% AND Perf vs Market 1M > 0% AND TTM Squeeze = On | Old #3 |
+| `vol-spike` | RVOL > 1.75 | Old #4 |
+| `trend-seeker` | Trend Seeker Signal = Buy | Old #5 |
+| `ttm-fired` | TTM Squeeze = Fired AND RVOL > 1.0 AND ATRP < 7% | Old #10 |
 
----
+Tags are non-exclusive — a stock near its 52W high with a volume spike gets `[52w-high, vol-spike]`.
 
-### 2. 5-Day Momentum Leaders
-
-**Purpose:** This week's leaders — catches ignition events, EPs, early PEAD entries.
-**View:** Standard
-
-| Filter | Value | Reasoning |
-|--------|-------|-----------|
-| 5D %Chg | > 5% | Significant weekly move |
-| 20D RelVol | > 1.0 | Volume confirms the move is real |
-| Performance vs Market 5D | > 0% | Outperforming SPY this week (Box 2 pre-filter) |
-
-**Maps to:** PM-01 (Breakout Momentum), PM-02 (PEAD day 1–5), Type A (EP)
-
----
-
-### 3. 1-Month Sustained Strength
-
-**Purpose:** Sustained Stage 2 stocks — not one-day wonders. Type B/C setup candidates.
-**View:** Standard
-
-| Filter | Value | Reasoning |
-|--------|-------|-----------|
-| 1M %Chg | > 10% | Sustained strength over a full month |
-| Performance vs Market 1M | > 0% | RS vs SPY over 1 month (Box 2) |
-| TTM Squeeze | On | Volatility contraction after strong run = base forming (Box 3) |
-
-**Maps to:** Box 1+2 (Trend Template + RS), Box 3 (Base Quality), Type B (VCP), Type C (SMA Reclaim)
-
----
-
-### 4. Volume Spike (RVOL > 1.75)
-
-**Purpose:** Ignition event detection — something significant is happening NOW.
-**View:** Standard
-
-| Filter | Value | Reasoning |
-|--------|-------|-----------|
-| 20D RelVol | > 1.75 | Strong volume spike vs average |
-
-**Maps to:** All setup types (volume confirmation), Type A (EP requires 5–10× volume)
-
----
-
-### 5. Trend Seeker Buy/Sell
-
-**Purpose:** Proprietary Barchart signal — supplementary confirmation, not primary.
-**View:** Standard
-
-| Filter | Value | Reasoning |
-|--------|-------|-----------|
-| Signal | New Buy or Sell | Fresh signal only |
-| Strength | Strong or Maximum | Filter weak signals |
-| Direction | Strengthening or Strongest | Momentum accelerating |
-
-**Maps to:** Supplementary — confirms momentum direction, not a standalone entry signal.
+**Maps to:** All long setup types (A, B, C), PM-01 through PM-04, PM-09, PM-11
 
 ---
 
@@ -145,44 +99,46 @@ broken above the 50D yet (anticipating the move).
 
 ---
 
-### 9. PEAD Candidates
+### 9. PEAD Scanner (replaces #9 + #13)
 
-**Purpose:** Post-Earnings Announcement Drift — stocks that gapped on earnings within the
-last 7 days. PM-02 is the highest-conviction mechanism in the playbook (40–60 day drift).
+**Purpose:** Post-Earnings Announcement Drift — both directions. Captures all stocks that
+reported earnings within the last 7 days with a meaningful surprise. PEAD is the
+highest-conviction mechanism in the playbook: positive drift 40–60 days on beats (Bernard &
+Thomas 1989), negative drift of equal magnitude on misses. The pipeline tags direction
+post-hoc from the returned data.
+
 **View:** PEAD/EP
+**Filters:** Global base filters only + earnings recency. No directional filters.
 
 | Filter | Value | Reasoning |
 |--------|-------|-----------|
 | Latest Earnings | Within past 7 days | Earnings event just happened |
-| 5D %Chg | > 10% | Playbook minimum gap for PM-02 |
 | 20D RelVol | > 2.0 | Earnings day volume spike (5–10× is ideal) |
-| Earnings Surprise% | > 5% | Larger surprise = longer drift (Bernard & Thomas 1989). Filters stocks that moved 10% on guidance/revenue but had a weak EPS beat |
-| Weighted Alpha | > 0 | Stock was already in positive trend (Stage 2) |
-| Performance vs Market 5D | > 0% | Outperforming SPY post-earnings (RS confirmation) |
 
-**Maps to:** PM-02 (PEAD), Type A (Episodic Pivot on earnings)
+With the base filters (Price > $5, Vol > 1M, MktCap > $200M) and the 7-day earnings
+window, the result set is well under 1,000 rows even during peak earnings season (~1,400
+stocks in the full universe, ~200–300 report per week, filter further by RVOL).
 
-**Evaluation priority:** Highest. PEAD has the strongest academic backing (Ball & Brown 1968,
-Bernard & Thomas 1989). Enter on day 2–5 via ORB; 35–55 days of drift remaining.
+The pipeline tags each stock using returned data columns:
 
----
+| Tag | Condition (applied by pipeline) | Framework layer |
+|-----|--------------------------------|-----------------|
+| `pead-long` | Earnings Surprise% > 5% AND 5D %Chg > 10% AND Perf vs Market 5D > 0% AND Weighted Alpha > 0 | PM-02 (long PEAD), Type A |
+| `pead-short` | Earnings Surprise% < −5% AND 5D %Chg < −5% AND % 50D MA < 0% AND Short Float < 20% | Layer 2A (Negative PEAD), Type D |
+| `consecutive-miss` | Earnings Surprise% < 0 AND ≥2 of Q-1/Q-2/Q-3 also < 0 | Layer 2B refinement |
 
-### 10. TTM Squeeze Breakout
+Tags are non-exclusive — a stock can carry `pead-short` + `consecutive-miss`.
 
-**Purpose:** Stocks emerging from a Bollinger/Keltner squeeze — volatility expansion imminent.
-Directly maps to Box 3 (base quality) and VCP pattern detection.
-**View:** Standard
+**Maps to:** PM-02 (PEAD, both directions), Type A (EP on earnings), Type D (Breakdown on miss)
 
-| Filter | Value | Reasoning |
-|--------|-------|-----------|
-| TTM Squeeze | Fired (momentum positive) | Squeeze just ended, momentum is bullish |
-| 20D RelVol | > 1.0 | Volume expanding on the squeeze release |
-| 20D ATRP | < 7% | Stop distance within playbook 7% limit (Box 5) |
+**Evaluation priority:** Highest. `pead-long` entries via ORB on day 2–5; 35–55 days of
+drift remaining. `pead-short` entries via put debit spreads; strong filtered signals
+(Surprise% < −10%, close in bottom 25% of range) show −12%/60d drift at 76.8% win rate.
 
-**Maps to:** Box 3 (Base Quality — BB squeeze), Box 5 (Risk — ATR confirms tight stop), Type B (VCP)
-
-**Note:** TTM Squeeze is a Barchart built-in that combines Bollinger Bands and Keltner
-Channels — exactly what Box 3 evaluates manually. This scanner automates that detection.
+> **Daily Closing Range note:** The strong Negative PEAD signal requires close in the bottom
+> 25% of the day's range. This field is not available in email views — the pipeline derives
+> it from IBKR EOD data enrichment. Stocks flagged `pead-short` without bottom-quartile
+> close are lower conviction.
 
 ---
 
@@ -226,32 +182,6 @@ PM-11 research candidate — watchlist scanner, not direct entry signal.
 
 **Evaluation:** Cross-reference with High Put Ratio (#6). Stocks appearing on both are the
 strongest squeeze candidates. Still requires full 5-box checklist before entry.
-
----
-
-### 13. Negative PEAD Candidates *(short framework)*
-
-**Purpose:** Stocks that gapped down on earnings within the last 7 days — the mirror of
-scanner #9. Negative PEAD drift is as persistent on the downside as the upside (Bernard &
-Thomas 1989). Feeds the short framework defined in `PortfolioAssessment.md`.
-**View:** PEAD/EP
-
-| Filter | Value | Reasoning |
-|--------|-------|-----------|
-| Latest Earnings | Within past 7 days | Earnings event just happened |
-| 5D %Chg | < –5% | Significant downside move post-earnings |
-| Earnings Surprise% | < –5% | Negative surprise — bottom quartile SUE |
-| 20D RelVol | > 2.0 | Volume spike on earnings day |
-| Short Float | < 20% | Squeeze filter — above 20% is squeeze risk, not signal |
-| % 50D MA | < 0% | Below 50D SMA — confirms Stage 3/4 distribution |
-
-**No long-only trend filters** — this scanner intentionally finds stocks in downtrends.
-
-**Maps to:** Negative PEAD (short framework Layer 2A), Type D (Breakdown)
-
-**Evaluation priority:** Highest during earnings season. Use the PEAD/EP view — Earnings
-Surprise% columns show the beat history. Stocks with 2+ consecutive misses (columns 19–21
-all negative) are the strongest short candidates (Layer 2B: consecutive miss).
 
 ---
 
@@ -320,88 +250,103 @@ references which view to use. The UOA options screener has its own separate view
 
 ### Standard View
 
-Used by screeners: **1, 2, 3, 4, 5, 10** (the core trend/momentum scanners).
+Used by screeners: **Long Universe** (the core trend/momentum scanner).
 
 Covers all 5 boxes at a glance. Optimized for end-of-day email evaluation.
 
-| # | Column | 5-Box Use |
-|---|--------|-----------|
-| 1 | Symbol | Identity |
-| 2 | Latest | Current price |
-| 3 | %Change | Today's move |
-| 4 | 5D %Chg | Weekly momentum (Box 1) |
-| 5 | 1M %Chg | Sustained strength (Box 1+2) |
-| 6 | 52W %Chg | Century momentum / 12M return (Box 1) |
-| 7 | 52W %/High | Overhead supply (Box 1) |
-| 8 | Weighted Alpha | 12M momentum weighted to recent (Box 1) |
-| 9 | Perf vs Market 5D | RS vs SPY this week (Box 2) |
-| 10 | Perf vs Market 1M | RS vs SPY this month (Box 2) |
-| 11 | 3M % Change from Index | RS vs SPY over 3 months — sustained RS confirmation (Box 2) |
-| 12 | Volume | Today's volume |
-| 13 | 20D RelVol | RVOL — ignition detection (Box 3) |
-| 14 | 20D ADR% | Daily range — must be > 3% for ORB viability (Box 3) |
-| 15 | 20D ATRP | ATR as % — stop distance check, max 7% (Box 5) |
-| 16 | % 50D MA | Distance from 50D SMA (Box 1) |
-| 17 | Slope of 50D SMA | SMA direction — rising required for Box 1 |
-| 18 | 200D MA Direction | 200D SMA direction — rising required for Stage 2 (Box 1) |
-| 19 | TTM Squeeze | Squeeze status — on/fired/off (Box 3 base quality) |
-| 20 | Bollinger Bands Rank | 0–100 position within bands — replaces BB% for cleaner reads (Box 3) |
-| 21 | 5D P/C Vol | Put/Call ratio (Box 4, PM-04) |
-| 22 | IV Pctl | IV Percentile — options structure selection |
-| 23 | Market Cap, $K | Size context |
-| 24 | Latest Earnings | Binary event proximity (Box 4, PEAD detection) |
-| 25 | Sector | Sector RS check (Box 2) |
+| # | Column | 5-Box Use | Tag use |
+|---|--------|-----------|---------|
+| 1 | Symbol | Identity | — |
+| 2 | Latest | Current price | — |
+| 3 | %Change | Today's move | — |
+| 4 | 5D %Chg | Weekly momentum (Box 1) | `5d-momentum` (> 5%) |
+| 5 | 1M %Chg | Sustained strength (Box 1+2) | `1m-strength` (> 10%) |
+| 6 | Trend Seeker Signal | Proprietary trend confirmation — Buy/Hold/Sell | `trend-seeker` (= Buy) |
+| 7 | 52W %/High | Overhead supply (Box 1) | `52w-high` (< 5%) |
+| 8 | Weighted Alpha | 12M momentum weighted to recent (Box 1) | Base filter (> 0) |
+| 9 | Perf vs Market 5D | RS vs SPY this week (Box 2) | `5d-momentum` (> 0%) |
+| 10 | Perf vs Market 1M | RS vs SPY this month (Box 2) | `1m-strength` (> 0%) |
+| 11 | 3M % Change from Index | RS vs SPY over 3 months — sustained RS confirmation (Box 2) | — |
+| 12 | Volume | Today's volume | — |
+| 13 | 20D RelVol | RVOL — ignition detection (Box 3) | `52w-high`/`5d-momentum` (> 1.0), `vol-spike` (> 1.75) |
+| 14 | 20D ADR% | Daily range — must be > 3% for ORB viability (Box 3) | Base filter (> 3%) |
+| 15 | 20D ATRP | ATR as % — stop distance check, max 7% (Box 5) | `ttm-fired` (< 7%) |
+| 16 | % 50D MA | Distance from 50D SMA (Box 1) | Base filter (> 0%) |
+| 17 | Slope of 50D SMA | SMA direction — rising required for Box 1 | Base filter (rising) |
+| 18 | Slope of 200D SMA | 200D SMA slope — positive = rising, required for Stage 2 (Box 1) | Base filter (> 0) |
+| 19 | TTM Squeeze | Squeeze status — on/fired/off (Box 3 base quality) | `52w-high`/`1m-strength` (= On), `ttm-fired` (= Fired) |
+| 20 | Bollinger Bands Rank | 0–100 position within bands — extension check (Box 3) | — |
+| 21 | 5D P/C Vol | Put/Call ratio (Box 4, PM-04) | — |
+| 22 | IV Pctl | IV Percentile — options structure selection | — |
+| 23 | Market Cap, $K | Size context | — |
+| 24 | Latest Earnings | Binary event proximity (Box 4, PEAD detection) | — |
+| 25 | Sector | Sector RS check (Box 2) | — |
 
-**Changes from prior view:** Added 3M % Change from Index, 20D ADR%, 200D MA Direction,
-Bollinger Bands Rank. Dropped %Chg(Pre) (intraday view only), BB% (replaced by Bollinger
-Bands Rank), Short Int %Chg (options/flow view), Days2Cover (options/flow view), 5D IV Chg
-(options/flow view).
+**Column 6 change:** Replaced 52W %Chg with Trend Seeker Signal. Weighted Alpha (col 8) is
+the documented better 12M momentum proxy; 52W %/High (col 7) covers overhead supply. The
+freed slot adds Trend Seeker as a data column so the pipeline can tag scanner #5 candidates
+without a separate screener.
+
+**Column 18 change:** Replaced 200D MA Direction (categorical: "strengthening/weakening" —
+opaque proprietary crossover signal) with Slope of 200D SMA (numeric: positive = rising).
+Direct mapping to Trend Template requirement, sortable, backtestable.
 
 ---
 
 ### PEAD / EP View
 
-Used by screeners: **9, 11** (earnings drift and gap scanners).
+Used by screeners: **9 (PEAD), 11 (EP Gap)** — serves both long and short PEAD evaluation.
 
-Adds earnings surprise history and gap data. Enables PM-02 and PM-03 evaluation in one row.
+Adds earnings surprise history and gap data. Enables PM-02 (both directions) and PM-03
+evaluation in one row. Short Float added for squeeze risk assessment on `pead-short` tags.
 
-| # | Column | 5-Box Use |
-|---|--------|-----------|
-| 1 | Symbol | Identity |
-| 2 | Latest | Current price |
-| 3 | %Change | Today's move |
-| 4 | Gap Up % | EP gap magnitude — must be > 10% for Type A (Box 4, PM-01) |
-| 5 | 5D %Chg | Weekly momentum (Box 1) |
-| 6 | 1M %Chg | Sustained strength (Box 1+2) |
-| 7 | 52W %/High | Overhead supply (Box 1) |
-| 8 | Weighted Alpha | 12M momentum weighted to recent (Box 1) |
-| 9 | Perf vs Market 5D | RS vs SPY post-event (Box 2) |
-| 10 | Perf vs Market 1M | RS vs SPY this month (Box 2) |
-| 11 | Volume | Today's volume |
-| 12 | 20D RelVol | RVOL — confirms institutional volume on the event (Box 3) |
-| 13 | 20D ADR% | Daily range check (Box 3) |
-| 14 | 20D ATRP | Stop distance check (Box 5) |
-| 15 | % 50D MA | Distance from 50D SMA (Box 1) |
-| 16 | Slope of 50D SMA | SMA direction (Box 1) |
-| 17 | 200D MA Direction | 200D SMA direction (Box 1) |
-| 18 | Earnings Surprise% | Current quarter surprise — core PEAD signal (PM-02) |
-| 19 | Earnings Surprise% 1-Qtr Ago | Beat history Q-1 — PM-03 requires ≥3 of 4 beats |
-| 20 | Earnings Surprise% 2-Qtrs Ago | Beat history Q-2 |
-| 21 | Earnings Surprise% 3-Qtrs Ago | Beat history Q-3 |
-| 22 | IV Pctl | IV Percentile — options structure selection |
-| 23 | 5D P/C Vol | Put/Call ratio — informed flow around earnings (Box 4) |
-| 24 | Latest Earnings | Earnings date — proximity and recency (Box 4) |
-| 25 | Sector | Sector context (Box 2) |
+| # | Column | Use | Tag use |
+|---|--------|-----|---------|
+| 1 | Symbol | Identity | — |
+| 2 | Latest | Current price | — |
+| 3 | %Change | Today's move | — |
+| 4 | Gap Up % | Gap magnitude — positive = up, negative = down (Box 4, PM-01) | — |
+| 5 | 5D %Chg | Weekly momentum (Box 1) | `pead-long` (> 10%), `pead-short` (< −5%) |
+| 6 | 1M %Chg | Sustained strength/weakness (Box 1+2) | — |
+| 7 | Short Float | Squeeze risk — above 20% disqualifies short entries (Layer 1) | `pead-short` (< 20%) |
+| 8 | Weighted Alpha | 12M momentum weighted to recent (Box 1) | `pead-long` (> 0) |
+| 9 | Perf vs Market 5D | RS/RW vs SPY post-event (Box 2) | `pead-long` (> 0%) |
+| 10 | Perf vs Market 1M | RS/RW vs SPY this month (Box 2) | — |
+| 11 | Volume | Today's volume | — |
+| 12 | 20D RelVol | RVOL — confirms institutional volume on the event (Box 3) | — |
+| 13 | 20D ADR% | Daily range check (Box 3) | — |
+| 14 | 20D ATRP | Stop distance check (Box 5) | — |
+| 15 | % 50D MA | Distance from 50D SMA (Box 1) | `pead-short` (< 0%) |
+| 16 | Slope of 50D SMA | SMA direction (Box 1) | — |
+| 17 | Slope of 200D SMA | 200D SMA slope — positive = rising (Box 1) | — |
+| 18 | Earnings Surprise% | Current quarter surprise — core PEAD signal (PM-02) | `pead-long` (> 5%), `pead-short` (< −5%) |
+| 19 | Earnings Surprise% 1-Qtr Ago | Beat history Q-1 | `consecutive-miss` (< 0) |
+| 20 | Earnings Surprise% 2-Qtrs Ago | Beat history Q-2 | `consecutive-miss` (< 0) |
+| 21 | Earnings Surprise% 3-Qtrs Ago | Beat history Q-3 | `consecutive-miss` (< 0) |
+| 22 | IV Pctl | IV Percentile — options structure selection | — |
+| 23 | 5D P/C Vol | Put/Call ratio — informed flow around earnings (Box 4) | — |
+| 24 | Latest Earnings | Earnings date — proximity and recency (Box 4) | — |
+| 25 | Sector | Sector context (Box 2) | — |
 
-**Key usage:** Columns 18–21 show the last four quarters of earnings surprises. PM-03
-(pre-earnings drift) requires beat ≥3 of 4 — visible at a glance. PM-02 prioritizes
+**Column 7 change:** Replaced 52W %/High with Short Float. Long PEAD stocks that just beat
+earnings and gapped 10%+ are at/near highs by definition — overhead supply is redundant.
+Short Float is critical for both sides: squeeze fuel on high-RS longs, squeeze risk filter
+on short entries.
+
+**Long PEAD evaluation:** Columns 18–21 show the last four quarters of earnings surprises.
+PM-03 (pre-earnings drift) requires beat ≥3 of 4 — visible at a glance. PM-02 prioritizes
 Surprise% > 10% (top decile) for the strongest drift signal.
+
+**Short PEAD evaluation:** Earnings Surprise% < −5% (col 18) is the core signal. Columns
+19–21 flag consecutive misses (Layer 2B) — first miss is strongest, but ≥2 consecutive
+misses upgrade conviction. Short Float (col 7) must be < 20% to avoid squeeze risk.
+Pipeline enriches with IBKR Daily Closing Range for strong signal filter (bottom 25%).
 
 ---
 
 ### Options / Flow View
 
-Used by screeners: **6, 7, 12** (put/call ratios, short squeeze watchlist).
+Used by screeners: **6, 7, 12, 14** (put/call ratios, short squeeze watchlist, RW breakdown).
 
 Surfaces options flow, IV dynamics, and short interest. Drops trend detail in favour of
 flow and squeeze data.
@@ -465,7 +410,7 @@ in the email pipeline.
 | 14 | 20D ATRP | Stop distance check (Box 5) |
 | 15 | % 50D MA | Distance from 50D SMA (Box 1) |
 | 16 | Slope of 50D SMA | SMA direction (Box 1) |
-| 17 | 200D MA Direction | 200D SMA direction (Box 1) |
+| 17 | Slope of 200D SMA | 200D SMA slope — positive = rising (Box 1) |
 | 18 | TTM Squeeze | Squeeze status (Box 3) |
 | 19 | Bollinger Bands Rank | Band position 0–100 (Box 3) |
 | 20 | 5D P/C Vol | Put/Call ratio (Box 4) |
@@ -570,21 +515,24 @@ The pipeline aggregates option contracts to underlying-level signals:
 
 | Scanner | Name | View | Email/Manual | Strategy | Mechanism | Setup Type |
 |---------|------|------|--------------|----------|-----------|------------|
-| #1 | 52-Week High | Standard | Email | Swing Long | PM-01 Breakout | Type B (VCP near highs) |
-| #2 | 5-Day Momentum | Standard | Email | Swing Long | PM-01 / PM-02 | Type A (EP) |
-| #3 | 1-Month Strength | Standard | Email | Swing Long | PM-01 | Type B / C |
-| #4 | Volume Spike | Standard | Email | Swing Long | PM-01 | All types |
-| #5 | Trend Seeker | Standard | Email | Swing Long | Supplementary | Confirmation |
+| **LU** | **Long Universe** | Standard | Email | Swing Long | PM-01/02/04/09 | All long (A, B, C) |
 | #6 | High Put Ratio | Options/Flow | Email | Both | PM-04 / PM-11 | Squeeze / Flow |
 | #7 | High Call Ratio | Options/Flow | Email | Swing Long | PM-04 | Flow confirmation |
 | #8 | Intraday RVOL | Intraday | Manual | Swing Long | PM-01 | Type A / C |
-| #9 | PEAD Candidates | PEAD/EP | Email | Swing Long | PM-02 | Type A (EP on earnings) |
-| #10 | TTM Squeeze | Standard | Email | Swing Long | PM-01 / PM-09 | Type B / C |
+| **#9** | **PEAD Scanner** | PEAD/EP | Email | **Both** | PM-02 (both directions) | Type A / D |
 | #11 | EP Gap Scanner | PEAD/EP | Email | Swing Long | PM-01 / PM-02 | Type A |
 | #12 | Short Squeeze | Options/Flow | Email | Swing Long | PM-11 | Watchlist |
-| #13 | Negative PEAD | PEAD/EP | Email | **Swing Short** | PM-02 (short) | Type D |
 | #14 | RW Breakdown | Options/Flow | Email | **Swing Short** | PM-05 (short) | Type D |
 | UOA | Unusual Options | UOA | Email | Both | PM-04 | Flow confirmation |
+
+> **Long Universe** consolidates old scanners #1–#5 and #10 (TTM Squeeze). Pipeline applies
+> tags (`52w-high`, `5d-momentum`, `1m-strength`, `vol-spike`, `trend-seeker`, `ttm-fired`)
+> post-hoc from returned columns. One email instead of six; no duplicate rows; tags are
+> non-exclusive.
+>
+> **PEAD Scanner** consolidates old #9 (long PEAD) + #13 (negative PEAD). No directional
+> filters — pipeline tags `pead-long`, `pead-short`, `consecutive-miss` from returned
+> columns. One email covers both sides of earnings drift.
 
 ---
 
@@ -620,8 +568,8 @@ column_mapping:
   "Gap Up %": gap_up_pct               # PEAD/EP + Intraday views
   "5D %Chg": change_5d_pct
   "1M %Chg": change_1m_pct
-  "52W %Chg": change_52w_pct
-  "52W %/High": high_52w_distance_pct
+  "Trend Seeker Signal": trend_seeker_signal  # Standard view — Buy/Hold/Sell
+  "52W %/High": high_52w_distance_pct   # Standard + Intraday views (removed from PEAD/EP)
 
   # Momentum & RS
   "Weighted Alpha": weighted_alpha
@@ -638,7 +586,7 @@ column_mapping:
   # Trend
   "% 50D MA": pct_from_50d_sma
   "Slope of 50D SMA": slope_50d_sma
-  "200D MA Direction": direction_200d_sma  # Standard + PEAD/EP + Intraday views
+  "Slope of 200D SMA": slope_200d_sma      # Standard + PEAD/EP + Intraday views
 
   # Base quality
   "TTM Squeeze": ttm_squeeze            # Standard + Intraday views
@@ -680,12 +628,12 @@ column_mapping:
 
 | Time | Action | Scanners |
 |------|--------|----------|
-| **After 16:00** | Run pipeline | All 12 email scanners (automated) |
+| **After 16:00** | Run pipeline | All 7 email scanners + UOA (automated) |
 | **Evening / pre-market** | Review Daily Prep | None — review `/daily-prep`, set ORB alerts, remove earnings |
 | **9:45** | Manual scan | Intraday RVOL Spike (#8) — morning ORB candidates |
 | **10:15–15:00** | Dead zone | No scanning, no entries |
 | **15:00** | Manual scan | Intraday RVOL Spike (#8) — last-hour candidates |
 | **15:15–15:45** | Execute | Last-hour ORB entries from watchlist + RVOL scan |
 
-**Email scanners** (1–7, 9–14) are configured for end-of-day delivery → pipeline runs once daily.
+**Email scanners** (LU, 6–7, 9, 11–12, 14, UOA) are configured for end-of-day delivery → pipeline runs once daily.
 **Intraday RVOL** (8) is manual on Barchart website — run only during execution windows.
