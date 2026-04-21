@@ -10,17 +10,12 @@ Automation target instruments: FDXS (IBDE40), MNQ (IBUST100), MES (IBUS500), MYM
 ## Master Verdict Table
 
 All strategies backtested, with overall Go/No-go per instrument.
-Signal bars marked † have been upgraded from the original Hougaard convention based on candle scan.
-Entries marked ‡ are derived from candle scan results, not a standalone named backtest.
 Blank (—) = strategy not tested on that instrument.
 
 | Strategy | IBDE40 | IBGB100 | IBUS500 | IBUST100 | IBUS30 | IBJP225 | IBES35 | IBAU200 | IBEU50/IBFR40/IBCH20/IBNL25/USGOLD |
 |----------|--------|---------|---------|----------|--------|---------|--------|---------|--------------------------------------|
 | **OCO candle scan** | **Go** | No-go | No-go | **Go** | **Go** | **Go** | Pilot | Pilot | No-go |
 | **Following Range Break** | Go | Pilot | Go | Go | Go | Go | No-go | — | — |
-| **Hougaard ASRS** (4th 5m) | No-go | — | No-go | **Go** | **Go** ‡ | — | — | — | — |
-| **Hougaard SRS** (2nd 15m) † | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
-| **OCO Opening Bar 30m** (scan) | **Go** ‡ | No-go | No-go | **Go** | **Go** ‡ | **Go** ‡ | — | — | — |
 | **Hougaard FOMC Rule of 4** | — | — | **Go** (event-only) | — | — | — | — | — | — |
 | **ORB 15m** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
 | **ORB 30m** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
@@ -29,6 +24,15 @@ Blank (—) = strategy not tested on that instrument.
 | **Micro/Macro Trend** | Do not pursue | — | — | — | — | — | — | — | — |
 | **0DTE Iron Condor** | — | — | No-go | — | — | — | — | — | — |
 | **Dealer Gamma Regime** | No filter value | — | No filter value | — | — | — | — | — | — |
+
+> **Removed rows:** Hougaard ASRS, Hougaard SRS, and OCO Opening Bar 30m were removed from
+> this table. All three are specific (timeframe, bar#, stop) parameter choices within the OCO
+> bracket family and are fully covered by the candle scan row — ASRS is 5min/bar3/bar_range,
+> SRS is 15min/bar1/atr, OCO Opening Bar 30m is 30min/bar0/atr. Retaining them alongside the
+> candle scan row duplicates information and obscures the signal: the scan found better bars
+> on most instruments (e.g. IBDE40 15min/bar2 beats SRS 15min/bar1; IBUS30 5min/bar2 beats
+> ASRS 5min/bar3). Per-instrument verdicts for these combos are in RESULTS.md; automation
+> parameters are in the Go Strategies section below.
 
 ---
 
