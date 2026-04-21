@@ -11,14 +11,16 @@ Automation target instruments: FDXS (IBDE40), MNQ (IBUST100), MES (IBUS500), MYM
 
 All strategies backtested, with overall Go/No-go per instrument.
 Signal bars marked † have been upgraded from the original Hougaard convention based on candle scan.
+Entries marked ‡ are derived from candle scan results, not a standalone named backtest.
+Blank (—) = strategy not tested on that instrument.
 
 | Strategy | IBDE40 | IBGB100 | IBUS500 | IBUST100 | IBUS30 | IBJP225 | IBES35 | IBAU200 | IBEU50/IBFR40/IBCH20/IBNL25/USGOLD |
 |----------|--------|---------|---------|----------|--------|---------|--------|---------|--------------------------------------|
 | **OCO candle scan** | **Go** | No-go | No-go | **Go** | **Go** | **Go** | Pilot | Pilot | No-go |
 | **Following Range Break** | Go | Pilot | Go | Go | Go | Go | No-go | — | — |
-| **Hougaard ASRS** (4th 5m) | No-go | — | No-go | **Go** | — | — | — | — | — |
+| **Hougaard ASRS** (4th 5m) | No-go | — | No-go | **Go** | **Go** ‡ | — | — | — | — |
 | **Hougaard SRS** (2nd 15m) † | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
-| **OCO Opening Bar 30m** (scan) | — | No-go | No-go | **Go** | — | — | — | — | — |
+| **OCO Opening Bar 30m** (scan) | **Go** ‡ | No-go | No-go | **Go** | **Go** ‡ | **Go** ‡ | — | — | — |
 | **Hougaard FOMC Rule of 4** | — | — | **Go** (event-only) | — | — | — | — | — | — |
 | **ORB 15m** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
 | **ORB 30m** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
