@@ -147,9 +147,10 @@ def _load_quarterly_returns(symbols: list[str] | None = None) -> pd.DataFrame:
             ORDER BY act_symbol, date
         """), db_stocks_connection)
     else:
-        # Batch load by symbol chunks
-        batch_size = 500
+        # Batch load by symbol chunks — small batches to avoid Dolt timeout
+        batch_size = 50
         dfs = []
+        total_batches = (len(symbols) + batch_size - 1) // batch_size
         for i in range(0, len(symbols), batch_size):
             batch = symbols[i:i + batch_size]
             placeholders = ",".join(f"'{s}'" for s in batch)
@@ -158,10 +159,11 @@ def _load_quarterly_returns(symbols: list[str] | None = None) -> pd.DataFrame:
                 FROM ohlcv
                 WHERE act_symbol IN ({placeholders})
                   AND date >= '2015-01-01'
-                ORDER BY act_symbol, date
             """)
             dfs.append(pd.read_sql(query, db_stocks_connection))
-            print(f"  Batch {i // batch_size + 1}: {len(batch)} symbols loaded")
+            batch_num = i // batch_size + 1
+            if batch_num <= 3 or batch_num % 10 == 0 or batch_num == total_batches:
+                print(f"  Batch {batch_num}/{total_batches}: {len(batch)} symbols")
         df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
     df["date"] = pd.to_datetime(df["date"])
