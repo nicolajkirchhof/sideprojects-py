@@ -93,6 +93,8 @@ def _simulate_oco(
     stop_pts: float,
     exit_mode: str = "2bar_trail",
     atr_pts: float = np.nan,
+    entry_offset: float = ENTRY_OFFSET_PTS,
+    spread_cost: float = SPREAD_COST_PTS,
 ) -> dict:
     """
     Simulate an OCO bracket trade from a signal bar.
@@ -105,11 +107,14 @@ def _simulate_oco(
         "atr_trail"  — trailing stop at price ± ATR * ATR_TRAIL_FACTOR
         "fixed_2r"   — hard stop at opposite bracket side, fixed 2R take-profit
 
+    entry_offset and spread_cost default to module-level constants so existing
+    callers are unaffected; pass explicit values for non-equity instruments.
+
     Returns a dict with keys: filled_direction, result_pts, entry, win, bar_range.
     """
     bar_range = signal_bar["high"] - signal_bar["low"]
-    long_entry = signal_bar["high"] + ENTRY_OFFSET_PTS
-    short_entry = signal_bar["low"] - ENTRY_OFFSET_PTS
+    long_entry = signal_bar["high"] + entry_offset
+    short_entry = signal_bar["low"] - entry_offset
     long_stop = long_entry - stop_pts
     short_stop = short_entry + stop_pts
 
@@ -179,9 +184,9 @@ def _simulate_oco(
         raise ValueError(f"Unknown exit_mode: {exit_mode!r}")
 
     if filled_dir == "long":
-        result = (exit_price - filled_entry) - SPREAD_COST_PTS
+        result = (exit_price - filled_entry) - spread_cost
     else:
-        result = (filled_entry - exit_price) - SPREAD_COST_PTS
+        result = (filled_entry - exit_price) - spread_cost
 
     base["result_pts"] = result
     base["win"] = bool(result > 0)
