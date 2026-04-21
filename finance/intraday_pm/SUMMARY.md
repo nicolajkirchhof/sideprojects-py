@@ -20,7 +20,6 @@ Blank (—) = strategy not tested on that instrument.
 | **Hougaard FOMC Rule of 4** | — | — | **Go** (event-only) | — | — | — | — | — | — |
 | **VWAP Extrema** | **Go** | **Go** | **Go** | **Go** | — | — | — | — | — |
 | **Micro/Macro Trend** | Do not pursue | — | — | — | — | — | — | — | — |
-| **Dealer Gamma Regime** | No filter value | — | No filter value | — | — | — | — | — | — |
 
 > **Removed rows:**
 > - *Hougaard ASRS, Hougaard SRS, OCO Opening Bar 30m* — specific (timeframe, bar#, stop)
@@ -33,6 +32,8 @@ Blank (—) = strategy not tested on that instrument.
 >   Key verdict change: IBUST100 loses its ORB Go status — the fixed_2r scan finds no viable
 >   fixed-target bar on IBUST100 (trailing-stop OCO remains Go). IBDE40 retains Go via
 >   the stronger fixed_2r 30min/bar2 result (+0.062). Per-instrument detail in Scan 3 section.
+> - *Dealer Gamma Regime* — removed. HV20 is too noisy as a GEX proxy; direction match
+>   near-random across regimes on both IBUS500 and IBDE40. Will not pursue.
 > - *Noon Iron Butterfly, 0DTE Iron Condor* — removed pending options data.
 >   Both strategies require intraday SPX/index options data and a brokerage supporting
 >   0–1 DTE execution. Backtests used HV20 as an IV proxy which understates true IV.
