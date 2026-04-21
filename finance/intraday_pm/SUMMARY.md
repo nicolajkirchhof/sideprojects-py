@@ -15,7 +15,7 @@ Signal bars marked † have been upgraded from the original Hougaard convention 
 | Strategy | IBDE40 | IBGB100 | IBUS500 | IBUST100 | IBUS30 | IBJP225 | IBES35 | IBAU200 | IBEU50/IBFR40/IBCH20/IBNL25/USGOLD |
 |----------|--------|---------|---------|----------|--------|---------|--------|---------|--------------------------------------|
 | **OCO candle scan** | **Go** | No-go | No-go | **Go** | **Go** | **Go** | Pilot | Pilot | No-go |
-| **Following Range Break** | Go | Pilot | Go | Go | — | — | — | — | — |
+| **Following Range Break** | Go | Pilot | Go | Go | Go | Go | No-go | — | — |
 | **Hougaard ASRS** (4th 5m) | No-go | — | No-go | **Go** | — | — | — | — | — |
 | **Hougaard SRS** (2nd 15m) † | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
 | **OCO Opening Bar 30m** (scan) | — | No-go | No-go | **Go** | — | — | — | — | — |
@@ -168,13 +168,12 @@ not produce the directional opening breakouts that drive the other instruments.
 **Exit:** 2-bar trailing stop on 15-min bars or 17:30 Frankfurt
 **Automation instrument:** FDXS
 
-| Direction | N | Win% | EV (pts) | Sharpe |
-|-----------|---|------|----------|--------|
-| Long | — | 43.7% | — | — |
-| Overall | 1567 | 43.7% | +3.04 | +0.054 |
+| N | Win% | EV (pts) | Sharpe |
+|---|------|----------|--------|
+| 1567 | 43.7% | +3.04 | +0.054 |
 
-> Original (09:15 bar): EV +1.03, Sharpe +0.018. Upgrade adds +0.036 Sharpe.
-> Per-direction breakdown available in candle scan section of RESULTS.md.
+> Original (09:15 bar): EV +1.03, Sharpe +0.018 (Long +1.46/+0.031, Short +0.61/+0.010). Upgrade adds +0.036 Sharpe.
+> Per-direction data not available for the upgraded bar from candle scan output.
 
 ---
 
@@ -189,7 +188,7 @@ not produce the directional opening breakouts that drive the other instruments.
 |---|------|----------|--------|
 | 1539 | 42.2% | +5.81 | +0.067 |
 
-> Highest Sharpe of any OCO bracket strategy across all instruments and timeframes.
+> Highest OCO bracket Sharpe on MNQ. Across all instruments, IBUS30/MYM (strategy §2) is highest (+0.098).
 > Fires at the same time as the ORB window — ensure no double-entry on same bar.
 
 ---
