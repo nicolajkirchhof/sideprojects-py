@@ -1,4 +1,8 @@
-import pickle
+import os
+import time
+
+import pandas as pd
+from sqlalchemy import text
 
 from finance.utils import exchanges
 
@@ -47,11 +51,93 @@ DAILY_SYMBOLS = {**{symbol: {'EX': exchanges.US_EXCHANGE} for symbol in
                  **{e: {'EX': exchanges.DE_EXCHANGE} for e in eu_indices + eu_index_future + eu_volatility_indices}, }
 
 
+_STATE_DIR = "finance/_data/state"
+_STOCKS_PATH = f"{_STATE_DIR}/liquid_stocks.parquet"
+_ETFS_PATH = f"{_STATE_DIR}/liquid_etfs.parquet"
+
+# Screener-aligned defaults (BarchartScreeners.md Global Base Filters)
+_DEFAULT_MIN_PRICE = 5.0
+_DEFAULT_MIN_AVG_VOLUME = 1_000_000
+_DEFAULT_LOOKBACK_DAYS = 60
+
+
+def refresh_liquid_universe(
+    min_price: float = _DEFAULT_MIN_PRICE,
+    min_avg_volume: int = _DEFAULT_MIN_AVG_VOLUME,
+    lookback_days: int = _DEFAULT_LOOKBACK_DAYS,
+) -> tuple[list[str], list[str]]:
+    """
+    Query Dolt stocks DB for liquid stocks and ETFs matching screener criteria.
+
+    Uses recent {lookback_days}-day average volume and average close price as
+    proxies for the screener's 20D avg volume and last price filters.
+
+    Writes liquid_stocks.parquet and liquid_etfs.parquet to _data/state/.
+    Returns (stock_symbols, etf_symbols).
+    """
+    from finance.utils.dolt_data import db_stocks_connection
+
+    t0 = time.time()
+
+    query_stocks = text("""
+        SELECT o.act_symbol
+        FROM ohlcv o
+        JOIN symbol s ON o.act_symbol = s.act_symbol
+        WHERE s.is_etf = 0
+          AND o.act_symbol NOT LIKE '%$$%'
+          AND o.act_symbol NOT LIKE '%.%'
+          AND o.date >= DATE_SUB(CURDATE(), INTERVAL :lookback DAY)
+        GROUP BY o.act_symbol
+        HAVING AVG(o.volume) > :min_vol
+           AND AVG(o.close) > :min_price
+           AND MAX(o.close) < 5000
+    """)
+
+    query_etfs = text("""
+        SELECT o.act_symbol
+        FROM ohlcv o
+        JOIN symbol s ON o.act_symbol = s.act_symbol
+        WHERE s.is_etf = 1
+          AND o.act_symbol NOT LIKE '%$$%'
+          AND o.act_symbol NOT LIKE '%.%'
+          AND o.date >= DATE_SUB(CURDATE(), INTERVAL :lookback DAY)
+        GROUP BY o.act_symbol
+        HAVING AVG(o.volume) > :min_vol
+           AND AVG(o.close) > :min_price
+           AND MAX(o.close) < 5000
+    """)
+
+    params = {"min_vol": min_avg_volume, "min_price": min_price, "lookback": lookback_days}
+
+    df_stocks = pd.read_sql(query_stocks, db_stocks_connection, params=params)
+    df_etfs = pd.read_sql(query_etfs, db_stocks_connection, params=params)
+
+    stocks = sorted(df_stocks["act_symbol"].tolist())
+    etfs = sorted(df_etfs["act_symbol"].tolist())
+
+    # Remove any overlap (prefer ETF classification)
+    stock_set = set(stocks) - set(etfs)
+    stocks = sorted(stock_set)
+
+    os.makedirs(_STATE_DIR, exist_ok=True)
+    pd.DataFrame({"symbol": stocks}).to_parquet(_STOCKS_PATH, index=False)
+    pd.DataFrame({"symbol": etfs}).to_parquet(_ETFS_PATH, index=False)
+
+    elapsed = time.time() - t0
+    print(f"[Universe] {len(stocks)} stocks + {len(etfs)} ETFs "
+          f"(price>{min_price}, avg_vol>{min_avg_volume:,}, {lookback_days}d lookback) "
+          f"in {elapsed:.1f}s")
+
+    return stocks, etfs
+
+
 def get_liquid_stocks():
-  return list(pickle.load(open('finance/_data/liquid_stocks.pkl', 'rb')))
+    return pd.read_parquet(_STOCKS_PATH)['symbol'].tolist()
+
 
 def get_liquid_etfs():
-  return list(pickle.load(open('finance/_data/liquid_etfs.pkl', 'rb')))
+    return pd.read_parquet(_ETFS_PATH)['symbol'].tolist()
+
 
 def get_liquid_underlyings():
-  return get_liquid_stocks() + get_liquid_etfs()
+    return get_liquid_stocks() + get_liquid_etfs()

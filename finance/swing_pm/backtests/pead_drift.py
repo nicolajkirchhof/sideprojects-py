@@ -76,12 +76,13 @@ def _add_sue_quartiles(df: pd.DataFrame) -> pd.DataFrame:
     """Add SUE quartile column (Q1=worst miss, Q4=best beat)."""
     valid = df["sue"].notna()
     df = df.copy()
-    df["sue_quartile"] = np.nan
+    df["sue_quartile"] = ""
     if valid.sum() >= 4:
         df.loc[valid, "sue_quartile"] = pd.qcut(
             df.loc[valid, "sue"], 4,
             labels=["Q1_miss", "Q2", "Q3", "Q4_beat"],
         ).astype(str)
+    df.loc[~valid, "sue_quartile"] = ""
     return df
 
 
@@ -130,7 +131,7 @@ def run() -> None:
 
     # --- 4. SUE quartile analysis ---
     df_q = _add_sue_quartiles(df_earn)
-    valid_quartiles = df_q["sue_quartile"].dropna().unique()
+    valid_quartiles = [q for q in df_q["sue_quartile"].unique() if q]
 
     for q_label in sorted(valid_quartiles):
         df_q_sub = df_q[df_q["sue_quartile"] == q_label]
@@ -152,10 +153,10 @@ def run() -> None:
             strong_long_mask = strong_long_mask & (df_beats["gappct"] >= 10)
         df_strong_long = df_beats[strong_long_mask]
         if not df_strong_long.empty:
-            print(f"\n--- Strong Long PEAD: Beat + Top 25% Close + Gap ≥10% (N={len(df_strong_long):,}) ---")
+            print(f"\n--- Strong Long PEAD: Beat + Top 25% Close + Gap >=10% (N={len(df_strong_long):,}) ---")
             report_strong = generate_report(
                 df=df_strong_long,
-                label="PEAD — Strong Long (Beat + Top25% + Gap≥10%)",
+                label="PEAD — Strong Long (Beat + Top25% + Gap>=10%)",
                 horizons=HORIZONS,
                 segment_cols=["market_cap_class", "spy_class"],
             )
@@ -168,10 +169,10 @@ def run() -> None:
             strong_short_mask = strong_short_mask & (df_misses["gappct"] <= -5)
         df_strong_short = df_misses[strong_short_mask]
         if not df_strong_short.empty:
-            print(f"\n--- Strong Short PEAD: Miss + Bottom 25% Close + Gap ≤-5% (N={len(df_strong_short):,}) ---")
+            print(f"\n--- Strong Short PEAD: Miss + Bottom 25% Close + Gap <=-5% (N={len(df_strong_short):,}) ---")
             report_short = generate_report(
                 df=df_strong_short,
-                label="PEAD — Strong Short (Miss + Bottom25% + Gap≤-5%)",
+                label="PEAD — Strong Short (Miss + Bottom25% + Gap<=-5%)",
                 horizons=HORIZONS,
                 segment_cols=["market_cap_class", "spy_class"],
             )

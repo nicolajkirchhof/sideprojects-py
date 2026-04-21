@@ -6,10 +6,8 @@ import numpy as np
 import pandas as pd
 
 import finance.utils as utils
-from finance.utils import underlyings
-
-# %load_ext autoreload
-# %autoreload 2
+from finance.utils.underlyings import refresh_liquid_universe
+from finance.utils.earnings_data import load_earnings
 
 # Constants from momentum.py
 INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp14', 'atrp20', 'atrp50', 'pct', 'rvol20', 'rvol50', 'std_mv', 'iv', 'hv9', 'hv14', 'hv20', 'hv50',
@@ -17,18 +15,19 @@ INDICATORS = ['c', 'v', 'atrp1', 'atrp9', 'atrp14', 'atrp20', 'atrp50', 'pct', '
               'ma5_slope', 'ma10_slope', 'ma20_slope', 'ma50_slope', 'ma100_slope', 'ma200_slope']
 SPY_INDICATORS = ['hv9', 'hv14', 'hv20', 'hv50', 'ma10_dist', 'ma20_dist', 'ma50_dist', 'ma100_dist', 'ma200_dist',
                   'ma10_slope', 'ma20_slope', 'ma50_slope', 'ma100_slope', 'ma200_slope']
-OFFSET_DAYS = 60       # was 25 — extended for 60-day PEAD drift analysis
-OFFSET_WEEKS = 12      # was 8  — extended for 12-week forward coverage
-MIN_VOLUME = 750000
+OFFSET_DAYS = 60       # extended for 60-day PEAD drift analysis
+OFFSET_WEEKS = 12      # extended for 12-week forward coverage
+MIN_VOLUME = 1_000_000  # aligned with BarchartScreeners.md base filter (20D Avg Vol > 1M)
+MIN_PRICE = 5.0         # aligned with BarchartScreeners.md base filter (Price > $5)
 
 # Setup Paths
 base_path = 'finance/_data/research/swing/momentum_earnings'
 data_path = f'{base_path}/ticker'
 os.makedirs(data_path, exist_ok=True)
 
-# Load Core Data
-liquid_stocks = underlyings.get_liquid_stocks()
-liquid_etfs = underlyings.get_liquid_etfs()
+# Refresh liquid universe from Dolt (screener-aligned filters)
+liquid_stocks, liquid_etfs = refresh_liquid_universe()
+liquid_etfs_set = set(liquid_etfs)
 liquid_symbols = liquid_stocks + liquid_etfs
 
 #%%
@@ -105,8 +104,10 @@ def _try_add_event(
     if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
         return disregarded_count
 
-    reaction_volume = df_day.iloc[reaction_idx].v
-    if reaction_volume < MIN_VOLUME:
+    row = df_day.iloc[reaction_idx]
+    if row.v < MIN_VOLUME:
+        return disregarded_count + 1
+    if hasattr(row, 'c') and pd.notna(row.c) and row.c < MIN_PRICE:
         return disregarded_count + 1
 
     reaction_date = df_day.index[reaction_idx]
@@ -123,20 +124,19 @@ def _try_add_event(
 for i, ticker in enumerate(symbols_to_process):
     ticker_start = time.time()
 
-    # Time: Earnings Load
+    # Time: Earnings Load (Dolt query)
     t0 = time.time()
-    earnings_path = f'finance/_data/research/swing/earnings/{ticker}.csv'
-    if not os.path.exists(earnings_path):
-        df_earnings = pd.DataFrame(columns=['date', 'eps', 'eps_est', 'when'])
-    else:
-        df_earnings = pd.read_csv(earnings_path)
-        df_earnings['date'] = pd.to_datetime(df_earnings['date'], format='%Y-%m-%d')
+    df_earnings = load_earnings(ticker)
     t_earnings = time.time() - t0
 
     # Time: Market Cap Load
     t0 = time.time()
-    is_etf = ticker in liquid_etfs
-    swing_data_full = utils.SwingTradingData(ticker, datasource='offline')
+    is_etf = ticker in liquid_etfs_set
+    try:
+        swing_data_full = utils.SwingTradingData(ticker, datasource='offline')
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | SKIP: SwingTradingData error: {type(e).__name__}")
+        continue
     if swing_data_full.empty:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | SKIP: No data")
         continue
@@ -152,23 +152,11 @@ for i, ticker in enumerate(symbols_to_process):
     # Time: Event Detection
     t0 = time.time()
 
-    # ===================================================================
-    # Track consecutive beats per symbol for PEAD analysis
-    # ===================================================================
-    # Sort earnings chronologically, compute running consecutive beat count
+    # Consecutive beats are pre-computed by load_earnings() — build lookup map
     earnings_consecutive_beats: dict[pd.Timestamp, int] = {}
-    if not df_earnings.empty and 'eps' in df_earnings.columns and 'eps_est' in df_earnings.columns:
-        df_earn_sorted = df_earnings.sort_values('date').copy()
-        running_beats = 0
-        for _, earn_row in df_earn_sorted.iterrows():
-            eps_val = earn_row.get('eps', np.nan)
-            est_val = earn_row.get('eps_est', np.nan)
-            if pd.notna(eps_val) and pd.notna(est_val) and est_val != 0:
-                if eps_val > est_val:
-                    running_beats += 1
-                else:
-                    running_beats = 0
-            earnings_consecutive_beats[earn_row.date] = running_beats
+    if not df_earnings.empty and 'consecutive_beats' in df_earnings.columns:
+        for _, earn_row in df_earnings.iterrows():
+            earnings_consecutive_beats[earn_row.date] = int(earn_row.get('consecutive_beats', 0))
 
     # --- 1. Identify Earnings Events ---
     for i_earn, earnings_event in df_earnings.iterrows():
@@ -190,10 +178,13 @@ for i, ticker in enumerate(symbols_to_process):
         if reaction_idx < OFFSET_DAYS or reaction_idx >= len(df_day) - OFFSET_DAYS:
             continue
 
-        reaction_date = df_day.iloc[reaction_idx].name
-        reaction_volume = df_day.iloc[reaction_idx].v
+        reaction_row = df_day.iloc[reaction_idx]
+        reaction_date = reaction_row.name
 
-        if reaction_volume < MIN_VOLUME:
+        if reaction_row.v < MIN_VOLUME:
+            disregarded_count += 1
+            continue
+        if pd.notna(reaction_row.c) and reaction_row.c < MIN_PRICE:
             disregarded_count += 1
             continue
 
@@ -204,15 +195,9 @@ for i, ticker in enumerate(symbols_to_process):
         meta['earnings_when'] = earnings_event.when
         meta['event_types'].add('earnings')
 
-        # SUE: Standardized Unexpected Earnings
-        eps_val = earnings_event.eps
-        est_val = earnings_event.eps_est
-        if pd.notna(eps_val) and pd.notna(est_val) and est_val != 0:
-            meta['sue'] = (eps_val - est_val) / abs(est_val)
-            meta['surprise_dir'] = 'beat' if eps_val > est_val else ('miss' if eps_val < est_val else 'inline')
-        else:
-            meta['sue'] = np.nan
-            meta['surprise_dir'] = 'unknown'
+        # SUE and surprise_dir are pre-computed by load_earnings()
+        meta['sue'] = earnings_event.get('sue', np.nan) if 'sue' in df_earnings.columns else np.nan
+        meta['surprise_dir'] = earnings_event.get('surprise_dir', 'unknown') if 'surprise_dir' in df_earnings.columns else 'unknown'
 
         # Close in range: where the stock closed within the day's range (0=low, 1=high)
         row_day = df_day.iloc[reaction_idx]
@@ -539,7 +524,7 @@ for i, ticker in enumerate(symbols_to_process):
     evt_types = df_ticker_events['event_types'].explode().value_counts().to_dict()
     evt_str = ", ".join([f"{k}: {v}" for k, v in evt_types.items()])
     disregarded_str = f" | Disregarded: {disregarded_count}" if disregarded_count > 0 else ""
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | Found {len(df_ticker_events)} events ({evt_str}){disregarded_str} | Total: {total_time:.2f}s")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {i+1:4}/{total_symbols}: {ticker:5} | Found {len(df_ticker_events)} events ({evt_str}){disregarded_str} | earn={t_earnings:.3f}s total={total_time:.2f}s")
 
 #%%
 # --- Final Aggregation ---
