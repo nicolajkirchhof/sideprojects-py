@@ -19,9 +19,7 @@ Blank (—) = strategy not tested on that instrument.
 | **Following Range Break** | Go | Pilot | Go | Go | Go | Go | No-go | — | — |
 | **Hougaard FOMC Rule of 4** | — | — | **Go** (event-only) | — | — | — | — | — | — |
 | **VWAP Extrema** | **Go** | **Go** | **Go** | **Go** | — | — | — | — | — |
-| **Noon Iron Butterfly** | No-go | — | **Go** | — | — | — | — | — | — |
 | **Micro/Macro Trend** | Do not pursue | — | — | — | — | — | — | — | — |
-| **0DTE Iron Condor** | — | — | No-go | — | — | — | — | — | — |
 | **Dealer Gamma Regime** | No filter value | — | No filter value | — | — | — | — | — | — |
 
 > **Removed rows:**
@@ -35,6 +33,11 @@ Blank (—) = strategy not tested on that instrument.
 >   Key verdict change: IBUST100 loses its ORB Go status — the fixed_2r scan finds no viable
 >   fixed-target bar on IBUST100 (trailing-stop OCO remains Go). IBDE40 retains Go via
 >   the stronger fixed_2r 30min/bar2 result (+0.062). Per-instrument detail in Scan 3 section.
+> - *Noon Iron Butterfly, 0DTE Iron Condor* — removed pending options data.
+>   Both strategies require intraday SPX/index options data and a brokerage supporting
+>   0–1 DTE execution. Backtests used HV20 as an IV proxy which understates true IV.
+>   Verdicts (Noon Butterfly IBUS500: Go +0.183–+0.278 by IV bucket; 0DTE IC IBUS500: No-go)
+>   are preserved in the Go/No-go sections below. Re-evaluate when real options data is available.
 
 ---
 
