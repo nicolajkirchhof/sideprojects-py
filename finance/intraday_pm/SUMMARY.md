@@ -38,8 +38,9 @@ Blank (—) = strategy not tested on that instrument.
 
 ## Candle Scan Findings
 
-Two scans run. Scan 1 (original, 4 instruments, 384 combinations): 95 positive EV.
+Three scans run. Scan 1 (original, 4 instruments, 384 combinations): 95 positive EV.
 Scan 2 (expanded, 13 instruments, 1248 combinations): 282 positive EV.
+Scan 3 (fixed_2r exit mode added, 13 instruments, 1872 combinations): 436 positive EV.
 
 **ATR stop consistently matches or beats bar-range stop** across the top combinations —
 use ATR stop as default for SRS-style strategies. Bar-range stop remains valid for ASRS.
@@ -80,7 +81,7 @@ at Sharpe +0.037. Not strong enough to automate; pilot-only status.
 **IBAU200 (ASX 200):** Weak positive edge. Best: 30min/bar1/atr (10:30 Sydney)
 at Sharpe +0.032. Pilot-only; Australian session adds operational complexity.
 
-**IBFR40, IBCH20:** Near-zero best Sharpe (+0.021, +0.020). No viable edge.
+**IBFR40, IBCH20:** Near-zero best Sharpe (+0.021, +0.020) for trailing-stop methods. No viable edge with trailing exit (see Scan 3 for fixed_2r results).
 
 **IBEU50:** No-go across all bars (best -0.074). EuroStoxx 50 lacks OCO bracket edge
 despite sharing a session with the viable IBDE40.
@@ -100,16 +101,52 @@ not produce the directional opening breakouts that drive the other instruments.
 | IBUS30 | 5min/bar2/bar_range (09:40 ET) | +0.098 | **Go** |
 | IBJP225 | 5min/bar13/bar_range (10:05 Tokyo) | +0.088 | **Go** |
 | IBUST100 | 30min/bar0/atr (09:30 ET) | +0.067 | **Go** |
-| IBDE40 | 15min/bar2/atr (09:30 Frankfurt) | +0.054 | **Go** |
+| IBDE40 | 30min/bar2/fixed_2r (10:00 Frankfurt) † | +0.062 | **Go** |
 | IBES35 | 10min/bar4/bar_range (09:40 Frankfurt) | +0.037 | Pilot |
 | IBAU200 | 30min/bar1/atr (10:30 Sydney) | +0.032 | Pilot |
-| IBFR40 | 30min/bar1/atr (09:30 Frankfurt) | +0.021 | No-go |
-| IBCH20 | 30min/bar2/atr (10:00 Zurich) | +0.020 | No-go |
-| IBGB100 | best across 96 combos | -0.020 | No-go |
+| IBCH20 | 30min/bar2/fixed_2r (10:00 Zurich) ‡ | +0.043 | No-go |
+| IBFR40 | 30min/bar2/fixed_2r (10:00 Paris) ‡ | +0.033 | No-go |
+| IBGB100 | best across 96 combos | -0.009 | No-go |
 | IBUS500 | best across 96 combos | -0.019 | No-go |
-| IBEU50 | best across 144 combos | -0.074 | No-go |
-| USGOLD | best across 144 combos | -0.268 | No-go |
-| IBNL25 | best across 144 combos | -0.652 | No-go (offset issue) |
+| IBEU50 | best across 144 combos | -0.020 | No-go |
+| USGOLD | best across 192 combos | -0.268 | No-go |
+| IBNL25 | best across 192 combos | -0.388 | No-go (offset issue) |
+
+> † fixed_2r result (Scan 3). Trailing-stop best for IBDE40 was 15min/bar2/atr at +0.054.
+> ‡ fixed_2r is the best combo for these instruments but Sharpe remains below pilot threshold (+0.050). No-go verdict unchanged.
+
+### Scan 3 — fixed_2r exit mode
+
+**What changed:** A third stop method was added — `fixed_2r` uses bar-range stop width but exits
+at a **fixed 2R take-profit target** (hard stop + fixed reward, no trailing). Stop is checked
+before target within each bar (conservative).
+
+**Key result:** `fixed_2r` does not improve on trailing-stop methods for the two strongest
+instruments (IBUS30, IBJP225 top combos remain trailing-based). One `fixed_2r` entry cracks
+the cross-instrument top 10.
+
+| Instrument | Best fixed_2r combo | Sharpe | vs trailing best | Delta | Verdict |
+|------------|---------------------|--------|-----------------|-------|---------|
+| IBDE40 | 30min/bar2 (10:00 Frankfurt) | +0.062 | +0.054 (15m/bar2/atr) | +0.008 | New best |
+| IBJP225 | 5min/bar17 (10:25 Tokyo) | +0.081 | +0.088 (5m/bar13/bar_range) | -0.007 | Top-10, not best |
+| IBCH20 | 30min/bar2 (10:00 Zurich) | +0.043 | +0.020 (trailing best) | +0.023 | No-go (improved) |
+| IBFR40 | 30min/bar2 (10:00 Paris) | +0.033 | +0.021 (trailing best) | +0.012 | No-go (improved) |
+| IBUS30 | 30min/bar2 (10:30 ET) | +0.043 | +0.098 (5m/bar2/bar_range) | -0.055 | Trailing dominates |
+| USGOLD | any | < -0.28 | < -0.27 (trailing) | worse | No-go |
+
+**Win rate profile:** fixed_2r trades at 39–42% win rate vs 43–46% for trailing methods.
+The lower win rate is structural (2R target is harder to reach than a trailing stop that
+locks in gains incrementally). Positive EV is driven by the 2:1 payoff ratio.
+
+**IBDE40 note:** The 30min signal bar (09:30–10:00 Frankfurt) is a different signal from
+the 15min bar scan. The 30-minute bar captures more open-auction information before entry,
+which may explain why the fixed 2R target is viable — the direction is more committed by
+the time the bar closes.
+
+**IBJP225 bar 17 (10:25 Tokyo):** This is the second hour of the Tokyo session. The
+fixed_2r edge here co-locates with a known strong trailing-stop window (10:10–10:25
+across multiple timeframes). The result is plausible but marginal vs the trailing
+alternatives at the same time. Not a new automation target.
 
 ---
 
@@ -327,8 +364,8 @@ Edge is event-specific. Calendar-driven — low frequency, requires FOMC date fe
 | OCO bracket (any bar) | IBGB100 | best: -0.45 | -0.020 | Scan confirms no viable bar exists (96 combos) |
 | OCO bracket (any bar) | IBUS500 | best: -0.36 | -0.019 | Scan confirms no viable bar exists (96 combos) |
 | OCO bracket (any bar) | IBEU50 | best: -1.01 | -0.074 | EuroStoxx 50 lacks opening direction despite shared session with IBDE40 |
-| OCO bracket (any bar) | IBFR40 | best: +0.56 | +0.021 | Edge too weak to trade; not reproducible at meaningful Sharpe |
-| OCO bracket (any bar) | IBCH20 | best: +0.71 | +0.020 | Edge too weak; SMI lacks sufficient open momentum |
+| OCO bracket (any bar) | IBFR40 | best: +1.13 (fixed_2r) | +0.033 | Edge too weak; best via fixed_2r still below pilot threshold |
+| OCO bracket (any bar) | IBCH20 | best: +2.08 (fixed_2r) | +0.043 | Edge too weak; fixed_2r improves on trailing but remains marginal |
 | OCO bracket (any bar) | IBNL25 | best: -1.94 | -0.652 | AEX point range too small; 2-pt offset is disproportionate |
 | OCO bracket (any bar) | USGOLD | best: -2.29 | -0.268 | No directional opening breakout edge on gold |
 | ORB 15m/30m | IBGB100 | -2.88 to -3.73 | -0.074 to -0.108 | Structurally no edge |
@@ -430,6 +467,7 @@ before beginning execution engine implementation.
 | IBUS500 + IBUST100 Hougaard ASRS/SRS | Filled 2026-04-21 |
 | IBGB100 ORB | Filled 2026-04-21 |
 | Candle scan (optimal bar search) | Completed 2026-04-21 |
+| Candle scan Scan 3 (fixed_2r exit mode) | Completed 2026-04-21 |
 
 ---
 
