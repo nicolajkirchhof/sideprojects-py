@@ -45,7 +45,7 @@ Barchart-based screener → quality filter → watchlist of max 20
 | Filter | Value | Reason |
 |---|---|---|
 | Avg Volume | > 1,000,000 | Liquidity — options must be tradeable |
-| Price | > $3.00 | Avoid penny stocks |
+| Price | > $5.00 | ORB execution quality — sub-$5 stocks have wide spreads |
 | No earnings | within 5 days | No binary events on entries |
 
 **SCAN SORT COLUMNS — Run each separately, build watchlist**
@@ -63,7 +63,7 @@ Barchart-based screener → quality filter → watchlist of max 20
 **SCANNING PROCESS**
 
 1. Run each scan — 5d, 1M, RVOL, Call vol, Put ratio
-2. Apply base filters — Vol >1M, Price >$3, No earnings <5d
+2. Apply base filters — Vol >1M, Price >$5, No earnings <5d
 3. Trend template check — Price > 50d > 200d, 200d sloping up
 4. RS check vs SPY — Is it outperforming or holding on dips?
 5. Chart quality check — Tight base? VCP? Clean structure?

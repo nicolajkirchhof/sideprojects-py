@@ -599,12 +599,24 @@ Full results in `BACKLOG-BACKTESTING.md` Results Register and `finance/_data/bac
 | Overnight Reversal (PM-08) | 33,935 | No edge at any horizon | Remove from active mechanisms |
 | General short PEAD (all misses) | 5,169 | Drift fades by day 20 | Restrict to 10-20d hold |
 
+### Factor confirmation signals (Layer 3)
+
+| Signal | N | Finding | Role |
+|--------|---|---------|------|
+| 1st earnings miss | 3,292 | -3.17%/1d, strongest short signal | Primary short trigger — focus on miss quality, not count |
+| 2nd consecutive miss | 1,073 | -1.82%/1d, weaker than 1st | Diminishing drift — bad news already priced in |
+| Accruals (D1 vs D10) | 59,536 | +3.38%/year long-short spread | Annual rebalance signal, not swing trade |
+| F-Score (>=8 vs <=2) | 197,250 | ~0.5%/quarter spread | Quality filter — F>=7 upgrades conviction |
+
 ### Key insight: short side is viable but time-limited
 
 The short PEAD drift is real but temporary. General misses show -2.2% at 10d then mean-revert.
 **Only the strong short signal** (miss + gap<=-5% + bottom 25% close) persists to 60d (-12%).
 The short framework should filter aggressively and use 10-20d holds for general misses,
 40-60d only for strong filtered signals.
+
+**Consecutive misses are weaker, not stronger.** The 1st miss produces the largest reaction.
+Focus on first-miss quality (SUE magnitude, gap size, close-in-range position) not miss count.
 
 ---
 

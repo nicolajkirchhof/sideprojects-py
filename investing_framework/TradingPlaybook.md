@@ -158,33 +158,32 @@ These mechanisms have strong academic backing and fit the 5–50 day swing timef
 | Invalidation | Stock holds gains for 5+ days with institutional follow-through (not just retail) |
 | Research gap | Define "extreme retail attention" quantitatively. Backtest 20-day returns on top Robinhood movers with no earnings catalyst. |
 
-#### PM-08 — Overnight Reversal *(Grade B · RESEARCH)*
+#### PM-08 — Overnight Reversal *(REJECTED — April 2026)*
 
-> Sell-offs create robust positive overnight returns. Enter at the close after a sell-off, exit at the open.
-
-| Attribute | Detail |
-|-----------|--------|
-| Market effect | Largest positive equity returns accrue between 2–3 AM ET (European open). Post-sell-off overnight returns average 3.6% annualized. |
-| Why it works | End-of-day order imbalances from forced selling resolve overnight. European institutional buying absorbs the discount. (Boyarchenko, Larsen, Whelan 2023) |
-| Timeframe | Overnight (close-to-open). Can be used as entry timing for swing trades. |
-| Signals | Stock down >2% intraday on above-average volume. RS intact (not a fundamental breakdown). |
-| Structure | Buy stock at MOC (market-on-close). Evaluate at next morning open — either take overnight profit or hold as swing if setup confirms. |
-| Invalidation | Overnight gap-down despite prior sell-off = fundamental shift, not order flow. Exit immediately. |
-| Research gap | Backtest: overnight returns on RS stocks after >2% intraday drops vs. random entries. |
-
-#### PM-09 — Mean Reversion to Trend *(Grade B · RESEARCH)*
-
-> Stocks oscillate around their trend in a quasi-periodic pattern. Oversold pullbacks within an uptrend revert to the moving average.
+> ~~Sell-offs create robust positive overnight returns.~~ **Backtest rejected.** 33,935 selloff events (pct<-2%, RVOL>1.5, Stage 2 uptrend) show no edge at any horizon: 1d -0.83%, 5d -0.12%, 10d +0.15%, 60d -0.28%. Win rate 46.8%, Sharpe -0.011. The academic effect (Boyarchenko 2023) does not survive in individual stocks filtered for RS/momentum.
 
 | Attribute | Detail |
 |-----------|--------|
-| Market effect | De-trended price residuals behave as mean-reverting Ornstein-Uhlenbeck process with exploitable periodicity |
-| Why it works | Institutional rebalancing creates oscillations around equilibrium. Overreaction to short-term news + institutional buying on dips. (Nassar & Ephrem 2020) |
-| Timeframe | 5–15 days (half the oscillation cycle) |
-| Signals | Price touches lower Bollinger Band while 20 SMA is still rising. Volume declining on pullback (no distribution). RS still intact vs SPY. |
-| Structure | This IS your Type C (SMA Reclaim) setup — but with a quantitative mean-reversion framework underneath. Long call 30–45 DTE or stock + hard stop. |
-| Invalidation | Close below 50 SMA. RS flips negative. Volume expands on pullback (distribution, not pullback). |
-| Research gap | Quantify the oscillation periodicity for your top 20 watchlist names. Does the Bollinger lower band touch reliably predict 5–15 day reversal? |
+| **Backtest** | N=33,935 · 2016–2026 · Price>$5, Vol>1M, Stage 2 |
+| **Result** | No edge. Mean return indistinguishable from zero at all horizons. |
+| **Status** | **Rejected.** Do not trade. Remove from scanning. |
+
+#### PM-09 — Mean Reversion to Trend *(Grade A · ACTIVE — validated April 2026)*
+
+> Stocks oscillate around their trend. Oversold pullbacks within an uptrend revert to the moving average. The Bollinger lower band touch is a quantifiable entry signal.
+
+| Attribute | Detail |
+|-----------|--------|
+| **Market effect** | De-trended price residuals behave as mean-reverting process with exploitable periodicity |
+| **Why it works** | Institutional rebalancing creates oscillations around equilibrium. Overreaction to short-term news + institutional buying on dips. (Nassar & Ephrem 2020) |
+| **Backtest** | N=53,400 BB lower touch events (low <= BB lower, ma50_slope>0, ma200_dist>0). 2016–2026. |
+| **Results** | 10d: +1.18% (53.8% WR). 20d: +1.70% (54.5%). 60d: +2.25% (55.1%, Sharpe 0.115). |
+| **Timeframe** | 5–20 days (confirmed by backtest — most of the edge captured by day 20) |
+| **Signals** | Price touches lower Bollinger Band while 50 SMA is rising and price above 200 SMA. Volume declining on pullback. RS intact vs SPY. |
+| **Structure** | This IS the Type C (SMA Reclaim) setup. Long call 30–45 DTE or stock + hard stop. |
+| **Role** | **Supplementary signal.** Confirms pullback is within trend. EMA Reclaim (Type C) produces better returns from the same setup — use BB touch as a confirmation layer, not standalone entry. |
+| **Invalidation** | Close below 50 SMA. RS flips negative. Volume expands on pullback (distribution). |
+| **Status** | Validated. Use as confirmation for Type C entries. |
 
 #### PM-10 — Insider & Corporate Action Drift *(Grade B · RESEARCH)*
 
@@ -218,18 +217,18 @@ These mechanisms have strong academic backing and fit the 5–50 day swing timef
 
 All mechanisms below are being evaluated. Do not trade until all 4 steps of the Outlier framework are complete.
 
-| # | Mechanism | Cluster | Grade | Gap | Priority |
-|---|-----------|---------|-------|-----|----------|
-| 06 | News-Driven Drift | Drift | B | Build news-vs-no-news classifier for watchlist | High — directly actionable |
-| 07 | Retail Attention Contrarian | Institution | B | Define "extreme attention" quantitatively; backtest 20d returns | High — contrarian edge |
-| 08 | Earnings Volatility Crush | Fear | A | Backtest: which underlyings stay within expected move? | High — already graded A |
-| 09 | Overnight Reversal | Drift | B | Backtest overnight returns on RS stocks after >2% drops | Medium — entry timing |
-| 10 | Mean Reversion to Trend | Drift | B | Quantify oscillation periodicity; validate BB lower touch as signal | Medium — extends Type C |
-| 11 | Insider & Corporate Action | Drift | B | Build SEC Form 4 screen; backtest insider buy + VCP combo | Medium — confirmation |
-| 12 | Short Squeeze | Institution | B | Quantify SI% + DTC thresholds for reliable squeeze outcomes | Medium — episodic |
-| 14 | Gamma-Induced Pinning | Institution | B | Can max pain predict 5-day directional trades near OpEx? | Low |
-| 20 | End of Month / Turn of Month | Regime | B | Pension fund flow effect on RS stocks in last/first 3 days | Low |
-| 29 | VTS Slope Alpha | Fear | B | Steep IV term structure as screening filter for long options | Low |
+| # | Mechanism | Cluster | Grade | Status | Notes |
+|---|-----------|---------|-------|--------|-------|
+| 06 | News-Driven Drift | Drift | B | Research | Build news-vs-no-news classifier |
+| 07 | Retail Attention Contrarian | Institution | B | Research | Define "extreme attention" quantitatively |
+| 08 | Earnings Volatility Crush | Fear | A | Research | Backtest: which underlyings stay within expected move? |
+| 09 | ~~Overnight Reversal~~ | ~~Drift~~ | ~~B~~ | **Rejected** | No edge — 33,935 events, Sharpe -0.011. Removed. |
+| 10 | ~~Mean Reversion to Trend~~ | ~~Drift~~ | ~~B~~ | **Promoted → PM-09 Active** | Validated: +2.25%/60d, 55.1% WR. Supplementary to Type C. |
+| 11 | Insider & Corporate Action | Drift | B | Research | Build SEC Form 4 screen |
+| 12 | Short Squeeze | Institution | B | Research | Quantify SI% + DTC thresholds |
+| 14 | Gamma-Induced Pinning | Institution | B | Research | Can max pain predict 5d directional trades? |
+| 20 | End of Month / Turn of Month | Regime | B | Research | Pension fund flow on RS stocks |
+| 29 | VTS Slope Alpha | Fear | B | Research | IV term structure as screening filter |
 
 ---
 
