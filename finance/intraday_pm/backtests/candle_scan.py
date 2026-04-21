@@ -15,9 +15,9 @@ Instruments:   IBDE40, IBGB100, IBUS500, IBUST100,
                IBUS30, IBAU200, IBJP225, USGOLD
 Timeframes:    5min, 10min, 15min, 30min
 Bar indices:   first 2 hours of session (0-indexed from session open)
-Stop methods:  atr  -- 20% of 14-day daily ATR (SRS style)
-               bar_range -- bar range + 2x offset (ASRS style)
-Exit:          2-bar trailing stop (fixed)
+Stop methods:  atr       -- 20% of 14-day daily ATR (SRS style), 2-bar trailing exit
+               bar_range -- bar range + 2x offset (ASRS style), 2-bar trailing exit
+               fixed_2r  -- bar range + 2x offset stop width, fixed 2R take-profit exit
 Entry offset:  2 pts (same as all Hougaard strategies)
 Cost:          2 pts round-trip spread
 
@@ -74,7 +74,7 @@ START     = datetime(2020, 1, 1, tzinfo=timezone.utc)
 END       = datetime(2026, 4, 1, tzinfo=timezone.utc)
 
 TIMEFRAMES    = ["5min", "10min", "15min", "30min"]
-STOP_METHODS  = ["atr", "bar_range"]
+STOP_METHODS  = ["atr", "bar_range", "fixed_2r"]
 MAX_SCAN_HOURS = 2   # scan bar indices within first 2 hours of session
 
 TZ_MAP = {
@@ -239,15 +239,23 @@ def _scan_one(
 
         atr_val = atr_series.get(trade_date, np.nan)
 
+        bar_range_pts = signal_bar["high"] - signal_bar["low"] + 2 * ENTRY_OFFSET_PTS
         if stop_method == "atr":
-            stop_pts = (
+            stop_pts  = (
                 atr_val * ATR_TRAIL_FACTOR if not np.isnan(atr_val)
-                else signal_bar["high"] - signal_bar["low"] + 2 * ENTRY_OFFSET_PTS
+                else bar_range_pts
             )
-        else:  # bar_range
-            stop_pts = signal_bar["high"] - signal_bar["low"] + 2 * ENTRY_OFFSET_PTS
+            exit_mode = "2bar_trail"
+        elif stop_method == "bar_range":
+            stop_pts  = bar_range_pts
+            exit_mode = "2bar_trail"
+        elif stop_method == "fixed_2r":
+            stop_pts  = bar_range_pts
+            exit_mode = "fixed_2r"
+        else:
+            raise ValueError(f"Unknown stop_method: {stop_method!r}")
 
-        rec = _simulate_oco(signal_bar, remaining, stop_pts, use_2bar_trail=True)
+        rec = _simulate_oco(signal_bar, remaining, stop_pts, exit_mode=exit_mode)
         rec["date"] = trade_date
         records.append(rec)
 
@@ -342,7 +350,7 @@ def _symbol_section(df: pd.DataFrame, symbol: str) -> list[str]:
     lines: list[str] = [
         f"### {symbol}",
         "",
-        f"Top {TOP_N} by Sharpe (all timeframes, both stop methods)  ",
+        f"Top {TOP_N} by Sharpe (all timeframes, all stop methods)  ",
         "",
         "| TF | Bar# | Time | Stop | N filled | Fill% | Win% | Avg win | Avg loss | EV (pts) | Sharpe |",
         "|-----|------|------|------|----------|-------|------|---------|----------|----------|--------|",
@@ -379,8 +387,8 @@ def build_section(all_results: pd.DataFrame) -> str:
         "",
         f"Generated: {date.today().isoformat()}  ",
         f"Period: {START.date().isoformat()} to {END.date().isoformat()}  ",
-        "Search space: 5min/10min/15min/30min x first-2h bar indices x atr/bar_range stop  ",
-        "Entry: OCO bracket +/-2 pts  |  Exit: 2-bar trailing stop  |  Cost: 2 pts  ",
+        "Search space: 5min/10min/15min/30min x first-2h bar indices x atr/bar_range/fixed_2r  ",
+        "Entry: OCO bracket +/-2 pts  |  Exit: 2-bar trail (atr/bar_range) or fixed 2R (fixed_2r)  |  Cost: 2 pts  ",
         "",
     ]
 
