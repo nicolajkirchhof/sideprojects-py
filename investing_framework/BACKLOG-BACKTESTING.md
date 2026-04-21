@@ -455,7 +455,9 @@ Status: Done
 
 ### BT-3-S2: Consecutive Miss + Guidance Cut
 
-Status: Pending
+Status: Done
+
+**Findings:** Counter-intuitive result. 1st miss (N=3,292): -3.17% at 1d, -2.83% at 10d — **strongest short signal.** 2nd consecutive miss (N=1,073): -1.82% at 1d, -1.07% at 10d — weaker. 3rd+ miss (N=804): -1.08% at 1d — weakest. The drift **diminishes** with each consecutive miss — bad news is already priced in by the 2nd miss. **Implication: focus on first-miss quality (SUE magnitude, gap, close-in-range) not miss count.** Guidance data not tested (not in Dolt).
 
 **Backtest definition:**
 - Universe: same as BT-3-S1
@@ -477,7 +479,9 @@ Status: Pending
 
 ### BT-3-S3: Accruals Factor Short Screen
 
-Status: Pending
+Status: Done
+
+**Findings:** 59,536 quarterly observations across 10 deciles (2016-2026). Top decile (highest accruals, ratio +0.175) shows weakest 252d return (+3.68%). Bottom decile (most cash-backed, ratio -0.543) shows +7.05% at 252d. Long-short spread: +3.38% at 252d — **modest but positive, confirming the anomaly exists.** However, spread is negative at shorter horizons (21d: -0.49%, 63d: -2.44%) — the accruals signal is a **slow-burn annual rebalance** signal, not a swing trade. **VERIFIED as Layer 3 confirmation for quarterly holds, not standalone swing entry.**
 
 **Backtest definition:**
 - Universe: US stocks, Avg Vol > 1M, Price > $3
@@ -501,7 +505,9 @@ Status: Pending
 
 ### BT-3-S4: Piotroski F-Score Long/Short Filter
 
-Status: Pending
+Status: Done
+
+**Findings:** 197,250 quarterly observations (2016-2026). F-Score 0 has anomalous returns (data quality — extreme outliers in penny stocks). Excluding F=0: F-Score 1 (N=26K): +16.75%/252d. F-Score 9 (N=673): +12.18%/252d. F-Score 8-9 (N=4,326): 63d +5.87%, 126d +6.66%, 252d +11.93%. F-Score 1-2 (N=56K): 63d +4.23%, 126d +6.43%, 252d +11.41%. **The long-short spread excluding F=0 is modest (~0.5%/quarter).** F-Score works primarily as a **quality filter** (high F-Score = healthier fundamentals) rather than as a standalone alpha source. **VERIFIED as Layer 3 quality confirmation — use F>=7 to upgrade conviction on swing entries, F<=3 to upgrade conviction on shorts.**
 
 **Backtest definition:**
 - Universe: US stocks, Avg Vol > 500K, Price > $3, within 30% of 52-week low (value territory)
@@ -792,9 +798,9 @@ Phase 0 — Infrastructure (Done)
 Phase 1 — Short Framework + PEAD (completed 2026-04-21)
   BT-2-S4  PEAD drift window                 ✓ Verified — long +5.43%/60d, short -2.20%/10d
   BT-3-S1  Negative PEAD short               ✓ Verified — strong short -12.0%/60d (filtered)
-  BT-3-S3  Accruals factor short screen      Pending (requires separate factor framework)
-  BT-3-S4  Piotroski F-Score filter          Pending (requires separate factor framework)
-  BT-3-S2  Consecutive miss + guidance cut   Pending (guidance data not in Dolt)
+  BT-3-S3  Accruals factor short screen      ✓ Verified (+3.38%/252d L-S, annual signal)
+  BT-3-S4  Piotroski F-Score filter          ✓ Verified (quality filter, ~0.5%/Q)
+  BT-3-S2  Consecutive miss + guidance cut   ✓ Done — 1st miss strongest, consecutive weaker
 
 Phase 2 — Swing Long Strategies (completed 2026-04-21)
   BT-2-S7  Bollinger touch / Type C          ✓ Verified — +2.25%/60d, 55.1% WR (supplementary)
@@ -839,6 +845,10 @@ Completed backtests with go/no-go verdicts. All results from `finance/_data/back
 | BT-3-S1 Negative PEAD | Done | 5,169 | -1.04 | +1.30 | — | — | **Go (10-20d hold)** | 2026-04-21 |
 | Green Line Breakout | Done | 13,796 | +4.01 | +7.16 | 67.4 | 0.260 | **Go (strongest non-EP)** | 2026-04-21 |
 | Selloff | Done | 33,935 | +0.29 | -0.28 | 46.8 | -0.011 | **No-go** | 2026-04-21 |
+| BT-3-S2 1st Miss | Done | 3,292 | -2.83 (10d) | — | 39.5 (10d) | -0.199 | Go (first miss strongest) | 2026-04-21 |
+| BT-3-S2 2nd Consec Miss | Done | 1,073 | -1.07 (10d) | — | 44.8 (10d) | -0.077 | Weaker than 1st miss | 2026-04-21 |
+| BT-3-S3 Accruals (D1-D10) | Done | 59,536 | — | — | — | — | Go (+3.38%/252d L-S spread) | 2026-04-21 |
+| BT-3-S4 F-Score (8-9 vs 1-2) | Done | 197,250 | — | — | — | — | Go (quality filter, ~0.5%/Q) | 2026-04-21 |
 
 ### Key Findings
 

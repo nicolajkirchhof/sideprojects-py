@@ -21,7 +21,8 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import text
 
-from finance.utils.dolt_data import db_earnings_connection, db_stocks_connection
+import finance.utils as utils
+from finance.utils.dolt_data import db_earnings_connection
 from finance.utils.fundamentals import compute_accruals, compute_fscore
 
 OUTPUT_DIR = "finance/_data/backtest_results/swing"
@@ -130,141 +131,94 @@ def _add_prior_quarter(df: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([df, shifted], axis=1)
 
 
-def _load_quarterly_returns(symbols: list[str] | None = None) -> pd.DataFrame:
+def _load_prices(symbols: list[str]) -> dict[str, pd.Series]:
     """
-    Load close prices from Dolt ohlcv for forward return computation.
-    Loads in batches of 500 symbols to avoid query size limits.
+    Load close prices from IBKR cache (fast), falling back to Dolt for
+    inactive/delisted symbols.
+
+    Returns dict mapping symbol -> date-indexed close Series.
     """
-    print("Loading EOD prices for forward returns...")
+    print(f"Loading EOD prices for {len(symbols)} symbols (IBKR cache -> Dolt fallback)...")
     t0 = time.time()
 
-    if symbols is None:
-        # Fallback: load everything (slow)
-        df = pd.read_sql(text("""
-            SELECT act_symbol, date, close
-            FROM ohlcv
-            WHERE date >= '2015-01-01'
-            ORDER BY act_symbol, date
-        """), db_stocks_connection)
-    else:
-        # Batch load by symbol chunks — small batches to avoid Dolt timeout
-        batch_size = 50
-        dfs = []
-        total_batches = (len(symbols) + batch_size - 1) // batch_size
-        for i in range(0, len(symbols), batch_size):
-            batch = symbols[i:i + batch_size]
-            placeholders = ",".join(f"'{s}'" for s in batch)
-            query = text(f"""
-                SELECT act_symbol, date, close
-                FROM ohlcv
-                WHERE act_symbol IN ({placeholders})
-                  AND date >= '2015-01-01'
-            """)
-            dfs.append(pd.read_sql(query, db_stocks_connection))
-            batch_num = i // batch_size + 1
-            if batch_num <= 3 or batch_num % 10 == 0 or batch_num == total_batches:
-                print(f"  Batch {batch_num}/{total_batches}: {len(batch)} symbols")
-        df = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+    price_map: dict[str, pd.Series] = {}
+    ibkr_hits = 0
+    dolt_hits = 0
+    misses = 0
 
-    df["date"] = pd.to_datetime(df["date"])
-    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+    for i, sym in enumerate(symbols):
+        try:
+            swing = utils.SwingTradingData(sym, datasource='offline')
+            if not swing.empty and swing.df_day is not None and not swing.df_day.empty:
+                closes = swing.df_day["c"].dropna()
+                if not closes.empty:
+                    price_map[sym] = closes
+                    ibkr_hits += 1
+                    continue
+        except Exception:
+            pass
+
+        # Dolt fallback for symbols not in IBKR cache
+        try:
+            from finance.utils.dolt_data import daily_w_volatility
+            df_dolt = daily_w_volatility(sym, offline=True)
+            if df_dolt is not None and not df_dolt.empty and "c" in df_dolt.columns:
+                closes = df_dolt["c"].dropna()
+                if not closes.empty:
+                    price_map[sym] = closes
+                    dolt_hits += 1
+                    continue
+        except Exception:
+            pass
+
+        misses += 1
+
+        if (i + 1) <= 3 or (i + 1) % 500 == 0 or (i + 1) == len(symbols):
+            elapsed = time.time() - t0
+            rate = (i + 1) / elapsed if elapsed > 0 else 0
+            eta = (len(symbols) - i - 1) / rate / 60 if rate > 0 else 0
+            print(f"  {i + 1}/{len(symbols)} symbols (IBKR={ibkr_hits} Dolt={dolt_hits} miss={misses}) {elapsed:.0f}s ETA {eta:.1f}m")
 
     elapsed = time.time() - t0
-    print(f"  Loaded {len(df):,} price rows in {elapsed:.1f}s")
+    print(f"  Loaded {len(price_map)} symbols (IBKR={ibkr_hits} Dolt={dolt_hits} miss={misses}) in {elapsed:.1f}s")
 
-    return df
+    return price_map
+
 
 
 def _compute_forward_returns(
     df_signals: pd.DataFrame,
-    df_prices: pd.DataFrame,
+    price_map: dict[str, pd.Series],
     forward_days: list[int],
 ) -> pd.DataFrame:
     """
-    For each signal row (act_symbol, date), compute forward returns at given horizons.
+    Compute forward returns for each signal row using pre-loaded price map.
 
-    Uses merge_asof to find the nearest trading day, then looks forward.
+    For each (act_symbol, date), finds the entry price (nearest trading day
+    on or after signal date) and exit price at each horizon.
     """
-    print("Computing forward returns...")
-    results = df_signals[["act_symbol", "date"]].copy()
-
-    for fwd in forward_days:
-        col = f"fwd_{fwd}d"
-        returns = []
-
-        for _, row in df_signals.iterrows():
-            sym = row["act_symbol"]
-            sig_date = row["date"]
-
-            sym_prices = df_prices[df_prices["act_symbol"] == sym].set_index("date")["close"]
-            if sym_prices.empty:
-                returns.append(np.nan)
-                continue
-
-            # Find nearest trading day on or after signal date
-            valid_dates = sym_prices.index[sym_prices.index >= sig_date]
-            if len(valid_dates) == 0:
-                returns.append(np.nan)
-                continue
-
-            entry_date = valid_dates[0]
-            entry_price = sym_prices[entry_date]
-
-            # Find price at forward horizon
-            target_date = entry_date + pd.Timedelta(days=fwd)
-            future_dates = sym_prices.index[(sym_prices.index >= target_date)]
-            if len(future_dates) == 0:
-                returns.append(np.nan)
-                continue
-
-            exit_price = sym_prices[future_dates[0]]
-            returns.append((exit_price / entry_price - 1) * 100)
-
-        results[col] = returns
-
-    return results
-
-
-def _compute_forward_returns_vectorized(
-    df_signals: pd.DataFrame,
-    df_prices: pd.DataFrame,
-    forward_days: list[int],
-) -> pd.DataFrame:
-    """
-    Vectorized forward return computation using merge_asof.
-    Much faster than the per-row approach for large datasets.
-    """
-    print("Computing forward returns (vectorized)...")
+    print(f"Computing forward returns for {len(df_signals):,} signals...")
     t0 = time.time()
 
-    df_p = df_prices.sort_values(["act_symbol", "date"]).reset_index(drop=True)
-    df_s = df_signals[["act_symbol", "date"]].sort_values(["act_symbol", "date"]).reset_index(drop=True)
+    df_s = df_signals[["act_symbol", "date"]].copy().reset_index(drop=True)
 
-    # Build price index per symbol for fast lookup
-    price_map: dict[str, pd.Series] = {}
-    for sym, grp in df_p.groupby("act_symbol"):
-        price_map[sym] = grp.set_index("date")["close"]
-
-    results = df_s.copy()
     for fwd in forward_days:
         col = f"fwd_{fwd}d"
         returns = np.full(len(df_s), np.nan)
 
-        for idx, row in df_s.iterrows():
-            sym = row["act_symbol"]
-            sig_date = row["date"]
+        for idx in range(len(df_s)):
+            sym = df_s.at[idx, "act_symbol"]
+            sig_date = df_s.at[idx, "date"]
 
             prices = price_map.get(sym)
             if prices is None or prices.empty:
                 continue
 
-            # Entry: nearest trading day on or after signal date
             entry_mask = prices.index >= sig_date
             if not entry_mask.any():
                 continue
             entry_price = prices[entry_mask].iloc[0]
 
-            # Exit: nearest trading day on or after signal_date + fwd days
             target = sig_date + pd.Timedelta(days=fwd)
             exit_mask = prices.index >= target
             if not exit_mask.any():
@@ -273,12 +227,12 @@ def _compute_forward_returns_vectorized(
 
             returns[idx] = (exit_price / entry_price - 1) * 100
 
-        results[col] = returns
+        df_s[col] = returns
 
     elapsed = time.time() - t0
     print(f"  Forward returns computed in {elapsed:.1f}s")
 
-    return results
+    return df_s
 
 
 def _format_decile_report(
@@ -364,11 +318,13 @@ def run() -> None:
     df_accruals_valid = df_accruals[df_accruals["accruals_ratio"].notna()].copy()
     print(f"Valid accruals ratios: {len(df_accruals_valid):,}")
 
-    # Load prices for forward returns — only for symbols with financial data
+    # Load prices — IBKR cache first, Dolt fallback for inactive symbols
     fin_symbols = df_accruals_valid["act_symbol"].unique().tolist()
-    df_prices = _load_quarterly_returns(symbols=fin_symbols)
-    df_accruals_fwd = _compute_forward_returns_vectorized(
-        df_accruals_valid, df_prices, FORWARD_DAYS,
+    price_map = _load_prices(fin_symbols)
+
+    # Compute forward returns for accruals signal dates
+    df_accruals_fwd = _compute_forward_returns(
+        df_accruals_valid, price_map, FORWARD_DAYS,
     )
 
     # Merge factor values back
@@ -395,8 +351,9 @@ def run() -> None:
     print(f"Valid F-Scores: {valid_fscore:,}")
 
     df_fscore_valid = df_fscore[df_fscore["fscore"].notna()].copy()
-    df_fscore_fwd = _compute_forward_returns_vectorized(
-        df_fscore_valid, df_prices, FORWARD_DAYS,
+    # Reuse same price_map — symbols overlap heavily
+    df_fscore_fwd = _compute_forward_returns(
+        df_fscore_valid, price_map, FORWARD_DAYS,
     )
 
     df_fscore_report = df_fscore_valid[["act_symbol", "date", "fscore"]].copy()
