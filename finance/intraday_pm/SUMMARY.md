@@ -15,9 +15,9 @@ Blank (—) = strategy not tested on that instrument.
 | Strategy | IBDE40 | IBGB100 | IBUS500 | IBUST100 | IBUS30 | IBJP225 | IBES35 | IBAU200 | IBEU50/IBFR40/IBCH20/IBNL25/USGOLD |
 |----------|--------|---------|---------|----------|--------|---------|--------|---------|--------------------------------------|
 | **OCO candle scan** | **Go** | No-go | No-go | **Go** | **Go** | **Go** | Pilot | Pilot | No-go |
+| **OCO fixed_2r** | **Go** | No-go | No-go | No-go | Pilot | **Go** | No-go | No-go | No-go |
 | **Following Range Break** | Go | Pilot | Go | Go | Go | Go | No-go | — | — |
 | **Hougaard FOMC Rule of 4** | — | — | **Go** (event-only) | — | — | — | — | — | — |
-| **ORB (15m/30m)** | **Go** | No-go | No-go | **Go** | — | — | — | — | — |
 | **VWAP Extrema** | **Go** | **Go** | **Go** | **Go** | — | — | — | — | — |
 | **Noon Iron Butterfly** | No-go | — | **Go** | — | — | — | — | — | — |
 | **Micro/Macro Trend** | Do not pursue | — | — | — | — | — | — | — | — |
@@ -30,9 +30,11 @@ Blank (—) = strategy not tested on that instrument.
 >   The scan found strictly better signal bars on most instruments (e.g. IBDE40 15min/bar2
 >   beats SRS 15min/bar1; IBUS30 5min/bar2 beats ASRS 5min/bar3). Per-instrument verdicts are
 >   in RESULTS.md; automation parameters are in the Go Strategies section below.
-> - *ORB 15m and ORB 30m* — merged into a single ORB row. Go/No-go verdict is identical
->   across all four tested instruments; separating timeframes added no information at this
->   level. Timeframe-level detail is in the Go Strategies section (§8–§9).
+> - *ORB (15m/30m)* — removed. The fixed_2r candle scan (Scan 3) now covers the same exit
+>   mechanic (fixed target + hard stop) systematically across all bars and timeframes.
+>   Key verdict change: IBUST100 loses its ORB Go status — the fixed_2r scan finds no viable
+>   fixed-target bar on IBUST100 (trailing-stop OCO remains Go). IBDE40 retains Go via
+>   the stronger fixed_2r 30min/bar2 result (+0.062). Per-instrument detail in Scan 3 section.
 
 ---
 
@@ -428,12 +430,11 @@ Signal bars marked † reflect candle scan upgrades.
 | VWAP Extrema (high-edge slots) | IBUS500 | MES | Pre-market + open | +0.444 | ~13,500/yr |
 | OCO Early Session Break | IBUS30 | MYM | 09:45 ET (bar closes; 3rd 5m bar) | +0.098 | ~250/yr |
 | OCO Opening Bar 30m | IBJP225 | FN225M† | 10:00 Tokyo (2nd 30m bar closes) | +0.075 | ~250/yr |
+| OCO fixed_2r | IBDE40 | FDXS | 10:00 Frankfurt (2nd 30m bar closes) | +0.062 | ~250/yr |
 | Hougaard SRS ‡ | IBDE40 | FDXS | 09:45 Frankfurt (3rd 15m bar closes) | +0.054 | ~250/yr |
 | OCO Opening Bar 30m | IBUST100 | MNQ | 10:00 ET (1st 30m bar closes) | +0.067 | ~250/yr |
 | Hougaard ASRS | IBUST100 | MNQ | 09:50 ET (4th 5m bar closes) | +0.049 | ~250/yr |
 | Hougaard SRS | IBUST100 | MNQ | 10:00 ET (2nd 15m bar closes) | +0.052 | ~250/yr |
-| ORB 30m long | IBDE40 | FDXS | 09:30 Frankfurt | +0.025 | ~550/yr |
-| ORB 15m/30m | IBUST100 | MNQ | 09:45/10:00 ET | +0.037 | ~1,100/yr |
 | Hougaard FOMC | IBUS500 | MES | FOMC announcement days | +0.110 | ~10/yr |
 
 > † FN225M (Micro Nikkei) is listed on OSE.JPN and is JPY-denominated. Requires
@@ -443,6 +444,10 @@ Signal bars marked † reflect candle scan upgrades.
 > ‡ Signal times corrected from SUMMARY v1: scheduler fires at bar *close* + 30s,
 > not at bar *open*. FDXS SRS bar opens 09:30, closes 09:45 → fires 09:45:30 Frankfurt.
 > MNQ strategies: OCO Opening Bar 30m closes 10:00 ET, ASRS closes 09:50 ET.
+>
+> FDXS two-signal note: OCO fixed_2r fires at 10:00:30 Frankfurt (2nd 30m bar close);
+> Hougaard SRS fires at 09:45:30 Frankfurt (3rd 15m bar close). Different times, no conflict.
+> Both use different stop widths (30m bar range vs ATR). Can run concurrently.
 >
 > IBUS30 conflict: the 3rd 5m bar (09:40–09:45 ET) overlaps with the ASRS bar on MNQ.
 > Both fire at 09:45:30 ET but on different instruments — no conflict.
