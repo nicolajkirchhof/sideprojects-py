@@ -18,8 +18,7 @@ from typing import Any
 APPS: dict[str, str] = {
     "swing-plot":  "finance.apps.swing_plot",
     "momentum":    "finance.apps.momentum_dashboard",
-    "conditions":  "finance.apps.conditions",
-    "analyst":     "finance.apps.analyst",
+    "assistant":   "finance.apps.assistant",
 }
 
 

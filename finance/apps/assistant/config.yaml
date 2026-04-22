@@ -1,0 +1,21 @@
+# Trading Assistant — Scoring Configuration
+#
+# Weights must sum to 100. Tag bonus is +tag_bonus_per_tag per tag, capped at tag_bonus_cap.
+# Full scoring spec: investing_framework/ScoringSystem.md
+
+scoring:
+  weights:
+    1: 25   # D1 Trend Template   — century momentum, cross-sectional momentum
+    2: 25   # D2 Relative Strength — cross-sectional momentum (RS vs SPY)
+    3: 15   # D3 Base Quality      — VCP/BB squeeze timing, entry quality
+    4: 20   # D4 Catalyst          — PEAD (Grade A academic), options flow
+    5: 15   # D5 Risk              — survival constraint, hard gates
+
+  tag_bonus_per_tag: 2
+  tag_bonus_cap: 12
+
+  # Numeric SMA slope from scanner (50D MA %Chg / 200D MA %Chg) is classified as:
+  #   abs(slope) <= threshold → "flat"
+  #   slope > threshold       → "rising"
+  #   slope < -threshold      → "falling"
+  slope_flat_threshold: 0.1
