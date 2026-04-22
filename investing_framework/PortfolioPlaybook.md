@@ -87,21 +87,19 @@ Each Barchart scanner feeds a specific strategy and mechanism. Full scanner conf
 
 | Scanner | Name | Strategy | Mechanism | Setup Type |
 |---------|------|----------|-----------|------------|
-| #1 | 52-Week High | Swing Long | PM-01 Breakout | Type B (VCP near highs) |
-| #2 | 5-Day Momentum | Swing Long | PM-01 / PM-02 | Type A (EP) |
-| #3 | 1-Month Strength | Swing Long | PM-01 | Type B / C |
-| #4 | Volume Spike | Swing Long | PM-01 | All types |
-| #5 | Trend Seeker | Swing Long | Supplementary | Confirmation |
-| #6 | High Put Ratio | Swing Long/Short | PM-04 / PM-11 | Squeeze / Flow |
+| **LU** | **Long Universe** | Swing Long+Short | PM-01/02/04/09 | All (A, B, C + scored short candidates) |
+| #6 | High Put Ratio | Both | PM-04 / PM-11 | Squeeze / Flow |
 | #7 | High Call Ratio | Swing Long | PM-04 | Flow confirmation |
 | #8 | Intraday RVOL | Swing Long | PM-01 | Type A / C (manual) |
-| #9 | PEAD Candidates | Swing Long | PM-02 | Type A (EP on earnings) |
-| #10 | TTM Squeeze | Swing Long | PM-01 / PM-09 | Type B / C |
+| **#9** | **PEAD Scanner** | **Both** | PM-02 (both directions) | Type A / D |
 | #11 | EP Gap Scanner | Swing Long | PM-01 / PM-02 | Type A |
 | #12 | Short Squeeze | Swing Long | PM-11 | Watchlist |
-| #13 | Negative PEAD | **Swing Short** | PM-02 (short) | Type D |
 | #14 | RW Breakdown | **Swing Short** | PM-05 (short) | Type D |
 | UOA | Unusual Options | Both | PM-04 | Flow confirmation |
+
+> Long Universe consolidates old #1–#5, #10. PEAD Scanner consolidates old #9, #13.
+> Scoring engine ranks all candidates (long and short) on a 0–100 scale.
+> Full scoring spec: `ScoringSystem.md`. Full scanner config: `BarchartScreeners.md`.
 
 ---
 
@@ -140,6 +138,7 @@ Summarised from `InvestingPlaybook.md` §02 Portfolio Hedging:
 | `TradingPlaybook.md` | Swing trading rules: mechanisms, setup types, entry/exit, short framework |
 | `InvestingPlaybook.md` | DRIFT premium selling + Long-Term ETF allocation |
 | `BarchartScreeners.md` | Scanner configuration, column views, pipeline integration |
+| `ScoringSystem.md` | Weighted 0–100 candidate scoring: dimension weights, long/short inversion, tag bonuses, hard gates |
 | `OptionsStrategyReference.md` | Options structure selection by IVR and market view |
 | `DashboardProfitMechanismMap.md` | PyQtGraph dashboard widget-to-mechanism mapping |
 | `BACKLOG-BACKTESTING.md` | Backtest stories, results register, research gaps |

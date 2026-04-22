@@ -13,11 +13,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from finance.intraday_pm.forex.forex_oco_bt import (
+from finance.intraday_pm.forex.backtests.forex_oco_bt import (
     _to_pips,
     PIP_SIZE,
 )
-from finance.intraday_pm.forex.currency_momentum_bt import (
+from finance.intraday_pm.forex.backtests.currency_momentum_bt import (
     _invert_returns,
     _momentum_score,
     _rank_long_short,

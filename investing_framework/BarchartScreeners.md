@@ -19,15 +19,26 @@ Applied to ALL screeners unless noted otherwise.
 | Market Cap | > $200M | Keep small-cap PEAD plays (strongest drift in research) while filtering micro-cap noise. Volume filter handles quality — any stock at 1M vol + $200M cap has institutional interest |
 | Next Earnings | Exclude within 5 days | Playbook Box 4 rule — no binary events on entries. Filter upfront to reduce scanner noise instead of scoring then failing |
 
-**Long-only scanners** (Long Universe, 11) add:
+**Broad universe scanners** (Long Universe, 11) add:
 
 | Filter | Value | Reasoning |
 |--------|-------|-----------|
-| % 50D MA | > 0% | Eliminate Stage 4 downtrends. Box 1 requires Price > 50D SMA. Reduces noise ~40% |
-| Slope of 50D SMA | Rising | Box 1 requires 50D SMA rising — more precise than just % from SMA |
-| Slope of 200D SMA | > 0 | Completes Trend Template — 200D must be sloping upward for Stage 2 confirmation. Numeric field (positive = rising); replaces the categorical "200D MA Direction" which is an opaque proprietary signal |
-| 20D ADR% | > 3% | Box 3 requires sufficient daily range for 2R+ within the 5–50 day timeframe. Stocks with ADR < 3% can't deliver ORB entries with tight stops |
-| Weighted Alpha | > 0 | 12-month momentum weighted to recent activity — better century momentum proxy than raw 52W %Chg |
+| 20D ADR% | > 2% | Minimum daily range for ORB viability. Lowered from 3% to include EP gap stocks with normally tight ranges. The scoring engine penalizes low ADR in D3 (Base Quality) and D5 (Risk). |
+
+**Removed from scanner** (handled by scoring engine — see Trading Assistant backlog):
+- ~~% 50D MA > 0%~~ — scorer penalizes in D1 (Trend Template). Removing this allows EP
+  candidates gapping from below 50D and Stage 1→2 transitions.
+- ~~Slope of 50D SMA: Rising~~ — scorer penalizes in D1. The 50D slope lags the price move
+  by weeks; this filter kills EP candidates at the moment of ignition.
+- ~~Slope of 200D SMA > 0~~ — scorer penalizes in D1. Stage 1→2 transitions have declining
+  200D for months after the reversal begins.
+- ~~Weighted Alpha > 0~~ — scorer penalizes in D1 (12-month return sub-component). Removing
+  this allows negative PEAD / short framework candidates to appear in the same universe.
+
+**Impact:** Universe roughly doubles from ~150 to ~300–400 stocks (adds Stage 1/3/4 and
+recent turnarounds). Still well under the 1,000 Barchart limit. Stage 2 momentum stocks
+score 70–90; turnarounds score 40–55; Stage 4 declines score 20–35 for longs but surface
+as short candidates under inverted scoring.
 
 **Do NOT add trend filters to:** High Put Ratio (#6), High Call Ratio (#7) — these
 intentionally scan across all trend states. UOA scanner has its own filters.
@@ -38,15 +49,16 @@ intentionally scan across all trend states. UOA scanner has its own filters.
 
 ### Long Universe (replaces scanners #1–#5, #10)
 
-**Purpose:** Single consolidated scanner for all long-only swing candidates. Returns ~150
-stocks with the long-only base filters. The pipeline applies scanner-specific thresholds
-post-hoc and tags each stock with the labels it qualifies for.
+**Purpose:** Broad scored universe for all swing candidates — long AND short. Returns
+~300–400 stocks with relaxed filters (no trend gates). The scoring engine ranks candidates;
+nothing is silently dropped. Stage 2 momentum stocks score high, turnarounds and Stage 4
+declines are visible but deprioritized (or flagged for the short framework).
 
 **View:** Standard
-**Filters:** Global base + long-only base filters only (no additional filters).
+**Filters:** Global base + ADR > 2% only. No trend filters — handled by scoring engine.
 
-With ~150 results vs the 1,000-row Barchart limit, all five original scanner populations
-are captured in one pass. The pipeline tags stocks using returned data columns:
+With ~300–400 results vs the 1,000-row Barchart limit, the full tradeable universe is
+captured. The pipeline tags stocks using returned data columns:
 
 | Tag | Condition (applied by pipeline) | Origin |
 |-----|--------------------------------|--------|
@@ -263,17 +275,17 @@ Covers all 5 boxes at a glance. Optimized for end-of-day email evaluation.
 | 5 | 1M %Chg | Sustained strength (Box 1+2) | `1m-strength` (> 10%) |
 | 6 | Trend Seeker Signal | Proprietary trend confirmation — Buy/Hold/Sell | `trend-seeker` (= Buy) |
 | 7 | 52W %/High | Overhead supply (Box 1) | `52w-high` (< 5%) |
-| 8 | Weighted Alpha | 12M momentum weighted to recent (Box 1) | Base filter (> 0) |
+| 8 | Weighted Alpha | 12M momentum weighted to recent (Box 1) | D1 scoring input |
 | 9 | Perf vs Market 5D | RS vs SPY this week (Box 2) | `5d-momentum` (> 0%) |
 | 10 | Perf vs Market 1M | RS vs SPY this month (Box 2) | `1m-strength` (> 0%) |
 | 11 | 3M % Change from Index | RS vs SPY over 3 months — sustained RS confirmation (Box 2) | — |
 | 12 | Volume | Today's volume | — |
 | 13 | 20D RelVol | RVOL — ignition detection (Box 3) | `52w-high`/`5d-momentum` (> 1.0), `vol-spike` (> 1.75) |
-| 14 | 20D ADR% | Daily range — must be > 3% for ORB viability (Box 3) | Base filter (> 3%) |
+| 14 | 20D ADR% | Daily range — must be > 2% for ORB viability (Box 3) | Base filter (> 2%) |
 | 15 | 20D ATRP | ATR as % — stop distance check, max 7% (Box 5) | `ttm-fired` (< 7%) |
-| 16 | % 50D MA | Distance from 50D SMA (Box 1) | Base filter (> 0%) |
-| 17 | Slope of 50D SMA | SMA direction — rising required for Box 1 | Base filter (rising) |
-| 18 | Slope of 200D SMA | 200D SMA slope — positive = rising, required for Stage 2 (Box 1) | Base filter (> 0) |
+| 16 | % 50D MA | Distance from 50D SMA (Box 1) | D1 scoring input |
+| 17 | Slope of 50D SMA | SMA direction (Box 1) | D1 scoring input |
+| 18 | Slope of 200D SMA | 200D SMA slope (Box 1) | D1 scoring input |
 | 19 | TTM Squeeze | Squeeze status — on/fired/off (Box 3 base quality) | `52w-high`/`1m-strength` (= On), `ttm-fired` (= Fired) |
 | 20 | Bollinger Bands Rank | 0–100 position within bands — extension check (Box 3) | — |
 | 21 | 5D P/C Vol | Put/Call ratio (Box 4, PM-04) | — |
