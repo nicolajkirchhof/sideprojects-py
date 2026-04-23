@@ -19,6 +19,8 @@ from pathlib import Path
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 
+from finance.apps.assistant._watchlist_model import Col, WatchlistModel
+
 log = logging.getLogger(__name__)
 
 _SETTINGS_ORG = "sideprojects-py"
@@ -30,6 +32,24 @@ _DEFAULT_WIDTH = 1400
 _DEFAULT_HEIGHT = 900
 _LEFT_WIDTH = 300
 _RIGHT_WIDTH = 350
+
+# Explicit pixel widths for each column; SECTOR is omitted because it uses
+# horizontalHeader().setStretchLastSection(True) to fill remaining space.
+_COLUMN_WIDTHS: dict[Col, int] = {
+    Col.CHECK:     28,
+    Col.SYMBOL:    70,
+    Col.DIRECTION: 30,
+    Col.SCORE:     50,
+    Col.D1:        40,
+    Col.D2:        40,
+    Col.D3:        40,
+    Col.D4:        40,
+    Col.D5:        40,
+    Col.TAGS:     160,
+    Col.PRICE:     65,
+    Col.CHANGE_5D: 55,
+    Col.RVOL:      50,
+}
 
 
 class AssistantWindow(QtWidgets.QMainWindow):
@@ -55,6 +75,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._settings = QtCore.QSettings(_SETTINGS_ORG, _SETTINGS_APP)
         self._results: list[dict] = []
         self._pipeline_thread: QtCore.QThread | None = None
+        self._watchlist_model = WatchlistModel(self)
 
         self._build_toolbar()
         self._build_panels()
@@ -115,7 +136,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
         self._left_panel = self._make_placeholder_panel("Market Context")
-        self._centre_panel = self._make_placeholder_panel("Watchlist")
+        self._centre_panel = self._build_watchlist_panel()
         self._right_panel = self._make_placeholder_panel("Detail")
 
         self._splitter.addWidget(self._left_panel)
@@ -130,6 +151,45 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._splitter.setStretchFactor(2, 0)
 
         self.setCentralWidget(self._splitter)
+
+    def _build_watchlist_panel(self) -> QtWidgets.QWidget:
+        """
+        Build the centre panel containing the scored-candidate QTableView.
+
+        Layout: a thin header label (candidate count) above the table view.
+        The table uses a QSortFilterProxyModel wrapping WatchlistModel so
+        clicking column headers sorts without mutating the source data.
+        """
+        panel = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        proxy = QtCore.QSortFilterProxyModel(self)
+        proxy.setSourceModel(self._watchlist_model)
+        proxy.setSortRole(QtCore.Qt.ItemDataRole.UserRole)
+        proxy.setSortCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
+
+        table = QtWidgets.QTableView()
+        table.setModel(proxy)
+        table.setSortingEnabled(True)
+        table.sortByColumn(3, QtCore.Qt.SortOrder.DescendingOrder)  # Score desc
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setShowGrid(False)
+
+        # Column widths driven by _COLUMN_WIDTHS constant; SECTOR stretches.
+        hh = table.horizontalHeader()
+        for col, width in _COLUMN_WIDTHS.items():
+            hh.resizeSection(col, width)
+
+        layout.addWidget(table)
+        self._watchlist_table = table
+        self._watchlist_proxy = proxy
+        return panel
 
     def _build_status_bar(self) -> None:
         self._status_bar = self.statusBar()
@@ -198,6 +258,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
             return
 
         self._results = rows
+        self._watchlist_model.load_rows(rows)
         ts = datetime.now().strftime("%H:%M")
         self.set_status(f"Loaded from cache ({ts})")
         self.set_candidate_count(len(rows))
@@ -244,6 +305,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
         """Handle successful pipeline completion."""
         result_rows: list[dict] = rows  # type: ignore[assignment]
         self._results = result_rows
+        self._watchlist_model.load_rows(result_rows)
         ts = datetime.now().strftime("%H:%M:%S")
         self.set_status(f"Done — {len(result_rows)} candidates  ({ts})")
         self._lbl_last_run.setText(f"Run  {ts}")
