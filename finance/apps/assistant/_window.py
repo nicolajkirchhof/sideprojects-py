@@ -13,7 +13,13 @@ via QSettings (key prefix: TradingAssistant/).
 """
 from __future__ import annotations
 
+import logging
+from datetime import date, datetime
+from pathlib import Path
+
 from pyqtgraph.Qt import QtCore, QtWidgets
+
+log = logging.getLogger(__name__)
 
 _SETTINGS_ORG = "sideprojects-py"
 _SETTINGS_APP = "TradingAssistant"
@@ -31,7 +37,14 @@ class AssistantWindow(QtWidgets.QMainWindow):
     Trading Assistant main window.
 
     Hosts three resizable panels and a toolbar. Panel content is populated
-    by subsequent stories; this class provides only the shell and layout.
+    by subsequent stories; this class provides the shell, layout, and
+    pipeline orchestration.
+
+    Attributes
+    ----------
+    _results:
+        In-memory list of result rows (dicts) from the most recent
+        pipeline run or cache load. Consumed by the watchlist table (TA-E4).
     """
 
     def __init__(self) -> None:
@@ -40,11 +53,14 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self.resize(_DEFAULT_WIDTH, _DEFAULT_HEIGHT)
 
         self._settings = QtCore.QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+        self._results: list[dict] = []
+        self._pipeline_thread: QtCore.QThread | None = None
 
         self._build_toolbar()
         self._build_panels()
         self._build_status_bar()
         self._restore_geometry()
+        self._load_today_cache()
 
     # ------------------------------------------------------------------
     # Layout construction
@@ -57,8 +73,9 @@ class AssistantWindow(QtWidgets.QMainWindow):
 
         self._btn_run = QtWidgets.QToolButton()
         self._btn_run.setText("▶  Run Pipeline")
-        self._btn_run.setToolTip("Fetch scanner emails, enrich, score, and analyse candidates")
+        self._btn_run.setToolTip("Enrich, score, and cache today's scanner candidates")
         self._btn_run.setMinimumWidth(130)
+        self._btn_run.clicked.connect(lambda: self._on_run_pipeline())
         tb.addWidget(self._btn_run)
 
         tb.addSeparator()
@@ -66,6 +83,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._btn_load_csv = QtWidgets.QToolButton()
         self._btn_load_csv.setText("Load CSV…")
         self._btn_load_csv.setToolTip("Manually import a Barchart screener CSV")
+        self._btn_load_csv.clicked.connect(self._on_load_csv)
         tb.addWidget(self._btn_load_csv)
 
         tb.addSeparator()
@@ -82,7 +100,6 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._btn_export_tws.setEnabled(False)
         tb.addWidget(self._btn_export_tws)
 
-        # Push the rest to the right
         spacer = QtWidgets.QWidget()
         spacer.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
@@ -105,13 +122,12 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._splitter.addWidget(self._centre_panel)
         self._splitter.addWidget(self._right_panel)
 
-        # Initial width distribution — centre gets all remaining space
         total = _DEFAULT_WIDTH
         centre = total - _LEFT_WIDTH - _RIGHT_WIDTH
         self._splitter.setSizes([_LEFT_WIDTH, centre, _RIGHT_WIDTH])
-        self._splitter.setStretchFactor(0, 0)  # left — fixed preference
-        self._splitter.setStretchFactor(1, 1)  # centre — stretches
-        self._splitter.setStretchFactor(2, 0)  # right — fixed preference
+        self._splitter.setStretchFactor(0, 0)
+        self._splitter.setStretchFactor(1, 1)
+        self._splitter.setStretchFactor(2, 0)
 
         self.setCentralWidget(self._splitter)
 
@@ -131,7 +147,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
 
         lbl = QtWidgets.QLabel(name)
         lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        lbl.setStyleSheet("color: #444; font-size: 16px;")
+        lbl.setStyleSheet("color: #555; font-size: 16px;")
         layout.addWidget(lbl)
 
         return widget
@@ -152,10 +168,13 @@ class AssistantWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtCore.QEvent) -> None:  # type: ignore[override]
         self._settings.setValue(_KEY_GEOMETRY, self.saveGeometry())
         self._settings.setValue(_KEY_SPLITTER, self._splitter.saveState())
+        if self._pipeline_thread is not None and self._pipeline_thread.isRunning():
+            self._pipeline_thread.quit()
+            self._pipeline_thread.wait(3000)
         super().closeEvent(event)
 
     # ------------------------------------------------------------------
-    # Status bar helpers (used by pipeline thread in TA-E2-S2)
+    # Status bar helpers
     # ------------------------------------------------------------------
 
     def set_status(self, message: str) -> None:
@@ -165,3 +184,87 @@ class AssistantWindow(QtWidgets.QMainWindow):
     def set_candidate_count(self, count: int) -> None:
         """Update the permanent candidate-count label."""
         self._lbl_candidate_count.setText(f"{count} candidates" if count is not None else "")
+
+    # ------------------------------------------------------------------
+    # Cache loading on launch
+    # ------------------------------------------------------------------
+
+    def _load_today_cache(self) -> None:
+        """Load today's JSON cache if it exists, skipping the pipeline."""
+        from finance.apps.assistant._pipeline import read_cache
+
+        rows = read_cache(date.today())
+        if rows is None:
+            return
+
+        self._results = rows
+        ts = datetime.now().strftime("%H:%M")
+        self.set_status(f"Loaded from cache ({ts})")
+        self.set_candidate_count(len(rows))
+        self._lbl_last_run.setText(f"Cache  {ts}")
+        log.info("Loaded %d rows from today's cache", len(rows))
+
+    # ------------------------------------------------------------------
+    # Pipeline orchestration
+    # ------------------------------------------------------------------
+
+    def _on_run_pipeline(self, *, csv_paths: list[Path] | None = None) -> None:
+        """Start the background pipeline thread."""
+        from finance.apps.assistant._pipeline import PipelineThread
+
+        if self._pipeline_thread is not None and self._pipeline_thread.isRunning():
+            return  # already running — ignore
+
+        thread = PipelineThread(csv_paths=csv_paths)
+        thread.stage_changed.connect(self._on_pipeline_stage)
+        thread.candidate_count_changed.connect(self.set_candidate_count)
+        thread.finished_ok.connect(self._on_pipeline_finished)
+        thread.error.connect(self._on_pipeline_error)
+
+        self._pipeline_thread = thread
+        self._set_pipeline_running(True)
+        thread.start()
+
+    def _on_load_csv(self) -> None:
+        """Open a file dialog and run the pipeline with the selected CSV(s)."""
+        paths, _ = QtWidgets.QFileDialog.getOpenFileNames(
+            self,
+            "Select Barchart Screener CSV(s)",
+            str(Path("finance/_data/barchart/screener")),
+            "CSV files (*.csv)",
+        )
+        if not paths:
+            return
+        self._on_run_pipeline(csv_paths=[Path(p) for p in paths])
+
+    def _on_pipeline_stage(self, message: str) -> None:
+        self.set_status(message)
+
+    def _on_pipeline_finished(self, rows: object) -> None:
+        """Handle successful pipeline completion."""
+        result_rows: list[dict] = rows  # type: ignore[assignment]
+        self._results = result_rows
+        ts = datetime.now().strftime("%H:%M:%S")
+        self.set_status(f"Done — {len(result_rows)} candidates  ({ts})")
+        self._lbl_last_run.setText(f"Run  {ts}")
+        self._set_pipeline_running(False)
+        self._pipeline_thread = None
+        log.info("Pipeline finished: %d candidates", len(result_rows))
+
+    def _on_pipeline_error(self, message: str) -> None:
+        """Handle pipeline failure — show error dialog and re-enable UI."""
+        from finance.apps.assistant._error_dialog import show_pipeline_error
+
+        self.set_status("Pipeline failed — see error dialog")
+        self._set_pipeline_running(False)
+        self._pipeline_thread = None
+        show_pipeline_error(self, message)
+
+    def _set_pipeline_running(self, running: bool) -> None:
+        """Toggle UI controls while the pipeline is active."""
+        self._btn_run.setEnabled(not running)
+        self._btn_load_csv.setEnabled(not running)
+        if running:
+            self._btn_run.setText("⏳  Running…")
+        else:
+            self._btn_run.setText("▶  Run Pipeline")
