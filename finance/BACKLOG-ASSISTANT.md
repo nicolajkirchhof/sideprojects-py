@@ -348,18 +348,18 @@ Left panel showing market conditions, economic events, AI summary, and DRIFT eli
 
 ### TA-E3-S1: Swing regime indicators
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** the GO/NO-GO regime displayed in the assistant,
 **So that** I have one app for all evening prep.
 
 **Acceptance criteria:**
-- [ ] Logic migrated from `conditions/_data.py` into `assistant/_data.py` (conditions app deleted)
-- [ ] Compact display: single GO/NO-GO banner + trend rows + VIX row
-- [ ] Colour-coded: green banner for GO, amber for CAUTION, red for NO-GO
-- [ ] SPY/QQQ each show: price, 50d SMA status (green/red + slope arrow), 200d SMA status
-- [ ] VIX shows: level, zone badge (green/amber/red), direction arrow, spike warning
+- [x] Logic migrated from `conditions/_data.py` into `assistant/_data.py` (conditions app deleted)
+- [x] Compact display: single GO/NO-GO banner + trend rows + VIX row
+- [x] Colour-coded: green banner for GO, amber for CAUTION, red for NO-GO
+- [x] SPY/QQQ each show: price, 50d SMA status (green/red + slope arrow), 200d SMA status
+- [x] VIX shows: level, zone badge (green/amber/red), direction arrow, spike warning
 
 **Affected layers:** UI | Data
 **Dependencies:** TA-E2-S1

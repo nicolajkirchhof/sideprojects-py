@@ -19,7 +19,14 @@ from pathlib import Path
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 
+from finance.apps.assistant._data import (
+    compute_go_nogo,
+    compute_trend_status,
+    compute_vix_status,
+    load_daily,
+)
 from finance.apps.assistant._header_checkbox import CheckableHeader
+from finance.apps.assistant._swing_panel import SwingRegimePanel
 from finance.apps.assistant._watchlist_model import Col, WatchlistModel
 
 log = logging.getLogger(__name__)
@@ -85,6 +92,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._build_status_bar()
         self._restore_geometry()
         self._load_today_cache()
+        self._load_regime_data()
 
     # ------------------------------------------------------------------
     # Layout construction
@@ -146,7 +154,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
     def _build_panels(self) -> None:
         self._splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
 
-        self._left_panel = self._make_placeholder_panel("Market Context")
+        self._left_panel = SwingRegimePanel(self)
         self._centre_panel = self._build_watchlist_panel()
         self._right_panel = self._make_placeholder_panel("Detail")
 
@@ -282,6 +290,27 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self.set_candidate_count(len(rows))
         self._lbl_last_run.setText(f"Cache  {ts}")
         log.info("Loaded %d rows from today's cache", len(rows))
+
+    def _load_regime_data(self) -> None:
+        """Load daily data for SPY, QQQ, and VIX and update the regime panel.
+
+        Reads from the local IBKR parquet cache (offline=True).  Missing
+        data yields None statuses which the panel renders as dashes.
+        """
+        try:
+            spy_df = load_daily("SPY")
+            qqq_df = load_daily("QQQ")
+            vix_df = load_daily("VIX")
+
+            spy = compute_trend_status("SPY", spy_df) if spy_df is not None else None
+            qqq = compute_trend_status("QQQ", qqq_df) if qqq_df is not None else None
+            vix = compute_vix_status(vix_df) if vix_df is not None else None
+            status = compute_go_nogo(spy, vix)
+
+            self._left_panel.update_indicators(spy, qqq, vix, status)
+            log.info("Regime panel updated: %s", status)
+        except Exception:
+            log.exception("Failed to load regime data — panel shows dashes")
 
     # ------------------------------------------------------------------
     # Pipeline orchestration

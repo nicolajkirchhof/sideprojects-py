@@ -448,6 +448,22 @@ def test_check_rows_checks_specific_source_indices():
 
 
 @pytest.mark.skipif(not _has_display, reason="No display available")
+def test_window_left_panel_is_swing_regime_panel():
+    """Left panel must be a SwingRegimePanel, not a generic placeholder."""
+    from finance.apps._qt_bootstrap import apply_dark_palette, ensure_qt_app
+    from finance.apps.assistant._swing_panel import SwingRegimePanel
+    from finance.apps.assistant._window import AssistantWindow
+
+    ensure_qt_app()
+    apply_dark_palette(ensure_qt_app())
+    with patch("finance.apps.assistant._pipeline.read_cache", return_value=None), \
+         patch("finance.apps.assistant._window.load_daily", return_value=None):
+        win = AssistantWindow()
+    assert isinstance(win._left_panel, SwingRegimePanel)
+    win.close()
+
+
+@pytest.mark.skipif(not _has_display, reason="No display available")
 def test_export_buttons_enabled_after_check():
     """Export buttons should become enabled once at least one row is checked."""
     from pyqtgraph.Qt import QtCore
