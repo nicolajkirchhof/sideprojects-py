@@ -277,7 +277,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
 
     def _load_today_cache(self) -> None:
         """Load today's JSON cache if it exists, skipping the pipeline."""
-        from finance.apps.assistant._pipeline import read_cache
+        from finance.apps.assistant._pipeline import read_cache, read_events_from_cache
 
         rows = read_cache(date.today())
         if rows is None:
@@ -290,6 +290,11 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self.set_candidate_count(len(rows))
         self._lbl_last_run.setText(f"Cache  {ts}")
         log.info("Loaded %d rows from today's cache", len(rows))
+
+        events = read_events_from_cache(date.today())
+        if events:
+            self._left_panel.update_events(events)
+            log.info("Loaded %d calendar events from cache", len(events))
 
     def _load_regime_data(self) -> None:
         """Load daily data for SPY, QQQ, and VIX and update the regime panel.
@@ -327,6 +332,7 @@ class AssistantWindow(QtWidgets.QMainWindow):
         thread.stage_changed.connect(self._on_pipeline_stage)
         thread.candidate_count_changed.connect(self.set_candidate_count)
         thread.finished_ok.connect(self._on_pipeline_finished)
+        thread.calendar_updated.connect(self._on_calendar_updated)
         thread.error.connect(self._on_pipeline_error)
 
         self._pipeline_thread = thread
@@ -347,6 +353,10 @@ class AssistantWindow(QtWidgets.QMainWindow):
 
     def _on_pipeline_stage(self, message: str) -> None:
         self.set_status(message)
+
+    def _on_calendar_updated(self, events: list) -> None:
+        """Update the left panel with freshly fetched calendar events."""
+        self._left_panel.update_events(events)
 
     def _on_pipeline_finished(self, rows: object) -> None:
         """Handle successful pipeline completion."""

@@ -18,7 +18,8 @@ Cache format:
     {
         "date": "YYYY-MM-DD",
         "created_at": "YYYY-MM-DDTHH:MM:SS",
-        "rows": [ { ...result row... }, ... ]
+        "rows": [ { ...result row... }, ... ],
+        "events": [ { ...economic event dict... }, ... ]   # optional
     }
 """
 from __future__ import annotations
@@ -90,9 +91,10 @@ def write_cache(
     trade_date: date,
     *,
     base_dir: Path | None = None,
+    events: list[dict] | None = None,
 ) -> Path:
     """
-    Write *rows* to the daily JSON cache file.
+    Write *rows* (and optional *events*) to the daily JSON cache file.
 
     Returns the path that was written.
     """
@@ -102,6 +104,7 @@ def write_cache(
         "date": trade_date.isoformat(),
         "created_at": datetime.now().replace(microsecond=0).isoformat(),
         "rows": rows,
+        "events": events or [],
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
@@ -128,6 +131,32 @@ def read_cache(
         return payload.get("rows", [])
     except Exception:
         log.warning("Failed to read cache %s — treating as missing", path, exc_info=True)
+        return None
+
+
+def read_events_from_cache(
+    trade_date: date,
+    *,
+    base_dir: Path | None = None,
+) -> list[dict] | None:
+    """
+    Load economic events from the daily JSON cache if they exist.
+
+    Returns
+    -------
+    list[dict] | None
+        The ``events`` list, or ``None`` if no cache file exists or the
+        cache was written before events support was added.
+    """
+    path = cache_path(trade_date, base_dir=base_dir)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        events = payload.get("events")
+        return events if events is not None else None
+    except Exception:
+        log.warning("Failed to read events cache %s — treating as missing", path, exc_info=True)
         return None
 
 
@@ -214,6 +243,7 @@ class PipelineThread(QtCore.QThread):
     stage_changed = QtCore.Signal(str)
     candidate_count_changed = QtCore.Signal(int)
     finished_ok = QtCore.Signal(object)
+    calendar_updated = QtCore.Signal(list)
     error = QtCore.Signal(str)
 
     def __init__(
@@ -312,9 +342,21 @@ class PipelineThread(QtCore.QThread):
         rows.sort(key=lambda r: r["score_total"], reverse=True)
         self.candidate_count_changed.emit(len(rows))
 
-        # Stage 5: Write cache
+        # Stage 5: Fetch economic calendar
+        self.stage_changed.emit("Fetching economic calendar…")
+        event_dicts: list[dict] = []
+        try:
+            from finance.apps.assistant._calendar import events_to_dicts, fetch_upcoming_events
+            events = fetch_upcoming_events(days_ahead=5, impact_filter="High")
+            event_dicts = events_to_dicts(events)
+            self.calendar_updated.emit(event_dicts)
+            log.info("Fetched %d calendar events", len(event_dicts))
+        except Exception:
+            log.warning("Calendar fetch failed — continuing without events", exc_info=True)
+
+        # Stage 6: Write cache
         self.stage_changed.emit("Saving results…")
-        path = write_cache(rows, self._trade_date)
+        path = write_cache(rows, self._trade_date, events=event_dicts)
         log.info("Cache written → %s (%d rows)", path, len(rows))
 
         self.stage_changed.emit(f"Done — {len(rows)} candidates scored.")

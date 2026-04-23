@@ -3,8 +3,12 @@ finance.apps.assistant._swing_panel
 ======================================
 Left panel — Swing Trading Regime indicators.
 
-Shows: SPY/QQQ trend rows, VIX row, composite GO/NO-GO banner.
-Migrated from finance.apps.conditions._swing_panel.
+Shows: SPY/QQQ trend rows, VIX row, composite GO/NO-GO banner,
+stop-out counter, macro event proximity warning, and economic
+events calendar.
+
+Migrated from finance.apps.conditions._swing_panel; extended for
+TA-E3-S2 (stop-out counter) and TA-E3-S3 (events calendar).
 """
 from __future__ import annotations
 
@@ -196,14 +200,224 @@ class GoNoGoBar(QtWidgets.QLabel):
 
 
 # ---------------------------------------------------------------------------
+# StopOutCounter
+# ---------------------------------------------------------------------------
+
+_STOPOUT_NOGO_THRESHOLD: int = 3
+
+
+class StopOutCounter(QtWidgets.QWidget):
+    """Manual consecutive stop-out counter.
+
+    Displays a -/count/+ row.  When count reaches _STOPOUT_NOGO_THRESHOLD
+    the override is active and the GO/NO-GO banner is forced to NO-GO.
+    In-session only — resets on app restart.
+    """
+
+    count_changed = QtCore.Signal(int)
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._count: int = 0
+
+        h = QtWidgets.QHBoxLayout(self)
+        h.setContentsMargins(0, 2, 0, 2)
+        h.setSpacing(8)
+
+        lbl = _label("Stop-outs:", size=12)
+        h.addWidget(lbl)
+
+        self._btn_dec = QtWidgets.QToolButton()
+        self._btn_dec.setText("−")
+        self._btn_dec.setFixedSize(22, 22)
+        self._btn_dec.clicked.connect(self.decrement)
+        h.addWidget(self._btn_dec)
+
+        self._count_lbl = _label("0", mono=True, size=13)
+        self._count_lbl.setFixedWidth(28)
+        self._count_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        h.addWidget(self._count_lbl)
+
+        self._btn_inc = QtWidgets.QToolButton()
+        self._btn_inc.setText("+")
+        self._btn_inc.setFixedSize(22, 22)
+        self._btn_inc.clicked.connect(self.increment)
+        h.addWidget(self._btn_inc)
+
+        h.addStretch()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    @property
+    def count(self) -> int:
+        return self._count
+
+    @property
+    def is_override_active(self) -> bool:
+        return self._count >= _STOPOUT_NOGO_THRESHOLD
+
+    def increment(self) -> None:
+        self._count += 1
+        self._refresh()
+
+    def decrement(self) -> None:
+        if self._count > 0:
+            self._count -= 1
+            self._refresh()
+
+    def reset(self) -> None:
+        self._count = 0
+        self._refresh()
+
+    # ------------------------------------------------------------------
+
+    def _refresh(self) -> None:
+        colour = RED if self.is_override_active else "#ccc"
+        self._count_lbl.setText(str(self._count))
+        self._count_lbl.setStyleSheet(f"color: {colour}; font-weight: bold;")
+        self.count_changed.emit(self._count)
+
+
+# ---------------------------------------------------------------------------
+# MacroEventLabel — inline risk text above GO/NO-GO bar
+# ---------------------------------------------------------------------------
+
+class MacroEventLabel(QtWidgets.QLabel):
+    """Single-line label showing the nearest high-impact macro event risk."""
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWordWrap(True)
+        self.setFont(QtGui.QFont("Segoe UI", 11))
+        self.setStyleSheet("color: #aaa;")
+        self.hide()
+
+    def set_events(self, event_dicts: list[dict]) -> None:
+        """Update from a list of serialised event dicts (from cache or pipeline)."""
+        from finance.apps.assistant._calendar import check_macro_risk_from_dicts
+        has_risk, risks = check_macro_risk_from_dicts(event_dicts)
+        if has_risk and risks:
+            # Show only the most urgent risk
+            text = risks[0]
+            if text.startswith("NO-GO"):
+                self.setStyleSheet(f"color: {RED};")
+            elif text.startswith("CAUTION"):
+                self.setStyleSheet(f"color: {AMBER};")
+            else:
+                self.setStyleSheet("color: #aaa;")
+            self.setText(text)
+            self.show()
+        else:
+            self.hide()
+
+
+# ---------------------------------------------------------------------------
+# EventsCalendarWidget — compact events table
+# ---------------------------------------------------------------------------
+
+_MAX_EVENTS_SHOWN: int = 10
+
+
+class EventsCalendarWidget(QtWidgets.QWidget):
+    """Compact scrollable list of upcoming high-impact economic events.
+
+    Each entry shows: [impact colour] title / date-time.
+    Events within 48 hours are highlighted.
+    NO-GO keywords get a red warning colour.
+    Max _MAX_EVENTS_SHOWN rows.
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        header = _label("ECONOMIC EVENTS (5d, High)", size=11)
+        header.setStyleSheet("color: #888;")
+        layout.addWidget(header)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFixedHeight(160)
+
+        self._container = QtWidgets.QWidget()
+        self._container_layout = QtWidgets.QVBoxLayout(self._container)
+        self._container_layout.setContentsMargins(0, 0, 0, 0)
+        self._container_layout.setSpacing(3)
+        self._container_layout.addStretch()
+
+        scroll.setWidget(self._container)
+        layout.addWidget(scroll)
+
+        self._placeholder = _label("No events loaded", size=11)
+        self._placeholder.setStyleSheet("color: #555;")
+        self._container_layout.insertWidget(0, self._placeholder)
+
+    def set_events(self, event_dicts: list[dict]) -> None:
+        """Rebuild the event list from serialised event dicts."""
+        from datetime import datetime, timezone
+
+        # Clear existing rows (keep stretch at end)
+        while self._container_layout.count() > 1:
+            item = self._container_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        now = datetime.now(timezone.utc)
+        shown = 0
+
+        for d in event_dicts[:_MAX_EVENTS_SHOWN]:
+            try:
+                dt = datetime.fromisoformat(d["date"])
+            except (ValueError, KeyError):
+                continue
+
+            hours_away = (dt - now).total_seconds() / 3600
+            title = d.get("title", "")
+            country = d.get("country", "")
+
+            from finance.apps.assistant._calendar import NO_GO_KEYWORDS
+            is_nogo = any(kw.lower() in title.lower() for kw in NO_GO_KEYWORDS)
+            is_imminent = hours_away <= 48
+
+            if is_nogo and is_imminent:
+                colour = RED
+            elif is_imminent:
+                colour = AMBER
+            else:
+                colour = "#888"
+
+            date_str = dt.strftime("%a %b %d %H:%M")
+            row_lbl = _label(f"{title}\n{country}  {date_str}", size=11)
+            row_lbl.setWordWrap(True)
+            row_lbl.setStyleSheet(f"color: {colour};")
+            self._container_layout.insertWidget(shown, row_lbl)
+            shown += 1
+
+        if shown == 0:
+            placeholder = _label("No upcoming high-impact events", size=11)
+            placeholder.setStyleSheet("color: #555;")
+            self._container_layout.insertWidget(0, placeholder)
+
+
+# ---------------------------------------------------------------------------
 # SwingRegimePanel — assembles everything
 # ---------------------------------------------------------------------------
 
 class SwingRegimePanel(QtWidgets.QWidget):
-    """Left panel: SPY/QQQ trend indicators, VIX, and composite GO/NO-GO."""
+    """Left panel: SPY/QQQ trend indicators, VIX, GO/NO-GO with stop-out
+    override, macro event warning, and events calendar.
+    """
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
+        self._natural_status: str = "NO-GO"
+
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
@@ -228,7 +442,25 @@ class SwingRegimePanel(QtWidgets.QWidget):
         self.go_nogo = GoNoGoBar()
         layout.addWidget(self.go_nogo)
 
+        layout.addWidget(_hsep())
+
+        self.stop_counter = StopOutCounter()
+        self.stop_counter.count_changed.connect(self._on_stopout_changed)
+        layout.addWidget(self.stop_counter)
+
+        self.macro_label = MacroEventLabel()
+        layout.addWidget(self.macro_label)
+
+        layout.addWidget(_hsep())
+
+        self.events_widget = EventsCalendarWidget()
+        layout.addWidget(self.events_widget)
+
         layout.addStretch()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def update_indicators(
         self,
@@ -237,6 +469,8 @@ class SwingRegimePanel(QtWidgets.QWidget):
         vix: VixStatus | None,
         status: str,
     ) -> None:
+        self._natural_status = status
+
         if spy:
             self.spy_row.update_data(spy)
         else:
@@ -252,4 +486,23 @@ class SwingRegimePanel(QtWidgets.QWidget):
         else:
             self.vix_row.clear_data()
 
-        self.go_nogo.set_status(status)
+        self._apply_status()
+
+    def update_events(self, event_dicts: list[dict]) -> None:
+        """Update macro warning label and events calendar from cache/pipeline data."""
+        self.macro_label.set_events(event_dicts)
+        self.events_widget.set_events(event_dicts)
+
+    # ------------------------------------------------------------------
+    # Private
+    # ------------------------------------------------------------------
+
+    def _on_stopout_changed(self, _count: int) -> None:
+        self._apply_status()
+
+    def _apply_status(self) -> None:
+        """Apply GO/NO-GO, respecting stop-out override."""
+        if self.stop_counter.is_override_active:
+            self.go_nogo.set_status("NO-GO")
+        else:
+            self.go_nogo.set_status(self._natural_status)

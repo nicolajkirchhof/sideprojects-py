@@ -368,18 +368,18 @@ Status: Done
 
 ### TA-E3-S2: Composite GO/NO-GO with stop-out counter
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** a composite GO/NO-GO status with a manual stop-out counter and macro warnings,
 **So that** I have a definitive answer before scanning.
 
 **Acceptance criteria:**
-- [ ] Composite: GO (all green), CAUTION (mixed), NO-GO (any red trigger)
-- [ ] Each sub-signal shown with individual status
-- [ ] Manual counter for consecutive stopped-out trades; ≥3 triggers NO-GO override
-- [ ] Counter persists within session, resets on app restart
-- [ ] Macro event proximity from economic calendar (TA-E3-S3): "FOMC in 2 days" shown inline
+- [x] Composite: GO (all green), CAUTION (mixed), NO-GO (any red trigger)
+- [x] Each sub-signal shown with individual status
+- [x] Manual counter for consecutive stopped-out trades; ≥3 triggers NO-GO override
+- [x] Counter persists within session, resets on app restart
+- [x] Macro event proximity from economic calendar (TA-E3-S3): "FOMC in 2 days" shown inline
 
 **Affected layers:** UI | State
 **Dependencies:** TA-E3-S1, TA-E3-S3
@@ -388,19 +388,19 @@ Status: Pending
 
 ### TA-E3-S3: Economic events calendar
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** to see high-impact economic events for the next 5 trading days,
 **So that** I know when to pause entries or reduce size.
 
 **Acceptance criteria:**
-- [ ] Uses `_calendar.py:fetch_upcoming_events(days_ahead=5, impact_filter="High")`
-- [ ] Table: date, time, event name, country, impact badge (red/amber), forecast/previous
-- [ ] Events within 48h highlighted with warning colour
-- [ ] NO-GO keywords (FOMC, CPI, NFP) shown with red alert icon
-- [ ] Compact: max 10 rows, sorted by date ascending
-- [ ] Fetched once at pipeline run; cached with the rest of the daily results
+- [x] Uses `_calendar.py:fetch_upcoming_events(days_ahead=5, impact_filter="High")`
+- [x] Table: date, time, event name, country, impact badge (red/amber), forecast/previous
+- [x] Events within 48h highlighted with warning colour
+- [x] NO-GO keywords (FOMC, CPI, NFP) shown with red alert icon
+- [x] Compact: max 10 rows, sorted by date ascending
+- [x] Fetched once at pipeline run; cached with the rest of the daily results
 
 **Affected layers:** UI | Calendar
 **Dependencies:** TA-E2-S1
