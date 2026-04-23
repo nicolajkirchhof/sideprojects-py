@@ -14,6 +14,7 @@ via QSettings (key prefix: TradingAssistant/).
 from __future__ import annotations
 
 import logging
+import subprocess
 from datetime import date, datetime
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from finance.apps.assistant._data import (
     compute_vix_status,
     load_daily,
 )
+from finance.apps.assistant._export import export_barchart, export_tws
 from finance.apps.assistant._header_checkbox import CheckableHeader
 from finance.apps.assistant._swing_panel import SwingRegimePanel
 from finance.apps.assistant._watchlist_model import Col, WatchlistModel
@@ -132,12 +134,14 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._btn_export_bc.setText("Export → Barchart")
         self._btn_export_bc.setToolTip("Copy selected tickers to clipboard (comma-separated)")
         self._btn_export_bc.setEnabled(False)
+        self._btn_export_bc.clicked.connect(lambda: self._on_export_barchart())
         tb.addWidget(self._btn_export_bc)
 
         self._btn_export_tws = QtWidgets.QToolButton()
         self._btn_export_tws.setText("Export → TWS")
         self._btn_export_tws.setToolTip("Save selected tickers as a TWS-importable CSV")
         self._btn_export_tws.setEnabled(False)
+        self._btn_export_tws.clicked.connect(lambda: self._on_export_tws())
         tb.addWidget(self._btn_export_tws)
 
         spacer = QtWidgets.QWidget()
@@ -446,3 +450,35 @@ class AssistantWindow(QtWidgets.QMainWindow):
             self._lbl_candidate_count.setText(f"{total} candidates | {checked} selected")
         else:
             self._lbl_candidate_count.setText(f"{total} candidates" if total else "")
+
+    # ------------------------------------------------------------------
+    # Export handlers — TA-E6-S1 / TA-E6-S2
+    # ------------------------------------------------------------------
+
+    def _on_export_barchart(self) -> None:
+        """Copy checked tickers to clipboard and save to txt file."""
+        symbols = self._watchlist_model.checked_symbols()
+        if not symbols:
+            return
+        export_barchart(symbols, date.today())
+        QtWidgets.QApplication.clipboard().setText(",".join(symbols))
+        self._show_toast(f"{len(symbols)} tickers copied to clipboard")
+        log.info("Barchart export: %d symbols", len(symbols))
+
+    def _on_export_tws(self) -> None:
+        """Write TWS-importable CSV and open containing folder in Explorer."""
+        symbols = self._watchlist_model.checked_symbols()
+        if not symbols:
+            return
+        path = export_tws(symbols, date.today())
+        try:
+            subprocess.Popen(["explorer", f"/select,{path}"])
+        except Exception:
+            log.warning("Failed to open Explorer for %s", path, exc_info=True)
+        self._show_toast(f"TWS file saved: {path.name}")
+        log.info("TWS export: %d symbols → %s", len(symbols), path)
+
+    def _show_toast(self, message: str, duration_ms: int = 3000) -> None:
+        """Display a timed status bar message that resets to 'Ready' after duration."""
+        self.set_status(message)
+        QtCore.QTimer.singleShot(duration_ms, lambda: self.set_status("Ready"))

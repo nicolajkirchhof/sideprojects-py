@@ -568,18 +568,18 @@ Status: Pending
 
 ### TA-E6-S1: Barchart ticker list export
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** to export selected tickers as a comma-separated list I can paste into Barchart,
 **So that** I can create a Barchart watchlist for chart review and intraday monitoring.
 
 **Acceptance criteria:**
-- [ ] "Export → Barchart" button in toolbar
-- [ ] Copies comma-separated ticker list to clipboard (e.g., `AAPL,MSFT,NVDA,TSLA`)
-- [ ] Also saves to `_data/assistant/watchlist-YYYY-MM-DD.txt`
-- [ ] Toast notification: "12 tickers copied to clipboard"
-- [ ] Only exports checked (selected) rows
+- [x] "Export → Barchart" button in toolbar
+- [x] Copies comma-separated ticker list to clipboard (e.g., `AAPL,MSFT,NVDA,TSLA`)
+- [x] Also saves to `_data/assistant/watchlist-YYYY-MM-DD.txt`
+- [x] Toast notification: "12 tickers copied to clipboard"
+- [x] Only exports checked (selected) rows
 
 **Affected layers:** UI | File I/O
 **Dependencies:** TA-E4-S3
@@ -588,19 +588,19 @@ Status: Pending
 
 ### TA-E6-S2: TWS CSV file export
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** to export selected tickers as a TWS-importable CSV file,
 **So that** I can import them into a TWS watchlist via File → Import.
 
 **Acceptance criteria:**
-- [ ] "Export → TWS" button in toolbar
-- [ ] Generates CSV in TWS import format: `DES,SYMBOL,STK,SMART,,,,` per line (all caps)
-- [ ] Saves to `_data/assistant/tws-watchlist-YYYY-MM-DD.csv`
-- [ ] Opens the saved file location in Windows Explorer (`explorer /select, <path>`)
-- [ ] Toast notification: "TWS file saved: {path}"
-- [ ] Only exports checked (selected) rows
+- [x] "Export → TWS" button in toolbar
+- [x] Generates CSV in TWS import format: `DES,SYMBOL,STK,SMART,,,,` per line (all caps)
+- [x] Saves to `_data/assistant/tws-watchlist-YYYY-MM-DD.csv`
+- [x] Opens the saved file location in Windows Explorer (`explorer /select, <path>`)
+- [x] Toast notification: "TWS file saved: {path}"
+- [x] Only exports checked (selected) rows
 
 **Affected layers:** UI | File I/O
 **Dependencies:** TA-E4-S3
