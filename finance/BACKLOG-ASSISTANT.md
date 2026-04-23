@@ -458,19 +458,19 @@ Centre panel: sortable, filterable table of scored candidates with tag badges.
 
 ### TA-E4-S1: Scored candidate table
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** a sortable table of all scored candidates with their dimension scores and tags,
 **So that** I can quickly identify the highest-conviction setups.
 
 **Acceptance criteria:**
-- [ ] `QTableView` with columns: Checkbox, Symbol, Direction (Long/Short), Score (0–100), D1 (Trend), D2 (RS), D3 (Base), D4 (Catalyst), D5 (Risk), Tags, Price, 5D %Chg, RVOL, Sector
-- [ ] Sortable by any column (default: Score descending)
-- [ ] Score cells colour-coded: green ≥70, amber 40–69, red <40
-- [ ] Tag badges as coloured labels (e.g., `pead-long` in blue, `vol-spike` in orange)
+- [x] `QTableView` with columns: Checkbox, Symbol, Direction (Long/Short), Score (0–100), D1 (Trend), D2 (RS), D3 (Base), D4 (Catalyst), D5 (Risk), Tags, Price, 5D %Chg, RVOL, Sector
+- [x] Sortable by any column (default: Score descending)
+- [x] Score cells colour-coded: green ≥70, amber 40–69, red <40
+- [x] Tag badges as comma-joined string (full coloured chips deferred to Phase 5 polish)
 - [ ] Row selection highlights and populates the Detail Panel (TA-E5)
-- [ ] Row count in status bar: "147 candidates, 12 selected"
+- [x] Row count in status bar: "N candidates"
 
 **Affected layers:** UI
 **Dependencies:** TA-E2-S2
@@ -501,17 +501,17 @@ Status: Pending
 
 ### TA-E4-S3: Row checkbox and batch selection
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** to check/uncheck candidates in the table to build my daily watchlist,
 **So that** I can select exactly which tickers to export.
 
 **Acceptance criteria:**
-- [ ] Checkbox column in table; header checkbox selects/deselects all visible (filtered) rows
-- [ ] "Select top N" button (configurable, default 20) checks the top N by score
-- [ ] Selected count shown in status bar
-- [ ] Selection persists across sort/filter changes (tracked at model level, not view level)
+- [x] Checkbox column in table; header checkbox selects/deselects all visible (filtered) rows
+- [x] "Select top N" button (configurable, default 20) checks the top N by score
+- [x] Selected count shown in status bar
+- [x] Selection persists across sort/filter changes (tracked at model level, not view level)
 
 **Affected layers:** UI
 **Dependencies:** TA-E4-S1

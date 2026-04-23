@@ -1,5 +1,5 @@
 """
-Tests for finance.apps.assistant._watchlist_model — TA-E4-S1.
+Tests for finance.apps.assistant._watchlist_model — TA-E4-S1 / TA-E4-S3.
 
 Tests are written first (TDD). Qt model tests don't require a display
 (no rendering), but they do need a QApplication for QColor/QBrush.
@@ -377,4 +377,93 @@ def test_window_watchlist_model_loaded_from_cache():
     with patch("finance.apps.assistant._pipeline.read_cache", return_value=_TEST_ROWS):
         win = AssistantWindow()
     assert win._watchlist_model.rowCount() == 3
+    win.close()
+
+
+# ---------------------------------------------------------------------------
+# Batch selection — TA-E4-S3
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _has_display, reason="No display available")
+def test_check_top_n_checks_highest_scored():
+    """check_top_n(1) should check only the row with the highest score_total."""
+    from finance.apps.assistant._watchlist_model import WatchlistModel, Col
+
+    m = _model_with_rows()
+    count = m.check_top_n(1)
+    assert count == 1
+    # AAPL has the highest score (75.0) and is at source index 0
+    assert "AAPL" in m.checked_symbols()
+    assert "TSLA" not in m.checked_symbols()
+    assert "MSFT" not in m.checked_symbols()
+
+
+@pytest.mark.skipif(not _has_display, reason="No display available")
+def test_check_top_n_clamps_to_row_count():
+    """check_top_n(n > rowCount) should check all rows and return rowCount."""
+    m = _model_with_rows()
+    count = m.check_top_n(100)
+    assert count == 3
+    assert set(m.checked_symbols()) == {"AAPL", "TSLA", "MSFT"}
+
+
+@pytest.mark.skipif(not _has_display, reason="No display available")
+def test_uncheck_all_clears_checked():
+    """uncheck_all() should clear all checked rows."""
+    from pyqtgraph.Qt import QtCore
+    from finance.apps.assistant._watchlist_model import WatchlistModel, Col
+
+    m = _model_with_rows()
+    m.setData(m.index(0, Col.CHECK), QtCore.Qt.CheckState.Checked, QtCore.Qt.ItemDataRole.CheckStateRole)
+    m.setData(m.index(1, Col.CHECK), QtCore.Qt.CheckState.Checked, QtCore.Qt.ItemDataRole.CheckStateRole)
+    assert m.checked_count() == 2
+    m.uncheck_all()
+    assert m.checked_count() == 0
+    assert m.checked_symbols() == []
+
+
+@pytest.mark.skipif(not _has_display, reason="No display available")
+def test_checked_count_reflects_checked_rows():
+    """checked_count() should return the number of currently checked rows."""
+    from pyqtgraph.Qt import QtCore
+    from finance.apps.assistant._watchlist_model import WatchlistModel, Col
+
+    m = _model_with_rows()
+    assert m.checked_count() == 0
+    m.setData(m.index(0, Col.CHECK), QtCore.Qt.CheckState.Checked, QtCore.Qt.ItemDataRole.CheckStateRole)
+    assert m.checked_count() == 1
+    m.setData(m.index(2, Col.CHECK), QtCore.Qt.CheckState.Checked, QtCore.Qt.ItemDataRole.CheckStateRole)
+    assert m.checked_count() == 2
+
+
+@pytest.mark.skipif(not _has_display, reason="No display available")
+def test_check_rows_checks_specific_source_indices():
+    """check_rows([0, 2]) should check AAPL and MSFT but not TSLA."""
+    m = _model_with_rows()
+    m.check_rows([0, 2])
+    assert "AAPL" in m.checked_symbols()
+    assert "MSFT" in m.checked_symbols()
+    assert "TSLA" not in m.checked_symbols()
+
+
+@pytest.mark.skipif(not _has_display, reason="No display available")
+def test_export_buttons_enabled_after_check():
+    """Export buttons should become enabled once at least one row is checked."""
+    from pyqtgraph.Qt import QtCore
+    from finance.apps._qt_bootstrap import apply_dark_palette, ensure_qt_app
+    from finance.apps.assistant._window import AssistantWindow
+
+    ensure_qt_app()
+    apply_dark_palette(ensure_qt_app())
+    with patch("finance.apps.assistant._pipeline.read_cache", return_value=_TEST_ROWS):
+        win = AssistantWindow()
+
+    assert not win._btn_export_bc.isEnabled()
+    assert not win._btn_export_tws.isEnabled()
+
+    # Check one row via the model — window must respond
+    win._watchlist_model.check_rows([0])
+    assert win._btn_export_bc.isEnabled()
+    assert win._btn_export_tws.isEnabled()
     win.close()

@@ -138,6 +138,45 @@ class WatchlistModel(QtCore.QAbstractTableModel):
             if i < len(self._rows)
         ]
 
+    def checked_count(self) -> int:
+        """Return the number of currently checked rows."""
+        return len(self._checked)
+
+    def check_rows(self, indices: list[int]) -> None:
+        """Check the given source-model row indices (adds to existing selection).
+
+        Emits dataChanged for each newly checked row's CHECK cell.
+        Out-of-range indices are silently ignored.
+        """
+        for i in indices:
+            if 0 <= i < len(self._rows) and i not in self._checked:
+                self._checked.add(i)
+                idx = self.index(i, Col.CHECK)
+                self.dataChanged.emit(idx, idx, [_ItemDataRole.CheckStateRole])
+
+    def uncheck_all(self) -> None:
+        """Clear all checked rows and emit dataChanged for each affected cell."""
+        for i in list(self._checked):
+            self._checked.discard(i)
+            idx = self.index(i, Col.CHECK)
+            self.dataChanged.emit(idx, idx, [_ItemDataRole.CheckStateRole])
+
+    def check_top_n(self, n: int) -> int:
+        """Check the top *n* rows by score_total (descending); returns actual count checked.
+
+        Existing checked state is replaced (uncheck_all is called first).
+        If *n* exceeds rowCount, all rows are checked.
+        """
+        self.uncheck_all()
+        ranked = sorted(
+            range(len(self._rows)),
+            key=lambda i: float(self._rows[i].get("score_total") or 0.0),
+            reverse=True,
+        )
+        to_check = ranked[:n]
+        self.check_rows(to_check)
+        return len(to_check)
+
     # ------------------------------------------------------------------
     # QAbstractTableModel interface
     # ------------------------------------------------------------------

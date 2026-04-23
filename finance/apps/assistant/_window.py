@@ -19,6 +19,7 @@ from pathlib import Path
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 
+from finance.apps.assistant._header_checkbox import CheckableHeader
 from finance.apps.assistant._watchlist_model import Col, WatchlistModel
 
 log = logging.getLogger(__name__)
@@ -50,6 +51,8 @@ _COLUMN_WIDTHS: dict[Col, int] = {
     Col.CHANGE_5D: 55,
     Col.RVOL:      50,
 }
+
+_SELECT_TOP_N: int = 20  # default for "Select Top N" toolbar button
 
 
 class AssistantWindow(QtWidgets.QMainWindow):
@@ -106,6 +109,14 @@ class AssistantWindow(QtWidgets.QMainWindow):
         self._btn_load_csv.setToolTip("Manually import a Barchart screener CSV")
         self._btn_load_csv.clicked.connect(self._on_load_csv)
         tb.addWidget(self._btn_load_csv)
+
+        tb.addSeparator()
+
+        self._btn_select_top_n = QtWidgets.QToolButton()
+        self._btn_select_top_n.setText(f"▣  Top {_SELECT_TOP_N}")
+        self._btn_select_top_n.setToolTip(f"Check the top {_SELECT_TOP_N} candidates by score")
+        self._btn_select_top_n.clicked.connect(lambda: self._on_select_top_n())
+        tb.addWidget(self._btn_select_top_n)
 
         tb.addSeparator()
 
@@ -170,7 +181,11 @@ class AssistantWindow(QtWidgets.QMainWindow):
         proxy.setSortRole(QtCore.Qt.ItemDataRole.UserRole)
         proxy.setSortCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
 
+        header = CheckableHeader(self)
+        header.toggle_all.connect(self._on_toggle_all)
+
         table = QtWidgets.QTableView()
+        table.setHorizontalHeader(header)
         table.setModel(proxy)
         table.setSortingEnabled(True)
         table.sortByColumn(3, QtCore.Qt.SortOrder.DescendingOrder)  # Score desc
@@ -178,17 +193,20 @@ class AssistantWindow(QtWidgets.QMainWindow):
         table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setStretchLastSection(True)
+        header.setStretchLastSection(True)
         table.setShowGrid(False)
 
         # Column widths driven by _COLUMN_WIDTHS constant; SECTOR stretches.
-        hh = table.horizontalHeader()
         for col, width in _COLUMN_WIDTHS.items():
-            hh.resizeSection(col, width)
+            header.resizeSection(col, width)
+
+        # Update export buttons + header checkbox whenever check state changes.
+        self._watchlist_model.dataChanged.connect(self._on_model_data_changed)
 
         layout.addWidget(table)
         self._watchlist_table = table
         self._watchlist_proxy = proxy
+        self._watchlist_header = header
         return panel
 
     def _build_status_bar(self) -> None:
@@ -330,3 +348,62 @@ class AssistantWindow(QtWidgets.QMainWindow):
             self._btn_run.setText("⏳  Running…")
         else:
             self._btn_run.setText("▶  Run Pipeline")
+
+    # ------------------------------------------------------------------
+    # Checkbox batch selection
+    # ------------------------------------------------------------------
+
+    def _on_select_top_n(self) -> None:
+        """Check the top N candidates by score and update UI."""
+        self._watchlist_model.check_top_n(_SELECT_TOP_N)
+        self._update_checked_ui()
+
+    def _on_toggle_all(self, check: bool) -> None:
+        """Check or uncheck all currently visible (proxy) rows."""
+        if not check:
+            self._watchlist_model.uncheck_all()
+        else:
+            proxy = self._watchlist_proxy
+            source_indices = [
+                proxy.mapToSource(proxy.index(i, 0)).row()
+                for i in range(proxy.rowCount())
+            ]
+            self._watchlist_model.check_rows(source_indices)
+        self._update_checked_ui()
+
+    def _on_model_data_changed(
+        self,
+        top_left: QtCore.QModelIndex,
+        bottom_right: QtCore.QModelIndex,
+        roles: list[int],
+    ) -> None:
+        """React to model data changes — only care about CheckStateRole."""
+        _CheckStateRole = QtCore.Qt.ItemDataRole.CheckStateRole
+        if not roles or _CheckStateRole in roles:
+            self._update_checked_ui()
+
+    def _update_checked_ui(self) -> None:
+        """Sync export buttons and header checkbox state with current check counts."""
+        checked = self._watchlist_model.checked_count()
+        visible = self._watchlist_proxy.rowCount()
+        total = self._watchlist_model.rowCount()
+
+        # Export buttons — enabled whenever at least one row is checked
+        has_checked = checked > 0
+        self._btn_export_bc.setEnabled(has_checked)
+        self._btn_export_tws.setEnabled(has_checked)
+
+        # Header checkbox tristate
+        if checked == 0:
+            state = QtCore.Qt.CheckState.Unchecked
+        elif checked >= visible and visible > 0:
+            state = QtCore.Qt.CheckState.Checked
+        else:
+            state = QtCore.Qt.CheckState.PartiallyChecked
+        self._watchlist_header.set_check_state(state)
+
+        # Status bar candidate count — show selection when non-zero
+        if checked > 0:
+            self._lbl_candidate_count.setText(f"{total} candidates | {checked} selected")
+        else:
+            self._lbl_candidate_count.setText(f"{total} candidates" if total else "")
