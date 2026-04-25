@@ -34,7 +34,11 @@
       "Bash(uv run:*)",
       "Bash(cd:*)",
       "Bash(npm view:*)",
-      "Bash(npm search:*)"
+      "Bash(npm search:*)",
+      "WebFetch(domain:www.brookstradingcourse.com)",
+      "WebFetch(domain:www.forexfactory.com)",
+      "WebFetch(domain:www.investing.com)",
+      "WebFetch(domain:www.barchart.com)"
     ]
   }
 }

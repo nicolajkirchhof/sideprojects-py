@@ -44,4 +44,5 @@ Path-specific context loads automatically from `.claude/rules/` when working wit
 | `/reqeng` | Requirements engineering |
 | `/trader` | Momentum swing trading analysis (5–50 days) |
 | `/investor` | Long-term portfolio + DRIFT options income |
+| `/researcher` | Critical strategy evaluation against academic edges |
 | `/writer` | Editing framework documents and presentations |

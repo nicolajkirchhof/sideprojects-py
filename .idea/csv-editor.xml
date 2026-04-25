@@ -10,70 +10,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\MarketCapThresholds.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\Options Strategies - NoonIronButterfly.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\delisted.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value=";" />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\earnings_cleaned\A.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\earnings_cleaned\FI.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\earnings_cleaned\INDI.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\earnings_cleaned\MSFT.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\finance\_data\financials\A.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\hist_earnings\dividends_latest.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\_data\hist_earnings\earnings_latest.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -87,21 +24,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\finance\_data\stocks-screener-eval-stocks-03-08-2026.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\finance\ibkr\paused\predefined_options.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\finance\intraday_pm\backtester\etf_symbols.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
