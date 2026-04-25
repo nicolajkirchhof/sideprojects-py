@@ -13,6 +13,7 @@ import pandas as pd
 # Constants
 # ---------------------------------------------------------------------------
 
+SMA_FAST = 20
 SMA_SHORT = 50
 SMA_LONG = 200
 SLOPE_LOOKBACK = 10
@@ -32,10 +33,13 @@ VIX_SPIKE_THRESHOLD = 0.20  # 20 %
 class TrendStatus:
     symbol: str
     last_price: float
+    sma_20: float
     sma_50: float
     sma_200: float
+    price_above_20: bool
     price_above_50: bool
     price_above_200: bool
+    sma_20_slope: str   # "rising" | "flat" | "falling"
     sma_50_slope: str   # "rising" | "flat" | "falling"
     sma_200_slope: str
 
@@ -93,19 +97,24 @@ def compute_trend_status(symbol: str, df: pd.DataFrame) -> TrendStatus | None:
     close = df["c"]
     last_price = float(close.iloc[-1])
 
+    sma_20_series = close.rolling(SMA_FAST).mean()
     sma_50_series = close.rolling(SMA_SHORT).mean()
     sma_200_series = close.rolling(SMA_LONG).mean()
 
+    sma_20 = float(sma_20_series.iloc[-1])
     sma_50 = float(sma_50_series.iloc[-1])
     sma_200 = float(sma_200_series.iloc[-1])
 
     return TrendStatus(
         symbol=symbol,
         last_price=last_price,
+        sma_20=sma_20,
         sma_50=sma_50,
         sma_200=sma_200,
+        price_above_20=last_price > sma_20,
         price_above_50=last_price > sma_50,
         price_above_200=last_price > sma_200,
+        sma_20_slope=classify_slope(sma_20_series.dropna()),
         sma_50_slope=classify_slope(sma_50_series.dropna()),
         sma_200_slope=classify_slope(sma_200_series.dropna()),
     )

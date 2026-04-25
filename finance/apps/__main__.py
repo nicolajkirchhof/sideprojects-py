@@ -38,7 +38,13 @@ def main() -> None:
         "--dry-run",
         action="store_true",
         default=False,
-        help="Skip Claude API calls and Tradelog push (analyst only).",
+        help="Skip writes (analyst: Claude/Tradelog; assistant: Parquet file).",
+    )
+    parser.add_argument(
+        "--archive",
+        action="store_true",
+        default=False,
+        help="Run the headless archive pipeline (assistant only).",
     )
 
     args, remaining = parser.parse_known_args()
@@ -57,6 +63,8 @@ def main() -> None:
         kwargs["csv_paths"] = args.csv_paths
     if args.dry_run:
         kwargs["dry_run"] = args.dry_run
+    if args.archive:
+        kwargs["archive"] = args.archive
 
     app_module.launch(**kwargs)
 

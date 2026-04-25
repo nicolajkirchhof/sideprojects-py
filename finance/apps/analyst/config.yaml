@@ -4,6 +4,10 @@ scanner:
   # CSV files come from Gmail attachments (primary) or --csv-paths (manual override)
 
   # Barchart CSV column mapping: barchart_column_name -> internal_field_name
+  # Covers all three scanner schemas:
+  #   Schema A (Standard / Long Universe): Trend, TTM Squeeze, BB%, 3M vs IDX, 20D ADRP, Market Cap
+  #   Schema B (PEAD / EP Gap): Gap Up%(Pre), Surprise% cols, Short Float, 20D ADR (no % suffix)
+  #   Schema C (Flow / Breakdown): 1M P/C Vol, Vol/OI Ratio, Short Int, 5D/1M IV Chg
   column_mapping:
     Symbol: symbol
     Latest: price
@@ -17,13 +21,57 @@ scanner:
     "52W %/High": high_52w_distance_pct
     "20D RelVol": rvol_20d
     "20D ATRP": atr_pct_20d
+    "20D ADRP": adr_pct_20d       # Standard view (has % suffix in some exports)
+    "20D ADR": adr_pct_20d        # PEAD/EP view (no % suffix)
+    "20D ADR%": adr_pct_20d       # BarchartScreeners.md canonical name
     "% 50D MA": pct_from_50d_sma
-    "BB%": bb_pct
+    "50D MA %Chg": slope_50d_sma  # legacy abbreviated name
+    "Slope of 50D SMA": slope_50d_sma  # BarchartScreeners.md canonical name
+    "200D MA %Chg": slope_200d_sma     # legacy abbreviated name
+    "Slope of 200D SMA": slope_200d_sma  # BarchartScreeners.md canonical name
+    "BB%": bb_pct                 # legacy Bollinger Band % field
+    "Bollinger Bands Rank": bb_rank  # BarchartScreeners.md Standard + Intraday views (0–100)
+    Trend: trend_seeker_signal    # legacy abbreviated name
+    "Trend Seeker Signal": trend_seeker_signal  # BarchartScreeners.md canonical name
+    "Wtd Alpha": weighted_alpha   # legacy abbreviated name
+    "Weighted Alpha": weighted_alpha  # BarchartScreeners.md canonical name
+    "5D vs IDX": perf_vs_market_5d    # legacy abbreviated name
+    "Perf vs Market 5D": perf_vs_market_5d  # BarchartScreeners.md canonical name
+    "1M vs IDX": perf_vs_market_1m    # legacy abbreviated name
+    "Perf vs Market 1M": perf_vs_market_1m  # BarchartScreeners.md canonical name
+    "3M vs IDX": perf_vs_market_3m    # legacy abbreviated name
+    "3M % Change from Index": perf_vs_market_3m  # BarchartScreeners.md canonical name
+    "TTM Squeeze": ttm_squeeze
+    "Gap Up%(Pre)": gap_up_pct    # legacy name
+    "Gap Up %": gap_up_pct        # BarchartScreeners.md canonical name
+    "%Chg(Pre)": change_pre_pct   # Intraday view pre-market % change
+    "Daily Closing Range": daily_closing_range  # Intraday view: 0–100 closing range
+    "Short Float": short_float
+    "Short Int": short_interest_k  # legacy abbreviated name
+    "Short Interest, K": short_interest_k  # BarchartScreeners.md canonical name
+    "Surprise%": earnings_surprise_pct  # legacy abbreviated name
+    "Earnings Surprise%": earnings_surprise_pct  # BarchartScreeners.md canonical name
+    "Surprise% 1-Qtr Ago": earnings_surprise_q1  # legacy abbreviated name
+    "Earnings Surprise% 1-Qtr Ago": earnings_surprise_q1  # BarchartScreeners.md canonical name
+    "Surprise% 2-Qtrs Ago": earnings_surprise_q2  # legacy abbreviated name
+    "Earnings Surprise% 2-Qtrs Ago": earnings_surprise_q2  # BarchartScreeners.md canonical name
+    "Surprise% 3-Qtrs Ago": earnings_surprise_q3  # legacy abbreviated name
+    "Earnings Surprise% 3-Qtrs Ago": earnings_surprise_q3  # BarchartScreeners.md canonical name
     "5D P/C Vol": put_call_vol_5d
+    "1M P/C Vol": put_call_vol_1m  # legacy abbreviated name
+    "1M Put/Call Vol": put_call_vol_1m  # BarchartScreeners.md canonical name
     "IV Pctl": iv_percentile
+    "5D IV Chg": iv_chg_5d
+    "1M IV Chg": iv_chg_1m
+    "1M Total Vol": options_vol_1m   # Options/Flow view: 1-month total options volume
+    "1M Total OI": options_oi_1m     # Options/Flow view: 1-month total open interest
+    "Vol/OI Ratio": vol_oi_ratio     # legacy name
+    "Total Volume/OI Ratio": vol_oi_ratio  # BarchartScreeners.md canonical name
     "Short Int %Chg": short_interest_chg_pct
-    "Days2Cover": days_to_cover
-    "Market Cap, $K": market_cap_k
+    "Days2Cover": days_to_cover      # legacy abbreviated name
+    "Days to Cover": days_to_cover   # BarchartScreeners.md canonical name
+    "Market Cap": market_cap_k       # legacy name (values in dollars despite field name)
+    "Market Cap, $K": market_cap_k   # BarchartScreeners.md canonical name
     "Latest Earnings": latest_earnings
     Sector: sector
 
@@ -37,10 +85,22 @@ scanner:
     - change_52w_pct
     - high_52w_distance_pct
     - atr_pct_20d
+    - adr_pct_20d
     - pct_from_50d_sma
+    - slope_50d_sma
+    - slope_200d_sma
     - bb_pct
+    - gap_up_pct
+    - change_pre_pct
+    - short_float
+    - earnings_surprise_pct
+    - earnings_surprise_q1
+    - earnings_surprise_q2
+    - earnings_surprise_q3
     - short_interest_chg_pct
     - iv_percentile
+    - iv_chg_5d
+    - iv_chg_1m
 
   # Options screener CSV column mapping (separate from stock screener)
   # These CSVs contain individual option contracts, aggregated by underlying in the pipeline

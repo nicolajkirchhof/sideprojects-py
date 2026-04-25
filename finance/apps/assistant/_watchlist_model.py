@@ -64,6 +64,23 @@ COLUMN_HEADERS: dict[Col, str] = {
     Col.SECTOR:    "Sector",
 }
 
+COLUMN_TOOLTIPS: dict[Col, str] = {
+    Col.CHECK:     "Select for export",
+    Col.SYMBOL:    "Ticker symbol",
+    Col.DIRECTION: "Trade direction: L = long, S = short",
+    Col.SCORE:     "Total weighted score (0–100). Green ≥70, amber ≥40, red <40.",
+    Col.D1:        "D1 Trend Template (weight 25)\nPrice above 50d & 200d SMA, both rising.\nMinervini Stage 2 structure.",
+    Col.D2:        "D2 Relative Strength (weight 25)\nRS vs SPY over 1M and 3M periods.\nCross-sectional momentum edge.",
+    Col.D3:        "D3 Base Quality (weight 15)\nVCP / BB squeeze tightness, ATR, entry timing.\nReduces whipsaw; does not generate alpha independently.",
+    Col.D4:        "D4 Catalyst (weight 20)\nPEAD (post-earnings drift), earnings surprise, options flow.\nEarnings blackout within 5 days = hard 0.",
+    Col.D5:        "D5 Risk (weight 15)\nStop distance vs ATR, position sizing.\nATR stop >7% = hard 0.",
+    Col.TAGS:      "Signal tags (each adds +2 to score, max +12).\nExamples: 52w-high, vol-spike, pead-long, ep-gap.",
+    Col.PRICE:     "Last price",
+    Col.CHANGE_5D: "5-day price change %",
+    Col.RVOL:      "Relative volume vs 20-day average",
+    Col.SECTOR:    "GICS sector",
+}
+
 # ---------------------------------------------------------------------------
 # Score thresholds and colours
 # ---------------------------------------------------------------------------
@@ -193,14 +210,16 @@ class WatchlistModel(QtCore.QAbstractTableModel):
         orientation: QtCore.Qt.Orientation,
         role: int = _ItemDataRole.DisplayRole,
     ) -> object:
-        if (
-            orientation == QtCore.Qt.Orientation.Horizontal
-            and role == _ItemDataRole.DisplayRole
-        ):
-            try:
-                return COLUMN_HEADERS[Col(section)]
-            except ValueError:
-                return None
+        if orientation != QtCore.Qt.Orientation.Horizontal:
+            return None
+        try:
+            col = Col(section)
+        except ValueError:
+            return None
+        if role == _ItemDataRole.DisplayRole:
+            return COLUMN_HEADERS[col]
+        if role == _ItemDataRole.ToolTipRole:
+            return COLUMN_TOOLTIPS.get(col)
         return None
 
     def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlag:

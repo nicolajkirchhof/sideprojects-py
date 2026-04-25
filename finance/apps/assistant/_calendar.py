@@ -49,7 +49,8 @@ def fetch_upcoming_events(
     """
     from datetime import timezone
     events: list[EconomicEvent] = []
-    cutoff = datetime.now(timezone.utc) + timedelta(days=days_ahead)
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(days=days_ahead)
     impact_levels = _impact_levels(impact_filter)
 
     for label, url in _CALENDAR_URLS.items():
@@ -71,6 +72,8 @@ def fetch_upcoming_events(
             except (ValueError, KeyError):
                 continue
 
+            if dt < now:
+                continue  # already passed
             if dt > cutoff:
                 continue
 

@@ -134,29 +134,32 @@ def _tag_trend_seeker(c: Candidate) -> bool:
     )
 
 
+def _bb_expanded(c: Candidate) -> bool:
+    """True when BBands are expanded — prefers bb_pct, falls back to bb_rank."""
+    if c.bb_pct is not None:
+        return c.bb_pct > 80.0
+    if c.bb_rank is not None:
+        return c.bb_rank > 80.0
+    return False
+
+
 def _tag_ttm_fired(c: Candidate) -> bool:
     """
     TTM Squeeze fired signal.
 
     Triggered by:
       1. Barchart "Long" or "Short" state — squeeze explicitly fired today.
-      2. Proxy: squeeze "Off" + BB% > 80 + RVOL > 1.0 + ATR% < 7%
+      2. Proxy: squeeze "Off" + BB expanded + RVOL > 1.0 + ATR% < 7%
          (recently-fired approximation when only "Off" is reported).
+
+    BB expansion uses bb_pct when available, falling back to bb_rank (0–100).
     """
     state = _parse_squeeze_state(c.ttm_squeeze)
     if state is None:
         return False
-    # Direct Barchart fired signal
-    if state in ("fired_long", "fired_short"):
+    if state in ("fired_long", "fired_short", "off"):
         return (
-            c.bb_pct is not None and c.bb_pct > 80.0
-            and c.rvol_20d is not None and c.rvol_20d > 1.0
-            and c.atr_pct_20d is not None and c.atr_pct_20d < 7.0
-        )
-    # Proxy: off + expanded BB
-    if state == "off":
-        return (
-            c.bb_pct is not None and c.bb_pct > 80.0
+            _bb_expanded(c)
             and c.rvol_20d is not None and c.rvol_20d > 1.0
             and c.atr_pct_20d is not None and c.atr_pct_20d < 7.0
         )

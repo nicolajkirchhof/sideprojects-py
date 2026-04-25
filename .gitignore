@@ -173,6 +173,10 @@ bin/
 # Analyst pipeline runtime state
 finance/apps/analyst/_state.json
 
+# OAuth credentials — never commit
+finance/apps/analyst/_credentials/
+finance/apps/assistant/_credentials/
+
 # Research temp files
 investing_framework/_research/**/paper_extracts.txt
 investing_framework/_research/**/book_extracts.txt

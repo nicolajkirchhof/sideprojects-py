@@ -52,7 +52,7 @@ def parse_csv(path: Path, config: ScannerConfig) -> list[Candidate]:
     candidates: list[Candidate] = []
     for _, row in df.iterrows():
         symbol = str(row[reverse_map["symbol"]]).strip().upper()
-        if not symbol or symbol == "NAN":
+        if not symbol or symbol == "NAN" or symbol.startswith("DOWNLOADED FROM"):
             continue
 
         kwargs: dict = {"symbol": symbol}

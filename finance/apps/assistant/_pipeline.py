@@ -4,11 +4,13 @@ finance.apps.assistant._pipeline
 Background pipeline thread and JSON cache I/O for the Trading Assistant.
 
 Pipeline stages (PipelineThread.run):
-  1. Discover scanner CSVs for today's date
+  1. Fetch screener CSVs from Gmail (label: TradeAnalyst) → staging dir
+     Manual mode (csv_paths provided): skip Gmail, use supplied paths directly
   2. Parse each CSV → deduplicated list[Candidate]
   3. IBKR enrichment (uses local Parquet data; gateway check runs before stage 3)
   4. Assign tags + direction + score each candidate
-  5. Write JSON cache → _data/assistant/YYYY-MM-DD.json
+  5. Fetch economic calendar (ForexFactory, 5-day window)
+  6. Write JSON cache → _data/assistant/YYYY-MM-DD.json
 
 Error policy: any unhandled exception emits the ``error`` signal with full
 traceback and stops the thread immediately. The caller is responsible for
@@ -35,9 +37,12 @@ from typing import TYPE_CHECKING
 
 from pyqtgraph.Qt import QtCore
 
+from finance.apps.assistant._claude import analyze_candidate, summarize_market
+
 if TYPE_CHECKING:
     from finance.apps.analyst._models import EnrichedCandidate
     from finance.apps.assistant._models import CandidateScore
+    from finance.apps.assistant._gmail import EmailBody
 
 log = logging.getLogger(__name__)
 
@@ -92,9 +97,10 @@ def write_cache(
     *,
     base_dir: Path | None = None,
     events: list[dict] | None = None,
+    market_summary: dict | None = None,
 ) -> Path:
     """
-    Write *rows* (and optional *events*) to the daily JSON cache file.
+    Write *rows* (and optional *events* / *market_summary*) to the daily JSON cache file.
 
     Returns the path that was written.
     """
@@ -105,6 +111,7 @@ def write_cache(
         "created_at": datetime.now().replace(microsecond=0).isoformat(),
         "rows": rows,
         "events": events or [],
+        "market_summary": market_summary,
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
@@ -157,6 +164,103 @@ def read_events_from_cache(
         return events if events is not None else None
     except Exception:
         log.warning("Failed to read events cache %s — treating as missing", path, exc_info=True)
+        return None
+
+
+def update_cache_market_summary(
+    trade_date: date,
+    summary: dict,
+    *,
+    base_dir: Path | None = None,
+) -> None:
+    """
+    Patch the ``market_summary`` field in an existing cache file.
+
+    No-op if no cache file exists for *trade_date*.
+    """
+    path = cache_path(trade_date, base_dir=base_dir)
+    if not path.exists():
+        return
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["market_summary"] = summary
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        log.warning("Failed to patch market_summary in cache %s", path, exc_info=True)
+
+
+def read_market_summary_from_cache(
+    trade_date: date,
+    *,
+    base_dir: Path | None = None,
+) -> dict | None:
+    """
+    Load the Claude market summary dict from the daily JSON cache if present.
+
+    Returns
+    -------
+    dict | None
+        The ``market_summary`` dict, or ``None`` if no cache exists, the
+        field is absent (old cache format), or the file cannot be read.
+    """
+    path = cache_path(trade_date, base_dir=base_dir)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload.get("market_summary") or None
+    except Exception:
+        log.warning("Failed to read market_summary from cache %s", path, exc_info=True)
+        return None
+
+
+def update_cache_candidate_analysis(
+    trade_date: date,
+    symbol: str,
+    analysis: dict,
+    *,
+    base_dir: Path | None = None,
+) -> None:
+    """
+    Patch ``candidate_analyses[symbol]`` in an existing cache file.
+
+    No-op if no cache file exists for *trade_date*.
+    """
+    path = cache_path(trade_date, base_dir=base_dir)
+    if not path.exists():
+        return
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        analyses = payload.setdefault("candidate_analyses", {})
+        analyses[symbol] = analysis
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        log.warning("Failed to patch candidate_analyses in cache %s", path, exc_info=True)
+
+
+def read_candidate_analysis_from_cache(
+    trade_date: date,
+    symbol: str,
+    *,
+    base_dir: Path | None = None,
+) -> dict | None:
+    """
+    Load the Claude analysis dict for *symbol* from the daily JSON cache.
+
+    Returns
+    -------
+    dict | None
+        The analysis dict, or ``None`` if absent.
+    """
+    path = cache_path(trade_date, base_dir=base_dir)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        analyses = payload.get("candidate_analyses") or {}
+        return analyses.get(symbol) or None
+    except Exception:
+        log.warning("Failed to read candidate_analyses from cache %s", path, exc_info=True)
         return None
 
 
@@ -292,15 +396,24 @@ class PipelineThread(QtCore.QThread):
             all_paths = list(self._csv_paths)
             scanner_sets: dict[str, set[str]] = {}
         else:
-            self.stage_changed.emit("Discovering scanner files…")
-            csv_map = discover_csvs(self._csv_dir, self._trade_date)
-            if not csv_map:
+            # Fetch screener CSVs from Gmail, then map by scanner key.
+            self.stage_changed.emit("Fetching screener CSVs from Gmail…")
+            from finance.apps.assistant._gmail import fetch_screener_csvs
+            downloaded = fetch_screener_csvs(
+                config.gmail,
+                staging_dir=self._csv_dir,
+                trade_date=self._trade_date,
+            )
+            if not downloaded:
                 raise RuntimeError(
-                    f"No scanner CSVs found in {self._csv_dir} "
+                    f"No screener emails found in Gmail label '{config.gmail.label}' "
                     f"for {self._trade_date.isoformat()}. "
-                    "Download today's Barchart exports first."
+                    "Check that today's Barchart exports were sent and the label is correct."
                 )
-            all_paths = list(csv_map.values())
+
+            self.stage_changed.emit(f"Mapping {len(downloaded)} CSV file(s) to scanner keys…")
+            csv_map = discover_csvs(self._csv_dir, self._trade_date)
+            all_paths = list(csv_map.values()) if csv_map else downloaded
 
             # Build per-scanner membership sets
             scanner_sets = {}
@@ -347,7 +460,7 @@ class PipelineThread(QtCore.QThread):
         event_dicts: list[dict] = []
         try:
             from finance.apps.assistant._calendar import events_to_dicts, fetch_upcoming_events
-            events = fetch_upcoming_events(days_ahead=5, impact_filter="High")
+            events = fetch_upcoming_events(days_ahead=5, impact_filter="Medium")
             event_dicts = events_to_dicts(events)
             self.calendar_updated.emit(event_dicts)
             log.info("Fetched %d calendar events", len(event_dicts))
@@ -361,3 +474,188 @@ class PipelineThread(QtCore.QThread):
 
         self.stage_changed.emit(f"Done — {len(rows)} candidates scored.")
         return rows
+
+
+# ---------------------------------------------------------------------------
+# Claude summary thread
+# ---------------------------------------------------------------------------
+
+
+class ClaudeSummaryThread(QtCore.QThread):
+    """
+    Background thread that calls ``summarize_market()`` and emits the result.
+
+    Signals
+    -------
+    summary_ready(object):
+        Emitted on success. Payload is ``dict`` — dataclasses.asdict of the
+        MarketSummary returned by summarize_market().
+    error(str):
+        Emitted on any unhandled exception. Payload is a formatted string
+        containing the exception type, message, and full traceback.
+
+    Parameters
+    ----------
+    emails:
+        EmailBody instances to summarise.
+    model:
+        Claude model ID (e.g. ``"claude-sonnet-4-6"``).
+    """
+
+    summary_ready = QtCore.Signal(object)
+    error = QtCore.Signal(str)
+
+    def __init__(
+        self,
+        *,
+        emails: list[EmailBody],
+        model: str,
+        trade_date: date | None = None,
+        spy_status: object | None = None,
+        qqq_status: object | None = None,
+        vix_status: object | None = None,
+        regime_status: str = "",
+        parent: QtCore.QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._emails = emails
+        self._model = model
+        self._trade_date = trade_date or date.today()
+        self._spy_status = spy_status
+        self._qqq_status = qqq_status
+        self._vix_status = vix_status
+        self._regime_status = regime_status
+
+    def run(self) -> None:
+        """Call summarize_market (with regime + web context) and emit summary_ready or error."""
+        try:
+            from finance.apps.assistant._claude import fetch_market_context, format_regime_context
+            regime_block = format_regime_context(
+                self._spy_status, self._qqq_status, self._vix_status, self._regime_status
+            )
+            web_block = fetch_market_context(self._trade_date)
+            market_context = "\n\n".join(filter(None, [regime_block, web_block]))
+            result = summarize_market(self._emails, self._model, market_context=market_context)
+            self.summary_ready.emit(dataclasses.asdict(result))
+        except Exception as exc:
+            msg = (
+                f"{type(exc).__name__}: {exc}\n\n"
+                f"{traceback.format_exc()}"
+            )
+            log.error("Claude summary failed: %s", msg)
+            self.error.emit(msg)
+
+
+# ---------------------------------------------------------------------------
+# Candidate analysis thread
+# ---------------------------------------------------------------------------
+
+
+class CandidateAnalysisThread(QtCore.QThread):
+    """
+    Background thread that calls ``analyze_candidate()`` for a single row.
+
+    Signals
+    -------
+    analysis_ready(object):
+        Emitted on success. Payload is ``dict`` — dataclasses.asdict of the
+        CandidateAnalysis returned by analyze_candidate().
+    error(str):
+        Emitted on any unhandled exception.
+
+    Parameters
+    ----------
+    row:
+        Result row dict to analyse.
+    model:
+        Claude model ID.
+    """
+
+    analysis_ready = QtCore.Signal(object)
+    error = QtCore.Signal(str)
+
+    def __init__(
+        self,
+        *,
+        row: dict,
+        model: str,
+        parent: QtCore.QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._row = row
+        self._model = model
+
+    def run(self) -> None:
+        """Call analyze_candidate and emit analysis_ready or error."""
+        try:
+            result = analyze_candidate(self._row, self._model)
+            self.analysis_ready.emit(dataclasses.asdict(result))
+        except Exception as exc:
+            msg = (
+                f"{type(exc).__name__}: {exc}\n\n"
+                f"{traceback.format_exc()}"
+            )
+            log.error("Candidate analysis failed: %s", msg)
+            self.error.emit(msg)
+
+
+# ---------------------------------------------------------------------------
+# Top-N auto analysis thread
+# ---------------------------------------------------------------------------
+
+
+class TopNAnalysisThread(QtCore.QThread):
+    """
+    Background thread that sequentially analyses the top-N candidates.
+
+    Signals
+    -------
+    row_analysis_ready(str, object):
+        Emitted after each successful analysis. Payload is (symbol, analysis_dict).
+    error(str):
+        Emitted if an unhandled exception stops the thread. Per-row API
+        failures are logged but do not stop the loop.
+
+    Parameters
+    ----------
+    rows:
+        Full list of result rows (sorted by score descending).
+    model:
+        Claude model ID.
+    top_n:
+        Number of top rows to analyse.
+    """
+
+    row_analysis_ready = QtCore.Signal(str, object)
+    error = QtCore.Signal(str)
+
+    def __init__(
+        self,
+        *,
+        rows: list[dict],
+        model: str,
+        top_n: int,
+        parent: QtCore.QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._rows = rows
+        self._model = model
+        self._top_n = top_n
+
+    def run(self) -> None:
+        """Analyse rows[:top_n] sequentially, emitting per-row results."""
+        try:
+            for row in self._rows[: self._top_n]:
+                symbol = row.get("symbol", "")
+                try:
+                    result = analyze_candidate(row, self._model)
+                    self.row_analysis_ready.emit(symbol, dataclasses.asdict(result))
+                except Exception:
+                    log.warning("Auto-analysis failed for %s", symbol, exc_info=True)
+        except Exception as exc:
+            msg = (
+                f"{type(exc).__name__}: {exc}\n\n"
+                f"{traceback.format_exc()}"
+            )
+            log.error("TopNAnalysisThread failed: %s", msg)
+            self.error.emit(msg)

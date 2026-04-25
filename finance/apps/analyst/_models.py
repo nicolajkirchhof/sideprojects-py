@@ -23,15 +23,41 @@ class Candidate:
     high_52w_distance_pct: float | None = None
     rvol_20d: float | None = None            # 20D relative volume
     atr_pct_20d: float | None = None         # 20D ATR as % of price
+    adr_pct_20d: float | None = None         # 20D ADR as % of price (daily range)
     pct_from_50d_sma: float | None = None    # distance from 50D SMA
-    bb_pct: float | None = None              # Bollinger Band %
+    slope_50d_sma: float | None = None       # 50D SMA slope (% change — positive = rising)
+    slope_200d_sma: float | None = None      # 200D SMA slope (% change — positive = rising)
+    bb_pct: float | None = None              # Bollinger Band % (can exceed 100 when above upper band)
+    bb_rank: float | None = None             # Bollinger Bands Rank 0–100 (Standard + Intraday views)
+    ttm_squeeze: str | None = None           # "On" | "Off"
+    trend_seeker_signal: str | None = None   # "Buy" | "Hold" | "Sell"
+    weighted_alpha: float | None = None      # 12M momentum weighted to recent (proxy for 12M return)
+    perf_vs_market_5d: float | None = None   # 5D performance vs SPY (percentage points)
+    perf_vs_market_1m: float | None = None   # 1M performance vs SPY
+    perf_vs_market_3m: float | None = None   # 3M performance vs SPY
+    gap_up_pct: float | None = None          # pre-market gap up % (PEAD/EP scanner)
+    change_pre_pct: float | None = None      # pre-market % change (Intraday view)
+    daily_closing_range: float | None = None # 0–100: where price closed within the day's range
+    short_float: float | None = None         # short interest as % of float
+    short_interest_k: float | None = None    # short interest in thousands
+    earnings_surprise_pct: float | None = None      # current quarter EPS surprise %
+    earnings_surprise_q1: float | None = None       # Q-1 surprise %
+    earnings_surprise_q2: float | None = None       # Q-2 surprise %
+    earnings_surprise_q3: float | None = None       # Q-3 surprise %
     put_call_vol_5d: float | None = None     # 5-day put/call volume ratio
+    put_call_vol_1m: float | None = None     # 1-month put/call volume ratio (display only)
     iv_percentile: float | None = None       # IV percentile (for options structure)
+    iv_chg_5d: float | None = None           # 5D IV change (display only)
+    iv_chg_1m: float | None = None           # 1M IV change (display only)
+    options_vol_1m: float | None = None      # 1-month total options volume (Options/Flow view)
+    options_oi_1m: float | None = None       # 1-month total open interest (Options/Flow view)
+    vol_oi_ratio: float | None = None        # Vol/OI ratio (Schema C, display only)
     short_interest_chg_pct: float | None = None
     days_to_cover: float | None = None
-    market_cap_k: float | None = None        # market cap in thousands
-    latest_earnings: str | None = None       # next earnings date
+    market_cap_k: float | None = None        # market cap (values are in dollars despite field name)
+    latest_earnings: str | None = None       # next earnings date (YYYY-MM-DD or MM/DD/YY)
     sector: str | None = None
+    source_scanner: str | None = None        # which scanner CSV this row came from
 
 
 @dataclass

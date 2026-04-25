@@ -1,4 +1,18 @@
-# Trading Assistant — Scoring Configuration
+# Trading Assistant — Configuration
+
+tradelog:
+  base_url: "http://localhost:5186"
+
+gmail:
+  label: TradeAnalyst
+
+claude:
+  model_summary: claude-sonnet-4-6
+  model_analysis: claude-haiku-4-5-20251001
+  max_emails: 10
+  top_n_auto_analyze: 3
+
+
 #
 # Weights must sum to 100. Tag bonus is +tag_bonus_per_tag per tag, capped at tag_bonus_cap.
 # Full scoring spec: investing_framework/ScoringSystem.md

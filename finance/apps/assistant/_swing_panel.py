@@ -4,17 +4,21 @@ finance.apps.assistant._swing_panel
 Left panel — Swing Trading Regime indicators.
 
 Shows: SPY/QQQ trend rows, VIX row, composite GO/NO-GO banner,
-stop-out counter, macro event proximity warning, and economic
-events calendar.
+macro event proximity warning, and economic events calendar.
 
 Migrated from finance.apps.conditions._swing_panel; extended for
-TA-E3-S2 (stop-out counter) and TA-E3-S3 (events calendar).
+TA-E3-S3 (events calendar).
 """
 from __future__ import annotations
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
-from finance.apps.assistant._data import TrendStatus, VixStatus
+from finance.apps.assistant._data import (
+    DriftTier,
+    DriftUnderlyingStatus,
+    TrendStatus,
+    VixStatus,
+)
 
 # ---------------------------------------------------------------------------
 # Colours
@@ -200,87 +204,6 @@ class GoNoGoBar(QtWidgets.QLabel):
 
 
 # ---------------------------------------------------------------------------
-# StopOutCounter
-# ---------------------------------------------------------------------------
-
-_STOPOUT_NOGO_THRESHOLD: int = 3
-
-
-class StopOutCounter(QtWidgets.QWidget):
-    """Manual consecutive stop-out counter.
-
-    Displays a -/count/+ row.  When count reaches _STOPOUT_NOGO_THRESHOLD
-    the override is active and the GO/NO-GO banner is forced to NO-GO.
-    In-session only — resets on app restart.
-    """
-
-    count_changed = QtCore.Signal(int)
-
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._count: int = 0
-
-        h = QtWidgets.QHBoxLayout(self)
-        h.setContentsMargins(0, 2, 0, 2)
-        h.setSpacing(8)
-
-        lbl = _label("Stop-outs:", size=12)
-        h.addWidget(lbl)
-
-        self._btn_dec = QtWidgets.QToolButton()
-        self._btn_dec.setText("−")
-        self._btn_dec.setFixedSize(22, 22)
-        self._btn_dec.clicked.connect(self.decrement)
-        h.addWidget(self._btn_dec)
-
-        self._count_lbl = _label("0", mono=True, size=13)
-        self._count_lbl.setFixedWidth(28)
-        self._count_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        h.addWidget(self._count_lbl)
-
-        self._btn_inc = QtWidgets.QToolButton()
-        self._btn_inc.setText("+")
-        self._btn_inc.setFixedSize(22, 22)
-        self._btn_inc.clicked.connect(self.increment)
-        h.addWidget(self._btn_inc)
-
-        h.addStretch()
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    @property
-    def count(self) -> int:
-        return self._count
-
-    @property
-    def is_override_active(self) -> bool:
-        return self._count >= _STOPOUT_NOGO_THRESHOLD
-
-    def increment(self) -> None:
-        self._count += 1
-        self._refresh()
-
-    def decrement(self) -> None:
-        if self._count > 0:
-            self._count -= 1
-            self._refresh()
-
-    def reset(self) -> None:
-        self._count = 0
-        self._refresh()
-
-    # ------------------------------------------------------------------
-
-    def _refresh(self) -> None:
-        colour = RED if self.is_override_active else "#ccc"
-        self._count_lbl.setText(str(self._count))
-        self._count_lbl.setStyleSheet(f"color: {colour}; font-weight: bold;")
-        self.count_changed.emit(self._count)
-
-
-# ---------------------------------------------------------------------------
 # MacroEventLabel — inline risk text above GO/NO-GO bar
 # ---------------------------------------------------------------------------
 
@@ -335,7 +258,7 @@ class EventsCalendarWidget(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
 
-        header = _label("ECONOMIC EVENTS (5d, High)", size=11)
+        header = _label("ECONOMIC EVENTS (5d, High+Med)", size=11)
         header.setStyleSheet("color: #888;")
         layout.addWidget(header)
 
@@ -378,6 +301,8 @@ class EventsCalendarWidget(QtWidgets.QWidget):
                 continue
 
             hours_away = (dt - now).total_seconds() / 3600
+            if hours_away < 0:
+                continue  # already passed
             title = d.get("title", "")
             country = d.get("country", "")
 
@@ -406,17 +331,229 @@ class EventsCalendarWidget(QtWidgets.QWidget):
 
 
 # ---------------------------------------------------------------------------
-# SwingRegimePanel — assembles everything
+# DriftSection — collapsible DRIFT regime + underlying eligibility block
 # ---------------------------------------------------------------------------
 
-class SwingRegimePanel(QtWidgets.QWidget):
-    """Left panel: SPY/QQQ trend indicators, VIX, GO/NO-GO with stop-out
-    override, macro event warning, and events calendar.
+_DRIFT_TIER_COLOURS = {
+    "Normal":          GREEN,
+    "Elevated":        AMBER,
+    "Correction":      "#FF7043",
+    "Deep Correction": RED,
+    "Bear":            RED,
+}
+
+_BP_WARNING_THRESHOLD: float = 50.0
+
+
+class _UnderlyingRow(QtWidgets.QWidget):
+    """One row: symbol  IVP%  ●eligible  structure-text"""
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+        h = QtWidgets.QHBoxLayout(self)
+        h.setContentsMargins(0, 1, 0, 1)
+        h.setSpacing(8)
+
+        self._sym = _label(mono=False, size=12)
+        self._sym.setFixedWidth(36)
+        self._sym.setStyleSheet("font-weight: bold;")
+        h.addWidget(self._sym)
+
+        self._ivp = _label(mono=True, size=11)
+        self._ivp.setFixedWidth(60)
+        h.addWidget(self._ivp)
+
+        self._dot_lbl = _label(size=14)
+        self._dot_lbl.setFixedWidth(20)
+        h.addWidget(self._dot_lbl)
+
+        self._structure = _label(size=11)
+        h.addWidget(self._structure)
+        h.addStretch()
+
+    def update_data(self, status: DriftUnderlyingStatus) -> None:
+        self._sym.setText(status.symbol)
+
+        if status.ivp is not None:
+            self._ivp.setText(f"IVP {status.ivp:.0f}")
+            ivp_colour = GREEN if status.ivp >= 50 else AMBER
+            self._ivp.setStyleSheet(f"color: {ivp_colour};")
+        else:
+            self._ivp.setText("IVP —")
+            self._ivp.setStyleSheet(f"color: {DIM};")
+
+        eligible_colour = GREEN if status.eligible else DIM
+        self._dot_lbl.setText(_dot(eligible_colour))
+
+        self._structure.setText(status.structure)
+        self._structure.setStyleSheet(f"color: {'#ccc' if status.eligible else DIM};")
+
+
+class DriftSection(QtWidgets.QWidget):
+    """Collapsible DRIFT regime block.
+
+    Header row: ▶/▼ toggle + «DRIFT» label + tier badge.
+    Collapsed by default; click toggle to expand.
+
+    Expanded content:
+      - Tier info row: BP% + structure + DTE range
+      - One _UnderlyingRow per underlying
+      - BP guardrail: labelled spinbox + warning when > 50%
     """
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        self._natural_status: str = "NO-GO"
+
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # ---- header row ----
+        header_row = QtWidgets.QWidget()
+        h = QtWidgets.QHBoxLayout(header_row)
+        h.setContentsMargins(0, 4, 0, 4)
+        h.setSpacing(6)
+
+        self._toggle_btn = QtWidgets.QPushButton("\u25b6 DRIFT")  # ▶
+        self._toggle_btn.setCheckable(True)
+        self._toggle_btn.setFlat(True)
+        self._toggle_btn.setFont(QtGui.QFont("Segoe UI", 11, QtGui.QFont.Weight.Bold))
+        self._toggle_btn.setStyleSheet("color: #888; text-align: left; padding: 0;")
+        self._toggle_btn.toggled.connect(self._on_toggle)
+        h.addWidget(self._toggle_btn)
+
+        self._tier_label = _label("", size=11)
+        self._tier_label.setStyleSheet(
+            f"color: #111; background: {DIM}; border-radius: 3px; padding: 1px 6px; font-weight: bold;"
+        )
+        h.addWidget(self._tier_label)
+        h.addStretch()
+        outer.addWidget(header_row)
+
+        # ---- collapsible content ----
+        self._content = QtWidgets.QWidget()
+        self._content.hide()
+        inner = QtWidgets.QVBoxLayout(self._content)
+        inner.setContentsMargins(8, 0, 0, 4)
+        inner.setSpacing(3)
+
+        # Tier info row
+        self._tier_info = _label("", size=11)
+        self._tier_info.setWordWrap(True)
+        self._tier_info.setStyleSheet("color: #aaa;")
+        inner.addWidget(self._tier_info)
+
+        inner.addWidget(_hsep())
+
+        # Underlying rows container
+        self._underlying_container = QtWidgets.QWidget()
+        self._underlying_layout = QtWidgets.QVBoxLayout(self._underlying_container)
+        self._underlying_layout.setContentsMargins(0, 0, 0, 0)
+        self._underlying_layout.setSpacing(1)
+        inner.addWidget(self._underlying_container)
+
+        inner.addWidget(_hsep())
+
+        # BP guardrail
+        bp_row = QtWidgets.QWidget()
+        bp_h = QtWidgets.QHBoxLayout(bp_row)
+        bp_h.setContentsMargins(0, 2, 0, 2)
+        bp_h.setSpacing(6)
+
+        bp_lbl = _label("BP used %", size=11)
+        bp_lbl.setStyleSheet("color: #888;")
+        bp_h.addWidget(bp_lbl)
+
+        self._bp_spinbox = QtWidgets.QDoubleSpinBox()
+        self._bp_spinbox.setRange(0.0, 100.0)
+        self._bp_spinbox.setSingleStep(5.0)
+        self._bp_spinbox.setDecimals(0)
+        self._bp_spinbox.setValue(0.0)
+        self._bp_spinbox.setFixedWidth(70)
+        self._bp_spinbox.setStyleSheet(
+            "background: #222; color: #ccc; border: 1px solid #444;"
+        )
+        self._bp_spinbox.valueChanged.connect(self._on_bp_changed)
+        bp_h.addWidget(self._bp_spinbox)
+        bp_h.addStretch()
+        inner.addWidget(bp_row)
+
+        self._bp_warning = _label("\u26a0 BP > 50% — reduce exposure", size=11)
+        self._bp_warning.setStyleSheet(f"color: {RED};")
+        self._bp_warning.hide()
+        inner.addWidget(self._bp_warning)
+
+        outer.addWidget(self._content)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def update_drift(
+        self,
+        tier: DriftTier,
+        underlyings: list[DriftUnderlyingStatus],
+    ) -> None:
+        """Refresh the section with new tier and underlying data."""
+        tier_colour = _DRIFT_TIER_COLOURS.get(tier.name, DIM)
+        self._tier_label.setText(tier.name)
+        self._tier_label.setStyleSheet(
+            f"color: #111; background: {tier_colour}; "
+            f"border-radius: 3px; padding: 1px 6px; font-weight: bold;"
+        )
+        self._toggle_btn.setStyleSheet(
+            f"color: {tier_colour}; text-align: left; padding: 0;"
+        )
+
+        self._tier_info.setText(
+            f"DD {tier.drawdown_pct:.1f}%  ·  BP rec {tier.bp_pct}%  ·  "
+            f"{tier.structure}  ·  DTE {tier.dte_range}"
+        )
+
+        # Rebuild underlying rows
+        while self._underlying_layout.count():
+            item = self._underlying_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        for status in underlyings:
+            row = _UnderlyingRow()
+            row.update_data(status)
+            self._underlying_layout.addWidget(row)
+
+    # ------------------------------------------------------------------
+    # Slots
+    # ------------------------------------------------------------------
+
+    def _on_toggle(self, checked: bool) -> None:
+        arrow = "\u25bc" if checked else "\u25b6"  # ▼ or ▶
+        # Preserve current colour in toggle button text
+        current_style = self._toggle_btn.styleSheet()
+        colour_match = current_style.split("color:")[1].split(";")[0].strip() if "color:" in current_style else "#888"
+        self._toggle_btn.setText(f"{arrow} DRIFT")
+        if checked:
+            self._content.show()
+        else:
+            self._content.hide()
+
+    def _on_bp_changed(self, value: float) -> None:
+        if value > _BP_WARNING_THRESHOLD:
+            self._bp_warning.show()
+        else:
+            self._bp_warning.hide()
+
+
+# ---------------------------------------------------------------------------
+# SwingRegimePanel — assembles everything
+# ---------------------------------------------------------------------------
+
+class SwingRegimePanel(QtWidgets.QWidget):
+    """Left panel: SPY/QQQ trend indicators, VIX, GO/NO-GO banner,
+    macro event warning, events calendar, and Claude market summary.
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -444,10 +581,6 @@ class SwingRegimePanel(QtWidgets.QWidget):
 
         layout.addWidget(_hsep())
 
-        self.stop_counter = StopOutCounter()
-        self.stop_counter.count_changed.connect(self._on_stopout_changed)
-        layout.addWidget(self.stop_counter)
-
         self.macro_label = MacroEventLabel()
         layout.addWidget(self.macro_label)
 
@@ -455,6 +588,16 @@ class SwingRegimePanel(QtWidgets.QWidget):
 
         self.events_widget = EventsCalendarWidget()
         layout.addWidget(self.events_widget)
+
+        layout.addWidget(_hsep())
+
+        self.summary_widget = MarketSummaryWidget()
+        layout.addWidget(self.summary_widget)
+
+        layout.addWidget(_hsep())
+
+        self.drift_section = DriftSection()
+        layout.addWidget(self.drift_section)
 
         layout.addStretch()
 
@@ -469,8 +612,6 @@ class SwingRegimePanel(QtWidgets.QWidget):
         vix: VixStatus | None,
         status: str,
     ) -> None:
-        self._natural_status = status
-
         if spy:
             self.spy_row.update_data(spy)
         else:
@@ -486,23 +627,141 @@ class SwingRegimePanel(QtWidgets.QWidget):
         else:
             self.vix_row.clear_data()
 
-        self._apply_status()
+        self.go_nogo.set_status(status)
 
     def update_events(self, event_dicts: list[dict]) -> None:
         """Update macro warning label and events calendar from cache/pipeline data."""
         self.macro_label.set_events(event_dicts)
         self.events_widget.set_events(event_dicts)
 
+    def update_market_summary(self, summary: dict | None) -> None:
+        """Push a new market summary dict (or None to clear) to the summary widget."""
+        self.summary_widget.set_summary(summary)
+
+    def update_drift(
+        self,
+        tier: DriftTier,
+        underlyings: list[DriftUnderlyingStatus],
+    ) -> None:
+        """Push updated DRIFT tier and underlying eligibility to the section."""
+        self.drift_section.update_drift(tier, underlyings)
+
+
+# ---------------------------------------------------------------------------
+# MarketSummaryWidget — Claude-generated regime brief
+# ---------------------------------------------------------------------------
+
+
+class MarketSummaryWidget(QtWidgets.QWidget):
+    """
+    Displays the Claude-generated market summary in three states:
+
+    - *empty*: placeholder text ("No summary yet")
+    - *generating*: spinner-style label ("Generating summary…")
+    - *ready*: regime badge + scrollable text brief
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        header = _label("MARKET BRIEF", size=11)
+        header.setStyleSheet("color: #888;")
+        layout.addWidget(header)
+
+        self._regime_badge = QtWidgets.QLabel()
+        self._regime_badge.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+        self._regime_badge.setFont(QtGui.QFont("Segoe UI", 12, QtGui.QFont.Weight.Bold))
+        self._regime_badge.hide()
+        layout.addWidget(self._regime_badge)
+
+        self._text = QtWidgets.QTextBrowser()
+        self._text.setReadOnly(True)
+        self._text.setOpenExternalLinks(False)
+        self._text.setFixedHeight(180)
+        self._text.setStyleSheet(
+            "background: #1a1a1a; border: 1px solid #333; "
+            "color: #ccc; font-size: 11px; padding: 4px;"
+        )
+        layout.addWidget(self._text)
+
+        self._set_placeholder("No summary yet")
+
     # ------------------------------------------------------------------
-    # Private
+    # Public API
     # ------------------------------------------------------------------
 
-    def _on_stopout_changed(self, _count: int) -> None:
-        self._apply_status()
+    def set_generating(self) -> None:
+        """Show a 'Generating…' state while Claude is running."""
+        self._regime_badge.hide()
+        self._text.setPlainText("Generating market summary…")
+        self._text.setStyleSheet(
+            "background: #1a1a1a; border: 1px solid #333; "
+            "color: #888; font-size: 11px; padding: 4px;"
+        )
 
-    def _apply_status(self) -> None:
-        """Apply GO/NO-GO, respecting stop-out override."""
-        if self.stop_counter.is_override_active:
-            self.go_nogo.set_status("NO-GO")
+    def set_error(self, message: str) -> None:
+        """Show an error state (red text) when the summary cannot be generated."""
+        self._regime_badge.hide()
+        self._text.setPlainText(message)
+        self._text.setStyleSheet(
+            "background: #1a1a1a; border: 1px solid #333; "
+            "color: #F44336; font-size: 11px; padding: 4px;"
+        )
+
+    def set_summary(self, summary: dict | None) -> None:
+        """
+        Display the Claude market summary dict.
+
+        Passing ``None`` resets to the empty placeholder state.
+        """
+        if not summary:
+            self._set_placeholder("No summary yet")
+            return
+
+        regime = summary.get("regime", "")
+        if regime:
+            bg, fg = _GONOGO_STYLES.get(regime, (DIM, "#fff"))
+            self._regime_badge.setText(regime)
+            self._regime_badge.setStyleSheet(
+                f"background: {bg}; color: {fg}; border-radius: 4px; "
+                f"padding: 2px 10px;"
+            )
+            self._regime_badge.show()
         else:
-            self.go_nogo.set_status(self._natural_status)
+            self._regime_badge.hide()
+
+        lines: list[str] = []
+        reasoning = summary.get("regime_reasoning", "")
+        if reasoning:
+            lines.append(reasoning)
+
+        for section, key in [
+            ("Themes", "themes"),
+            ("Movers", "movers"),
+            ("Risks", "risks"),
+            ("Actions", "action_items"),
+        ]:
+            items = summary.get(key) or []
+            if items:
+                lines.append(f"\n{section}:")
+                lines.extend(f"  • {item}" for item in items)
+
+        self._text.setPlainText("\n".join(lines))
+        self._text.setStyleSheet(
+            "background: #1a1a1a; border: 1px solid #333; "
+            "color: #ccc; font-size: 11px; padding: 4px;"
+        )
+
+    # ------------------------------------------------------------------
+
+    def _set_placeholder(self, text: str) -> None:
+        self._regime_badge.hide()
+        self._text.setPlainText(text)
+        self._text.setStyleSheet(
+            "background: #1a1a1a; border: 1px solid #333; "
+            "color: #555; font-size: 11px; padding: 4px;"
+        )

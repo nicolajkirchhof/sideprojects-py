@@ -56,3 +56,28 @@ class CandidateScore:
     tag_bonus: float = 0.0
     total: float = 0.0                         # sum of weighted_scores + tag_bonus
     tags: list[str] = field(default_factory=list)
+
+
+@dataclass
+class MarketSummary:
+    """Claude-generated market context summary for the evening prep session."""
+    regime: str = ""                    # "GO" | "CAUTION" | "NO-GO" | ""
+    regime_reasoning: str = ""
+    themes: list[str] = field(default_factory=list)
+    movers: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
+    action_items: list[str] = field(default_factory=list)
+    raw_response: str = ""              # full Claude response for audit
+
+
+@dataclass
+class CandidateAnalysis:
+    """Claude-generated trade analysis for a single watchlist candidate."""
+    setup_type: str = ""                # e.g. "Type A — EP"
+    profit_mechanism: str = ""          # e.g. "PM-02 PEAD"
+    thesis: str = ""                    # 1-2 sentence trade thesis
+    entry: float | None = None          # suggested entry price
+    stop: float | None = None           # suggested stop price
+    target: float | None = None         # suggested target price
+    confidence: str = ""                # "LOW" | "MEDIUM" | "HIGH"
+    raw_response: str = ""              # full Claude response for audit
