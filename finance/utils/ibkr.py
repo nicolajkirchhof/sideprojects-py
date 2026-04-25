@@ -38,6 +38,25 @@ JP_INDEX = ib.Index('N225', 'OSE.JPN', 'JPY')
 HK_INDEX = ib.Index('HSI', 'HKFE', 'HKD')
 INDICES = [*EU_INDICES, *US_INDICES, JP_INDEX, FR_INDEX, HK_INDEX]
 
+def _build_contract(symbol: str):
+  """Return the appropriate ib_async contract for *symbol*.
+
+  Prefix conventions:
+    ``^XXXYYY`` — Forex pair  (e.g. ``^EURUSD`` → EUR/USD)
+    ``$$NAME``  — CFD         (e.g. ``$$NAS100``)
+    ``$NAME``   — Index       (looked up in INDICES)
+    ``NAME``    — Stock       (USD, SMART routing)
+  """
+  if symbol.startswith('^'):
+    return ib.Forex(symbol=symbol[1:4], exchange='IDEALPRO', currency=symbol[4:])
+  elif symbol.startswith('$$'):
+    return ib.CFD(symbol=symbol.replace('$$', ''), exchange='SMART')
+  elif symbol.startswith('$'):
+    return [x for x in INDICES if x.symbol == symbol[1:]][0]
+  else:
+    return ib.Stock(symbol=symbol, exchange='SMART', currency='USD')
+
+
 def cache_path(symbol: str) -> str:
   """Return the on-disk parquet path used by `daily_w_volatility` for this symbol."""
   if '.' in symbol:
@@ -120,21 +139,12 @@ def daily_w_volatility(symbol, api='api_paper', offline=False, ib_con=None, refr
       ib_con = utils.ibkr.connect(api, 17, 1)
       disconnect = True
 
-    if symbol.startswith('^'):
-      contract = ib.Forex(symbol=symbol[1:4], exchange='IDEALPRO', currency=symbol[4:])
-    if symbol.startswith('$$'):
-      contract = ib.CFD(symbol=symbol.replace('$$', ''), exchange='SMART')
-    if symbol.startswith('$'):
-      contract = [x for x in INDICES if x.symbol == symbol[1:]][0]
-    else:
-      contract = ib.Stock(symbol=symbol, exchange='SMART', currency='USD')
-    ib_con.qualifyContracts(contract  )
+    contract = _build_contract(symbol)
+    ib_con.qualifyContracts(contract)
     details = ib_con.reqContractDetails(contract)
     print(f"Contract details for {symbol}: {details[0].longName}")
 
-  #%%
     rth = True
-    ##%%
     duration = '10 Y'
     barSize = '1 day'
     offset_days = 5

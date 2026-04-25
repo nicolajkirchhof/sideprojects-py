@@ -24,7 +24,7 @@ Sessions (UTC)
   Sydney open  22:00 UTC  — AUDUSD (previous calendar day in UTC)
 
 Run from repo root:
-    python finance/intraday_pm/forex/forex_oco_bt.py
+    python finance/forex_pm/backtests/forex_oco_bt.py
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import numpy as np
 import pandas as pd
@@ -89,7 +89,7 @@ PAIR_SESSIONS: dict[str, list[str]] = {
     "AUDUSD": ["sydney", "tokyo"],
 }
 
-RESULTS_APPEND_PATH = "finance/intraday_pm/forex/RESULTS.md"
+RESULTS_APPEND_PATH = "finance/forex_pm/RESULTS.md"
 TOP_N = 10  # top combinations to show per pair × session
 
 

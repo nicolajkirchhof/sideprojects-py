@@ -20,4 +20,5 @@ from . import chart_styles
 from . import momentum_data
 from . import move_character
 from . import underlyings
+from . import backtest
 from .swing_trading_data import SwingTradingData

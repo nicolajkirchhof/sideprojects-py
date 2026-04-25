@@ -5,7 +5,7 @@ from pathlib import Path
 from finance import utils
 
 DATASOURCES = ['dolt', 'ibkr', 'offline', 'update']
-CACHE_DIR = Path('finance/_data/swing_data')
+CACHE_DIR = Path('finance/_data/research/swing/swing_data')
 
 class SwingTradingData:
   def __init__(self, symbol: string, datasource='auto', api='api_paper'):

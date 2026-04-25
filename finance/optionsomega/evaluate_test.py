@@ -37,7 +37,7 @@ mpl.use('QtAgg')
 
 #%%
 # Download VIX data
-df_vix = pd.read_csv('finance/_data/VIX_History.csv', parse_dates=True,index_col=['DATE'])
+df_vix = pd.read_csv('finance/_data/ref/VIX_History.csv', parse_dates=True,index_col=['DATE'])
 df_vix = df_vix.rename(columns={'OPEN': 'vo', 'HIGH': 'vh', 'LOW': 'vl', 'CLOSE': 'vc'})
 df_vix['vhcl'] = df_vix[['vh', 'vc', 'vl']].sum(axis=1)/3
 

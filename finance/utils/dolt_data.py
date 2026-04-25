@@ -1,5 +1,4 @@
 import os.path
-import pickle
 import time
 import functools
 from pathlib import Path
@@ -36,7 +35,7 @@ _CACHE_DIR = Path("finance/_data/dolt_cache")
 def _cache_file(func_name: str, symbol: str) -> Path:
   _CACHE_DIR.mkdir(parents=True, exist_ok=True)
   safe_symbol = str(symbol).upper().strip()
-  return _CACHE_DIR / f"{func_name}__{safe_symbol}.pkl"
+  return _CACHE_DIR / f"{func_name}__{safe_symbol}.parquet"
 
 def _cache_is_fresh(path: Path, *, max_age_days: float | None) -> bool:
   if not path.exists():
@@ -48,14 +47,13 @@ def _cache_is_fresh(path: Path, *, max_age_days: float | None) -> bool:
 
 def _read_cache(path: Path) -> pd.DataFrame | None:
   try:
-    obj = pd.read_pickle(path)
-    return obj if isinstance(obj, pd.DataFrame) else None
+    return pd.read_parquet(path)
   except Exception:
     return None
 
 def _write_cache(path: Path, df: pd.DataFrame) -> None:
-  tmp = path.with_suffix(path.suffix + ".tmp")
-  df.to_pickle(tmp)
+  tmp = path.with_suffix(".tmp")
+  df.to_parquet(tmp)
   tmp.replace(path)
 
 def time_db_call(func):
@@ -131,10 +129,11 @@ def load_delisted():
   global DELISTED
   if DELISTED is not None: return DELISTED
 
-  if os.path.exists('finance/_data/delisted.pkl'):
-    DELISTED = pickle.load(open('finance/_data/delisted.pkl', 'rb'))
+  _delisted_path = 'finance/_data/state/delisted.parquet'
+  if os.path.exists(_delisted_path):
+    DELISTED = set(pd.read_parquet(_delisted_path)['symbol'].tolist())
   else:
-    print("No delisted.pkl found. DOLT will not work correctly")
+    print("No delisted.parquet found. DOLT will not work correctly")
   return DELISTED
 #%%
 @time_db_call

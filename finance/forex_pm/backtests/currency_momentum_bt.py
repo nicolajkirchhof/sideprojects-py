@@ -23,7 +23,7 @@ Methodology
 6. Transaction cost: SPREAD_COST_PIPS per pair that changes position.
 
 Run from repo root:
-    python finance/intraday_pm/forex/currency_momentum_bt.py
+    python finance/forex_pm/backtests/currency_momentum_bt.py
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import numpy as np
 import pandas as pd
@@ -63,7 +63,7 @@ MOMENTUM_SKIP_WEEKS     = 4   # skip most recent N weeks (reversal buffer)
 N_LONG  = 3  # number of pairs to hold long
 N_SHORT = 3  # number of pairs to hold short
 
-RESULTS_APPEND_PATH = "finance/intraday_pm/forex/RESULTS.md"
+RESULTS_APPEND_PATH = "finance/forex_pm/RESULTS.md"
 WEEKLY_CLOSE_HOUR   = 21  # hour at-or-before which we take the weekly close (UTC)
 
 
