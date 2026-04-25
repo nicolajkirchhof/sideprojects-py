@@ -1,0 +1,15 @@
+mode: paper
+
+ibkr:
+  host: 127.0.0.1
+  paper_port: 4002
+  live_port: 4001
+  client_id: 10
+
+risk:
+  max_daily_loss_eur: 100
+  max_daily_loss_usd: 100
+
+telegram:
+  bot_token: ""
+  chat_id: ""
