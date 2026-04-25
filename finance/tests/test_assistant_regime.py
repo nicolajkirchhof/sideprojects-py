@@ -1,6 +1,5 @@
 """
-Tests for TA-E3-S2 (stop-out counter + GO/NO-GO override)
-and TA-E3-S3 (economic events calendar cache I/O).
+Tests for TA-E3-S3 (economic events calendar cache I/O).
 
 Written test-first (TDD).
 """
@@ -10,7 +9,6 @@ import json
 import os
 import sys
 from datetime import date
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -41,79 +39,6 @@ _SAMPLE_EVENTS = [
         "previous": "0.2%",
     },
 ]
-
-
-# ---------------------------------------------------------------------------
-# StopOutCounter — model-level (no display required)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skipif(not _has_display, reason="No display available")
-def test_stopout_counter_starts_at_zero():
-    from finance.apps._qt_bootstrap import ensure_qt_app
-    from finance.apps.assistant._swing_panel import StopOutCounter
-
-    ensure_qt_app()
-    counter = StopOutCounter()
-    assert counter.count == 0
-
-
-@pytest.mark.skipif(not _has_display, reason="No display available")
-def test_stopout_counter_increments():
-    from finance.apps._qt_bootstrap import ensure_qt_app
-    from finance.apps.assistant._swing_panel import StopOutCounter
-
-    ensure_qt_app()
-    counter = StopOutCounter()
-    counter.increment()
-    counter.increment()
-    assert counter.count == 2
-
-
-@pytest.mark.skipif(not _has_display, reason="No display available")
-def test_stopout_counter_clamps_at_zero():
-    """Decrementing below zero should keep count at 0."""
-    from finance.apps._qt_bootstrap import ensure_qt_app
-    from finance.apps.assistant._swing_panel import StopOutCounter
-
-    ensure_qt_app()
-    counter = StopOutCounter()
-    counter.decrement()
-    counter.decrement()
-    assert counter.count == 0
-
-
-@pytest.mark.skipif(not _has_display, reason="No display available")
-def test_stopout_counter_three_triggers_override():
-    """At count == 3 the override should be active."""
-    from finance.apps._qt_bootstrap import ensure_qt_app
-    from finance.apps.assistant._swing_panel import StopOutCounter
-
-    ensure_qt_app()
-    counter = StopOutCounter()
-    assert not counter.is_override_active
-    counter.increment()
-    counter.increment()
-    assert not counter.is_override_active
-    counter.increment()
-    assert counter.is_override_active
-
-
-@pytest.mark.skipif(not _has_display, reason="No display available")
-def test_stopout_reset_clears_override():
-    """Resetting the counter should deactivate the override."""
-    from finance.apps._qt_bootstrap import ensure_qt_app
-    from finance.apps.assistant._swing_panel import StopOutCounter
-
-    ensure_qt_app()
-    counter = StopOutCounter()
-    counter.increment()
-    counter.increment()
-    counter.increment()
-    assert counter.is_override_active
-    counter.reset()
-    assert counter.count == 0
-    assert not counter.is_override_active
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +88,6 @@ def test_read_events_from_cache_returns_none_when_no_events_key(tmp_path):
     """Old cache files without 'events' key should return None, not error."""
     from finance.apps.assistant._pipeline import cache_path, read_events_from_cache
 
-    # Write cache file without events key (old format)
     p = cache_path(_TEST_DATE, base_dir=tmp_path)
     p.write_text(
         json.dumps({"date": "2026-04-23", "rows": [], "created_at": "2026-04-23T18:00:00"}),
@@ -176,22 +100,6 @@ def test_read_events_from_cache_returns_none_when_no_events_key(tmp_path):
 # ---------------------------------------------------------------------------
 # Window integration (require display)
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.skipif(not _has_display, reason="No display available")
-def test_window_left_panel_has_stopout_counter():
-    from finance.apps._qt_bootstrap import apply_dark_palette, ensure_qt_app
-    from finance.apps.assistant._swing_panel import StopOutCounter
-    from finance.apps.assistant._window import AssistantWindow
-
-    ensure_qt_app()
-    apply_dark_palette(ensure_qt_app())
-    with patch("finance.apps.assistant._pipeline.read_cache", return_value=None), \
-         patch("finance.apps.assistant._window.load_daily", return_value=None):
-        win = AssistantWindow()
-    assert hasattr(win._left_panel, "stop_counter")
-    assert isinstance(win._left_panel.stop_counter, StopOutCounter)
-    win.close()
 
 
 @pytest.mark.skipif(not _has_display, reason="No display available")

@@ -5,6 +5,7 @@ import pytest
 from finance.apps.assistant._data import (
     SLOPE_LOOKBACK,
     SLOPE_THRESHOLD,
+    SMA_FAST,
     SMA_LONG,
     SMA_SHORT,
     TrendStatus,
@@ -106,8 +107,10 @@ class TestComputeTrendStatus:
         df = _make_daily(closes)
         status = compute_trend_status("SPY", df)
 
+        expected_20 = np.mean(closes[-SMA_FAST:])
         expected_50 = np.mean(closes[-SMA_SHORT:])
         expected_200 = np.mean(closes[-SMA_LONG:])
+        assert status.sma_20 == pytest.approx(expected_20, rel=1e-6)
         assert status.sma_50 == pytest.approx(expected_50, rel=1e-6)
         assert status.sma_200 == pytest.approx(expected_200, rel=1e-6)
 
@@ -192,10 +195,13 @@ class TestComputeGoNogo:
         return TrendStatus(
             symbol="SPY",
             last_price=500.0,
+            sma_20=495.0,
             sma_50=490.0 if above_50 else 510.0,
             sma_200=480.0 if above_200 else 520.0,
+            price_above_20=True,
             price_above_50=above_50,
             price_above_200=above_200,
+            sma_20_slope="rising",
             sma_50_slope="rising",
             sma_200_slope=slope_200,
         )
