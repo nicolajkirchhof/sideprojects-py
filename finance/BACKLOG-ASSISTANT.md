@@ -412,18 +412,18 @@ filters by impact. Moves from analyst to assistant unchanged.
 
 ### TA-E3-S4: Market summary from Claude
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** a concise AI-generated market summary from today's emails,
 **So that** I understand themes, risks, and notable movers in 2 minutes.
 
 **Acceptance criteria:**
-- [ ] Uses `_claude.py:summarize_market()` (migrated from analyst)
-- [ ] Displayed as rendered markdown in a scrollable text area
-- [ ] Sections: Regime assessment, Active themes, Notable movers, Risks, Action items
-- [ ] "Generating..." placeholder while Claude API call runs in background
-- [ ] Cached per date — doesn't re-call Claude on refresh if already generated today
+- [x] Uses `_claude.py:summarize_market()` (migrated from analyst)
+- [x] Displayed as rendered markdown in a scrollable text area
+- [x] Sections: Regime assessment, Active themes, Notable movers, Risks, Action items
+- [x] "Generating..." placeholder while Claude API call runs in background
+- [x] Cached per date — doesn't re-call Claude on refresh if already generated today
 
 **Affected layers:** UI | Claude integration
 **Dependencies:** TA-E2-S2
@@ -432,20 +432,20 @@ Status: Pending
 
 ### TA-E3-S5: DRIFT regime and eligibility
 
-Status: Pending
+Status: Done
 
 **As an** investor running the DRIFT portfolio,
 **I want** to see the DRIFT regime tier and per-underlying eligibility in the assistant,
 **So that** I don't need a separate dashboard for DRIFT decisions.
 
 **Acceptance criteria:**
-- [ ] DRIFT regime tier: SPY drawdown × VIX → tier (Normal/Elevated/Correction/Deep/Bear) with BP%
-- [ ] Underlying registry: Directional + Neutral blocks with tier (Core/Selective/Optional)
-- [ ] Per-underlying checklist: IVP ≥ 50, Price vs 200d SMA, IV > HV → eligible/not
-- [ ] Structure recommendation: short put / PDS / iron condor per underlying based on conditions
-- [ ] BP guardrail: manual BP input, warning when > 50%
-- [ ] Collapsible section — DRIFT is secondary to swing for the evening prep workflow
-- [ ] If IBKR IV data unavailable, show "IBKR required" placeholder per underlying
+- [x] DRIFT regime tier: SPY drawdown × VIX → tier (Normal/Elevated/Correction/Deep/Bear) with BP%
+- [x] Underlying registry: Directional + Neutral blocks with tier (Core/Selective/Optional)
+- [x] Per-underlying checklist: IVP ≥ 50, Price vs 200d SMA, IV > HV → eligible/not
+- [x] Structure recommendation: short put / PDS / iron condor per underlying based on conditions
+- [x] BP guardrail: manual BP input, warning when > 50%
+- [x] Collapsible section — DRIFT is secondary to swing for the evening prep workflow
+- [x] If IBKR IV data unavailable, show "IBKR required" placeholder per underlying
 
 **Affected layers:** UI | Data
 **Dependencies:** TA-E2-S1
@@ -479,20 +479,20 @@ Status: Done
 
 ### TA-E4-S2: Filtering and search
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** to filter the watchlist by score range, tags, and sector,
 **So that** I can focus on relevant subsets (e.g., only `pead-long` or only Tech).
 
 **Acceptance criteria:**
-- [ ] Score range slider (0–100) filters table in real time
-- [ ] Direction filter: All / Long / Short
-- [ ] Tag filter: multi-select dropdown showing all active tags with counts
-- [ ] Sector filter: multi-select dropdown
-- [ ] Text search: symbol or sector substring match
-- [ ] Filters are AND-combined; active filters shown as chips above the table
-- [ ] "Reset filters" button clears all
+- [x] Score range slider (0–100) filters table in real time (implemented as two QSpinBox min/max — no range-slider dep)
+- [x] Direction filter: All / Long / Short
+- [x] Tag filter: multi-select dropdown showing all active tags with counts
+- [x] Sector filter: multi-select dropdown
+- [x] Text search: symbol or sector substring match
+- [x] Filters are AND-combined; active filters shown as chips above the table
+- [x] "Reset filters" button clears all
 
 **Affected layers:** UI
 **Dependencies:** TA-E4-S1
@@ -524,19 +524,19 @@ Right panel: detailed view of the selected candidate with Claude analysis.
 
 ### TA-E5-S1: Candidate detail view
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** to see the full scoring breakdown and AI reasoning for the selected candidate,
 **So that** I can make an informed decision about whether to include it in my watchlist.
 
 **Acceptance criteria:**
-- [ ] Header: Symbol, Direction, Price, Score, Tags
-- [ ] Dimension breakdown: 5 bars (0–weight each: 25/25/15/20/15) with sub-component detail expandable; hard gate violations shown with alert icon; partial data flagged
-- [ ] Scanner data: key fields from the CSV row (change %, RVOL, IV percentile, P/C ratio, earnings date)
-- [ ] AI reasoning section (from Claude): setup type, profit mechanism, thesis, entry/stop/target (absolute prices), confidence
-- [ ] "No reasoning available — click Analyze to generate" state when Claude hasn't been called yet
-- [ ] Updates when a different row is selected in the watchlist table
+- [x] Header: Symbol, Direction, Price, Score, Tags
+- [x] Dimension breakdown: 5 bars (0–weight each: 25/25/15/20/15) with sub-component detail expandable; hard gate violations shown with alert icon; partial data flagged
+- [x] Scanner data: key fields from the CSV row (change %, RVOL, IV percentile, P/C ratio, earnings date)
+- [x] AI reasoning section (from Claude): setup type, profit mechanism, thesis, entry/stop/target (absolute prices), confidence
+- [x] "No reasoning available — click Analyze to generate" state when Claude hasn't been called yet
+- [x] Updates when a different row is selected in the watchlist table
 
 **Affected layers:** UI
 **Dependencies:** TA-E4-S1
@@ -545,19 +545,19 @@ Status: Pending
 
 ### TA-E5-S2: On-demand Claude analysis for single candidate
 
-Status: Pending
+Status: Done
 
 **As a** swing trader,
 **I want** to request Claude analysis for a specific candidate by clicking a button,
 **So that** I can get AI reasoning for candidates outside the auto-analyzed top N.
 
 **Acceptance criteria:**
-- [ ] "Analyze" button in the detail panel
-- [ ] Calls Claude with the single candidate's data + market context (reuses `_claude.py` prompt)
-- [ ] Result cached per symbol per date — doesn't re-call if already analyzed today
-- [ ] Loading state while API call runs in background QThread
-- [ ] **Error handling:** exception stops the call and shows error dialog (same unified policy)
-- [ ] Top N candidates (configurable, default 10) are auto-analyzed during the pipeline run; others are on-demand only
+- [x] "Analyze" button in the detail panel
+- [x] Calls Claude with the single candidate's data + market context (reuses `_claude.py` prompt)
+- [x] Result cached per symbol per date — doesn't re-call if already analyzed today
+- [x] Loading state while API call runs in background QThread
+- [x] **Error handling:** exception stops the call and shows error dialog (same unified policy)
+- [x] Top N candidates (configurable, default 10) are auto-analyzed during the pipeline run; others are on-demand only
 
 **Affected layers:** UI | Claude integration
 **Dependencies:** TA-E5-S1, TA-E3-S4
@@ -605,6 +605,114 @@ Status: Done
 **Affected layers:** UI | File I/O
 **Dependencies:** TA-E4-S3
 **Notes:** TWS import via right-click watchlist → "Import/Export" → "Import Financial Instruments".
+
+---
+
+## Epic 7 — Trade Management Window
+
+### TA-E7-S1: Rules engine
+
+Status: Done
+
+**As a** swing trader,
+**I want** a pure-Python rules engine that evaluates open positions against trading rules,
+**So that** the app can surface actionable alerts without any UI coupling.
+
+**Acceptance criteria:**
+- [x] `Position` dataclass with symbol, type, direction, entry, current, initial_risk, pnl_dollars, days_held, underlying_trend
+- [x] `Alert` dataclass with severity (ok/warn/critical), rule name, message
+- [x] `rule_scale_out_1_5r` — fires warn at ≥ 1.5R
+- [x] `rule_stop_to_breakeven` — fires warn at ≥ 2.0R
+- [x] `rule_loser_held_too_long` — fires critical when days > max_days and P&L < 0
+- [x] `rule_option_underlying_broke_sma` — fires warn when long option underlying below 50d SMA
+- [x] `rule_option_regime_nogo` — fires warn when long option in NO-GO regime
+- [x] `evaluate_position()` runs all rules, sorts critical → warn → ok
+- [x] 24 TDD tests pass (`test_position_rules.py`)
+
+**Affected layers:** Rules engine (pure Python)
+**Dependencies:** None
+
+---
+
+### TA-E7-S2: Data clients
+
+Status: Done
+
+**As a** swing trader,
+**I want** best-effort API clients for Tradelog and IBKR positions,
+**So that** the trade management window can fetch live and historical data.
+
+**Acceptance criteria:**
+- [x] `_tradelog_client.py`: `fetch_closed_trades()`, `fetch_open_option_positions()`, `fetch_open_stock_positions()` — all return `[]` on error
+- [x] `_ibkr_positions.py`: `fetch_live_positions()` — connects to TWS, maps portfolio + stop orders to Position objects
+- [x] Stock 1R = stop_distance × shares (from STOP/TRAIL orders); fallback 8% of entry
+- [x] Option 1R = |avgCost| × |qty| × 100
+- [x] 11 TDD tests pass (`test_tradelog_client.py`)
+
+**Affected layers:** Data layer
+**Dependencies:** TA-E7-S1
+
+---
+
+### TA-E7-S3: Live positions tab
+
+Status: Done
+
+**As a** swing trader,
+**I want** a live positions table with R-multiples and rule alerts,
+**So that** I can see at a glance which positions need action.
+
+**Acceptance criteria:**
+- [x] `LivePositionsPanel` widget with table + alerts panel (left/right splitter)
+- [x] Columns: Symbol, Type, Dir, Entry, Current, P&L $, P&L R, Days, ⚠
+- [x] Row selection → populates AlertsPanel with evaluated rules
+- [x] "↻ Refresh" button + last-updated timestamp
+- [x] `PositionRefreshThread` runs in background, emits `positions_ready`
+- [x] `QTimer` auto-refresh every 5 minutes
+
+**Affected layers:** UI
+**Dependencies:** TA-E7-S1, TA-E7-S2
+
+---
+
+### TA-E7-S4: Trade review tab
+
+Status: Done
+
+**As a** swing trader,
+**I want** to review closed trades with rule flags and Claude narrative,
+**So that** I can identify patterns in my trade management behaviour.
+
+**Acceptance criteria:**
+- [x] `TradeReviewPanel` with trade list (left) + review pane (right)
+- [x] Loads closed trades from Tradelog API on open
+- [x] Evaluates each trade with rules engine using `XAtrMove` as 1R proxy
+- [x] Trade list shows symbol, date, P&L, flag icon for critical/warn trades
+- [x] "Get Claude Review" → `TradeReviewThread` → sends trade + rule flags to Claude
+- [x] Prompt: `_prompts/trade_review.md` — verdict, summary, what went well, lessons
+
+**Affected layers:** UI | Claude integration
+**Dependencies:** TA-E7-S1, TA-E7-S2
+
+---
+
+### TA-E7-S5: Window + launcher
+
+Status: Done
+
+**As a** swing trader,
+**I want** a standalone Position Management window launched from the main toolbar,
+**So that** I can manage trades without leaving the main assistant window.
+
+**Acceptance criteria:**
+- [x] `PositionManagementWindow` with two tabs: "Live Positions", "Trade Review"
+- [x] Accepts regime state from main window; propagates to child panels
+- [x] "Positions ↗" button in main toolbar opens/raises the window
+- [x] Geometry persisted via QSettings
+- [x] `tradelog.base_url` added to `config.yaml`
+
+**Affected layers:** UI | Config
+**Dependencies:** TA-E7-S3, TA-E7-S4
 
 ---
 
