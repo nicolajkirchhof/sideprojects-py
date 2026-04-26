@@ -10,35 +10,8 @@ namespace tradelog.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<string>(
-                name: "Symbol",
-                table: "Trades",
-                type: "nvarchar(60)",
-                maxLength: 60,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(20)",
-                oldMaxLength: 20);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Symbol",
-                table: "OptionPositions",
-                type: "nvarchar(60)",
-                maxLength: 60,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(20)",
-                oldMaxLength: 20);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "ContractId",
-                table: "OptionPositions",
-                type: "nvarchar(40)",
-                maxLength: 40,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(20)",
-                oldMaxLength: 20);
+            // AlterColumn operations omitted: SQLite ignores string length constraints,
+            // so nvarchar(20) → nvarchar(60) is a no-op at the storage level.
 
             // Reset staging data for clean Flex sync baseline
             migrationBuilder.Sql("DELETE FROM [OptionPositionsLogs];");
@@ -54,35 +27,7 @@ namespace tradelog.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<string>(
-                name: "Symbol",
-                table: "Trades",
-                type: "nvarchar(20)",
-                maxLength: 20,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(60)",
-                oldMaxLength: 60);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Symbol",
-                table: "OptionPositions",
-                type: "nvarchar(20)",
-                maxLength: 20,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(60)",
-                oldMaxLength: 60);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "ContractId",
-                table: "OptionPositions",
-                type: "nvarchar(20)",
-                maxLength: 20,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(40)",
-                oldMaxLength: 40);
+            // AlterColumn operations omitted: no-op on SQLite.
         }
     }
 }

@@ -20,13 +20,13 @@ namespace tradelog.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "Notes",
                 table: "StockPositions",
-                type: "nvarchar(max)",
+                type: "TEXT",
                 nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "Notes",
                 table: "OptionPositions",
-                type: "nvarchar(max)",
+                type: "TEXT",
                 nullable: true);
 
             migrationBuilder.CreateTable(
@@ -37,7 +37,7 @@ namespace tradelog.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     AccountId = table.Column<int>(type: "int", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Content = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Content = table.Column<string>(type: "TEXT", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -117,10 +117,10 @@ namespace tradelog.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     AccountId = table.Column<int>(type: "int", nullable: false),
                     Date = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Notes = table.Column<string>(type: "TEXT", nullable: true),
                     PnlImpact = table.Column<decimal>(type: "decimal(18,6)", precision: 18, scale: 6, nullable: true),
                     TradeId = table.Column<int>(type: "int", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Type = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {

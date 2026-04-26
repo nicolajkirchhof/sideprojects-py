@@ -38,6 +38,7 @@ dependencies = [
     "seaborn>=0.13.2",
     "sns>=0.1",
     "sqlalchemy>=2.0.45",
+    "pyodbc>=5.3.0",
 ]
 
 [dependency-groups]

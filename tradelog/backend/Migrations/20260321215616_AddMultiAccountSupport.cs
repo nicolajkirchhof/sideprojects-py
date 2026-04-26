@@ -86,39 +86,24 @@ namespace tradelog.Migrations
                 column: "IbkrAccountId",
                 unique: true);
 
-            // Backfill: create a default account and assign all existing records to it
+            // Backfill: create a default account and assign all existing records to it (SQLite)
             migrationBuilder.Sql(@"
-                -- Migrate IbkrConfig settings to the default Account (if IbkrConfigs had data)
-                IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'IbkrConfigs')
-                BEGIN
-                    INSERT INTO Accounts (IbkrAccountId, Name, Host, Port, ClientId, IsDefault, LastSyncAt, LastSyncResult)
-                    SELECT TOP 1 'UNKNOWN', 'Default', Host, Port, ClientId, 1, LastSyncAt, LastSyncResult
-                    FROM IbkrConfigs
-                END
+                INSERT INTO Accounts (IbkrAccountId, Name, Host, Port, ClientId, IsDefault, LastSyncAt, LastSyncResult)
+                SELECT 'UNKNOWN', 'Default', Host, Port, ClientId, 1, LastSyncAt, LastSyncResult
+                FROM IbkrConfigs LIMIT 1;
 
-                -- If no IbkrConfig existed but there is data, create a placeholder account
-                IF NOT EXISTS (SELECT 1 FROM Accounts)
-                   AND (EXISTS (SELECT 1 FROM Trades) OR EXISTS (SELECT 1 FROM OptionPositions))
-                BEGIN
-                    INSERT INTO Accounts (IbkrAccountId, Name, Host, Port, ClientId, IsDefault)
-                    VALUES ('UNKNOWN', 'Default', '127.0.0.1', 7497, 1, 1)
-                END
+                INSERT INTO Accounts (IbkrAccountId, Name, Host, Port, ClientId, IsDefault)
+                SELECT 'UNKNOWN', 'Default', '127.0.0.1', 7497, 1, 1
+                WHERE NOT EXISTS (SELECT 1 FROM Accounts)
+                  AND (EXISTS (SELECT 1 FROM Trades) OR EXISTS (SELECT 1 FROM OptionPositions));
 
-                -- Assign all existing records to the default account
-                IF EXISTS (SELECT 1 FROM Accounts)
-                BEGIN
-                    DECLARE @defaultAccountId INT = (SELECT TOP 1 Id FROM Accounts WHERE IsDefault = 1)
-                    IF @defaultAccountId IS NOT NULL
-                    BEGIN
-                        UPDATE Trades SET AccountId = @defaultAccountId WHERE AccountId = 0
-                        UPDATE TradeEntries SET AccountId = @defaultAccountId WHERE AccountId = 0
-                        UPDATE OptionPositions SET AccountId = @defaultAccountId WHERE AccountId = 0
-                        UPDATE OptionPositionsLogs SET AccountId = @defaultAccountId WHERE AccountId = 0
-                        UPDATE Capitals SET AccountId = @defaultAccountId WHERE AccountId = 0
-                        UPDATE WeeklyPreps SET AccountId = @defaultAccountId WHERE AccountId = 0
-                        UPDATE Portfolios SET AccountId = @defaultAccountId WHERE AccountId = 0
-                    END
-                END
+                UPDATE Trades SET AccountId = (SELECT Id FROM Accounts WHERE IsDefault = 1 LIMIT 1) WHERE AccountId = 0;
+                UPDATE TradeEntries SET AccountId = (SELECT Id FROM Accounts WHERE IsDefault = 1 LIMIT 1) WHERE AccountId = 0;
+                UPDATE OptionPositions SET AccountId = (SELECT Id FROM Accounts WHERE IsDefault = 1 LIMIT 1) WHERE AccountId = 0;
+                UPDATE OptionPositionsLogs SET AccountId = (SELECT Id FROM Accounts WHERE IsDefault = 1 LIMIT 1) WHERE AccountId = 0;
+                UPDATE Capitals SET AccountId = (SELECT Id FROM Accounts WHERE IsDefault = 1 LIMIT 1) WHERE AccountId = 0;
+                UPDATE WeeklyPreps SET AccountId = (SELECT Id FROM Accounts WHERE IsDefault = 1 LIMIT 1) WHERE AccountId = 0;
+                UPDATE Portfolios SET AccountId = (SELECT Id FROM Accounts WHERE IsDefault = 1 LIMIT 1) WHERE AccountId = 0;
             ");
 
             migrationBuilder.DropTable(

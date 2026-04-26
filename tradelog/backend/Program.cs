@@ -9,15 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Load user-secrets in all environments (not just Development)
 builder.Configuration.AddUserSecrets<Program>();
 
-// Inject the DB password from user-secrets into the connection string
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
-var passwordKey = $"DbPassword:{builder.Environment.EnvironmentName}";
-var dbPassword = builder.Configuration[passwordKey]
-    ?? throw new InvalidOperationException($"Missing user-secret '{passwordKey}'. Run: dotnet user-secrets set \"{passwordKey}\" \"<password>\"");
-connectionString = connectionString.Replace("{password}", dbPassword);
 
-builder.Services.AddDbContext<DataContext>(options =>
-    options.UseSqlServer(connectionString));
+builder.Services.AddDbContext<DataContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddControllers(options =>
 {
     options.ReturnHttpNotAcceptable = true;
@@ -59,7 +53,8 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<DataContext>();
-    context.Database.Migrate();
+
+    context.Database.EnsureCreated();
 
     // One-off backfill: populate LogCount for any open positions that have never
     // been computed. Runs synchronously after migrate so the column is coherent

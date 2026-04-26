@@ -45,52 +45,63 @@ namespace tradelog.Migrations
             var seedSql = @"
 -- Budget: LongTerm=0, Drift=1, Swing=2, Speculative=3
 INSERT INTO LookupValues (AccountId, Category, Name, SortOrder, IsActive)
-SELECT Id, 'Budget', v.Name, v.SortOrder, 1
-FROM Accounts CROSS APPLY (VALUES
-  (0,'Long-Term'),(1,'Drift'),(2,'Swing'),(3,'Speculative')
-) AS v(SortOrder, Name);
+SELECT a.Id, 'Budget', v.Name, v.SortOrder, 1
+FROM Accounts a, (
+  SELECT 0 AS SortOrder, 'Long-Term' AS Name UNION ALL
+  SELECT 1, 'Drift' UNION ALL SELECT 2, 'Swing' UNION ALL SELECT 3, 'Speculative'
+) v;
 
 -- Strategy: 0..9
 INSERT INTO LookupValues (AccountId, Category, Name, SortOrder, IsActive)
-SELECT Id, 'Strategy', v.Name, v.SortOrder, 1
-FROM Accounts CROSS APPLY (VALUES
-  (0,'Positive Drift'),(1,'Range Bound'),(2,'PEAD'),(3,'Breakout Momentum'),
-  (4,'IV Mean Reversion'),(5,'Sector Strength'),(6,'Sector Weakness'),
-  (7,'Green Line Breakout'),(8,'Slingshot'),(9,'Pre-Earnings')
-) AS v(SortOrder, Name);
+SELECT a.Id, 'Strategy', v.Name, v.SortOrder, 1
+FROM Accounts a, (
+  SELECT 0 AS SortOrder, 'Positive Drift' AS Name UNION ALL
+  SELECT 1, 'Range Bound' UNION ALL SELECT 2, 'PEAD' UNION ALL
+  SELECT 3, 'Breakout Momentum' UNION ALL SELECT 4, 'IV Mean Reversion' UNION ALL
+  SELECT 5, 'Sector Strength' UNION ALL SELECT 6, 'Sector Weakness' UNION ALL
+  SELECT 7, 'Green Line Breakout' UNION ALL SELECT 8, 'Slingshot' UNION ALL
+  SELECT 9, 'Pre-Earnings'
+) v;
 
 -- TypeOfTrade: 0..19
 INSERT INTO LookupValues (AccountId, Category, Name, SortOrder, IsActive)
-SELECT Id, 'TypeOfTrade', v.Name, v.SortOrder, 1
-FROM Accounts CROSS APPLY (VALUES
-  (0,'Short Strangle'),(1,'Short Put Spread'),(2,'Short Call Spread'),
-  (3,'Long Call'),(4,'Long Put'),(5,'Long Call Vertical'),
-  (6,'Long Put Vertical'),(7,'Synthetic Long'),(8,'Covered Strangle'),
-  (9,'Butterfly'),(10,'Ratio Diagonal Spread'),(11,'Long Strangle'),
-  (12,'Short Put'),(13,'Short Call'),(14,'Long Stock'),(15,'Short Stock'),
-  (16,'Iron Condor'),(17,'XYZ'),(18,'PMCC'),(19,'Calendar Spread')
-) AS v(SortOrder, Name);
+SELECT a.Id, 'TypeOfTrade', v.Name, v.SortOrder, 1
+FROM Accounts a, (
+  SELECT 0 AS SortOrder, 'Short Strangle' AS Name UNION ALL
+  SELECT 1, 'Short Put Spread' UNION ALL SELECT 2, 'Short Call Spread' UNION ALL
+  SELECT 3, 'Long Call' UNION ALL SELECT 4, 'Long Put' UNION ALL
+  SELECT 5, 'Long Call Vertical' UNION ALL SELECT 6, 'Long Put Vertical' UNION ALL
+  SELECT 7, 'Synthetic Long' UNION ALL SELECT 8, 'Covered Strangle' UNION ALL
+  SELECT 9, 'Butterfly' UNION ALL SELECT 10, 'Ratio Diagonal Spread' UNION ALL
+  SELECT 11, 'Long Strangle' UNION ALL SELECT 12, 'Short Put' UNION ALL
+  SELECT 13, 'Short Call' UNION ALL SELECT 14, 'Long Stock' UNION ALL
+  SELECT 15, 'Short Stock' UNION ALL SELECT 16, 'Iron Condor' UNION ALL
+  SELECT 17, 'XYZ' UNION ALL SELECT 18, 'PMCC' UNION ALL SELECT 19, 'Calendar Spread'
+) v;
 
 -- DirectionalBias: 0..2
 INSERT INTO LookupValues (AccountId, Category, Name, SortOrder, IsActive)
-SELECT Id, 'Directional', v.Name, v.SortOrder, 1
-FROM Accounts CROSS APPLY (VALUES
-  (0,'Bullish'),(1,'Neutral'),(2,'Bearish')
-) AS v(SortOrder, Name);
+SELECT a.Id, 'Directional', v.Name, v.SortOrder, 1
+FROM Accounts a, (
+  SELECT 0 AS SortOrder, 'Bullish' AS Name UNION ALL
+  SELECT 1, 'Neutral' UNION ALL SELECT 2, 'Bearish'
+) v;
 
 -- Timeframe: 0..2
 INSERT INTO LookupValues (AccountId, Category, Name, SortOrder, IsActive)
-SELECT Id, 'Timeframe', v.Name, v.SortOrder, 1
-FROM Accounts CROSS APPLY (VALUES
-  (0,'1 Day'),(1,'1 Week'),(2,'Delta Band')
-) AS v(SortOrder, Name);
+SELECT a.Id, 'Timeframe', v.Name, v.SortOrder, 1
+FROM Accounts a, (
+  SELECT 0 AS SortOrder, '1 Day' AS Name UNION ALL
+  SELECT 1, '1 Week' UNION ALL SELECT 2, 'Delta Band'
+) v;
 
 -- ManagementRating: 0..2
 INSERT INTO LookupValues (AccountId, Category, Name, SortOrder, IsActive)
-SELECT Id, 'ManagementRating', v.Name, v.SortOrder, 1
-FROM Accounts CROSS APPLY (VALUES
-  (0,'As Planned'),(1,'Minor Adjustments'),(2,'Rogue')
-) AS v(SortOrder, Name);
+SELECT a.Id, 'ManagementRating', v.Name, v.SortOrder, 1
+FROM Accounts a, (
+  SELECT 0 AS SortOrder, 'As Planned' AS Name UNION ALL
+  SELECT 1, 'Minor Adjustments' UNION ALL SELECT 2, 'Rogue'
+) v;
 ";
             migrationBuilder.Sql(seedSql);
 
@@ -98,55 +109,52 @@ FROM Accounts CROSS APPLY (VALUES
             // Trades table has: TypeOfTrade, Directional, Timeframe, Budget, Strategy, ManagementRating
             var remapSql = @"
 -- Trades.Budget
-UPDATE t SET t.Budget = lv.Id
-FROM Trades t
-INNER JOIN LookupValues lv ON lv.AccountId = t.AccountId
-  AND lv.Category = 'Budget' AND lv.SortOrder = t.Budget;
+UPDATE Trades SET Budget = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Trades.AccountId AND lv.Category = 'Budget' AND lv.SortOrder = Trades.Budget
+);
 
 -- Trades.Strategy
-UPDATE t SET t.Strategy = lv.Id
-FROM Trades t
-INNER JOIN LookupValues lv ON lv.AccountId = t.AccountId
-  AND lv.Category = 'Strategy' AND lv.SortOrder = t.Strategy;
+UPDATE Trades SET Strategy = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Trades.AccountId AND lv.Category = 'Strategy' AND lv.SortOrder = Trades.Strategy
+);
 
 -- Trades.TypeOfTrade
-UPDATE t SET t.TypeOfTrade = lv.Id
-FROM Trades t
-INNER JOIN LookupValues lv ON lv.AccountId = t.AccountId
-  AND lv.Category = 'TypeOfTrade' AND lv.SortOrder = t.TypeOfTrade;
+UPDATE Trades SET TypeOfTrade = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Trades.AccountId AND lv.Category = 'TypeOfTrade' AND lv.SortOrder = Trades.TypeOfTrade
+);
 
 -- Trades.Directional (nullable)
-UPDATE t SET t.Directional = lv.Id
-FROM Trades t
-INNER JOIN LookupValues lv ON lv.AccountId = t.AccountId
-  AND lv.Category = 'Directional' AND lv.SortOrder = t.Directional
-WHERE t.Directional IS NOT NULL;
+UPDATE Trades SET Directional = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Trades.AccountId AND lv.Category = 'Directional' AND lv.SortOrder = Trades.Directional
+) WHERE Directional IS NOT NULL;
 
 -- Trades.Timeframe (nullable)
-UPDATE t SET t.Timeframe = lv.Id
-FROM Trades t
-INNER JOIN LookupValues lv ON lv.AccountId = t.AccountId
-  AND lv.Category = 'Timeframe' AND lv.SortOrder = t.Timeframe
-WHERE t.Timeframe IS NOT NULL;
+UPDATE Trades SET Timeframe = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Trades.AccountId AND lv.Category = 'Timeframe' AND lv.SortOrder = Trades.Timeframe
+) WHERE Timeframe IS NOT NULL;
 
 -- Trades.ManagementRating (nullable)
-UPDATE t SET t.ManagementRating = lv.Id
-FROM Trades t
-INNER JOIN LookupValues lv ON lv.AccountId = t.AccountId
-  AND lv.Category = 'ManagementRating' AND lv.SortOrder = t.ManagementRating
-WHERE t.ManagementRating IS NOT NULL;
+UPDATE Trades SET ManagementRating = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Trades.AccountId AND lv.Category = 'ManagementRating' AND lv.SortOrder = Trades.ManagementRating
+) WHERE ManagementRating IS NOT NULL;
 
 -- Portfolios.Budget
-UPDATE p SET p.Budget = lv.Id
-FROM Portfolios p
-INNER JOIN LookupValues lv ON lv.AccountId = p.AccountId
-  AND lv.Category = 'Budget' AND lv.SortOrder = p.Budget;
+UPDATE Portfolios SET Budget = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Portfolios.AccountId AND lv.Category = 'Budget' AND lv.SortOrder = Portfolios.Budget
+);
 
 -- Portfolios.Strategy
-UPDATE p SET p.Strategy = lv.Id
-FROM Portfolios p
-INNER JOIN LookupValues lv ON lv.AccountId = p.AccountId
-  AND lv.Category = 'Strategy' AND lv.SortOrder = p.Strategy;
+UPDATE Portfolios SET Strategy = (
+  SELECT lv.Id FROM LookupValues lv
+  WHERE lv.AccountId = Portfolios.AccountId AND lv.Category = 'Strategy' AND lv.SortOrder = Portfolios.Strategy
+);
 ";
             migrationBuilder.Sql(remapSql);
         }

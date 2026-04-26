@@ -54,9 +54,9 @@ namespace tradelog.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     AccountId = table.Column<int>(type: "int", nullable: false),
                     TradeId = table.Column<int>(type: "int", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Type = table.Column<string>(type: "TEXT", nullable: false),
                     Date = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Notes = table.Column<string>(type: "TEXT", nullable: true),
                     PnlImpact = table.Column<decimal>(type: "decimal(18,6)", precision: 18, scale: 6, nullable: true)
                 },
                 constraints: table =>

@@ -159,6 +159,9 @@ flask_session/
 #NET
 obj/
 bin/
+tradelog/_data/*.db
+tradelog/_data/*.db-shm
+tradelog/_data/*.db-wal
 
 # Research source materials (keep summaries, exclude originals)
 *.pdf

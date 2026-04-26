@@ -112,7 +112,7 @@ namespace tradelog.Migrations
                     Symbol = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     Date = table.Column<DateTime>(type: "datetime2", nullable: false),
                     TypeOfTrade = table.Column<int>(type: "int", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Notes = table.Column<string>(type: "TEXT", nullable: true),
                     Directional = table.Column<int>(type: "int", nullable: true),
                     Timeframe = table.Column<int>(type: "int", nullable: true),
                     Budget = table.Column<int>(type: "int", nullable: false),
@@ -125,11 +125,11 @@ namespace tradelog.Migrations
                     InstitutionalSupport = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     GapPct = table.Column<decimal>(type: "decimal(18,6)", precision: 18, scale: 6, nullable: true),
                     XAtrMove = table.Column<decimal>(type: "decimal(18,6)", precision: 18, scale: 6, nullable: true),
-                    TaFaNotes = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IntendedManagement = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ActualManagement = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    TaFaNotes = table.Column<string>(type: "TEXT", nullable: true),
+                    IntendedManagement = table.Column<string>(type: "TEXT", nullable: true),
+                    ActualManagement = table.Column<string>(type: "TEXT", nullable: true),
                     ManagementRating = table.Column<int>(type: "int", nullable: true),
-                    Learnings = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    Learnings = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -163,17 +163,17 @@ namespace tradelog.Migrations
                     Date = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IndexBias = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     Breadth = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    NotableSectors = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    VolatilityNotes = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    OpenPositionsRequiringManagement = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    NotableSectors = table.Column<string>(type: "TEXT", nullable: true),
+                    VolatilityNotes = table.Column<string>(type: "TEXT", nullable: true),
+                    OpenPositionsRequiringManagement = table.Column<string>(type: "TEXT", nullable: true),
                     CurrentPortfolioRisk = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    PortfolioNotes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PortfolioNotes = table.Column<string>(type: "TEXT", nullable: true),
                     ScanningFor = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    IndexSectorPreference = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Watchlist = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Learnings = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    FocusForImprovement = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ExternalComments = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    IndexSectorPreference = table.Column<string>(type: "TEXT", nullable: true),
+                    Watchlist = table.Column<string>(type: "TEXT", nullable: true),
+                    Learnings = table.Column<string>(type: "TEXT", nullable: true),
+                    FocusForImprovement = table.Column<string>(type: "TEXT", nullable: true),
+                    ExternalComments = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
